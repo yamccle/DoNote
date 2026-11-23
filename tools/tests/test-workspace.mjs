@@ -203,7 +203,9 @@ async function testBackgroundSubtitles(page) {
     const file = { id: crypto.randomUUID(), name: 'QA background.webm', mime: blob.type, size: blob.size, addedAt: new Date().toISOString() };
     const recordId = crypto.randomUUID();
     const ownerId = appState.activeId;
-    await put({ id: recordId, type: 'resource', title: file.name, date: today(), status: '待读', tags: [], body: '', attachments: [file] },
+    // 预置旧字幕，验证“重新识别”时第一批新字幕也会从第一条开始同步翻译。
+    const seeded = [{ start: 0, end: 0.1, en: 'Old line', zh: '旧译' }];
+    await put({ id: recordId, type: 'resource', title: file.name, date: today(), status: '待读', tags: [], body: '', attachments: [file], videoSubtitles: { [file.id]: seeded } },
       [{ key: fileKey(ownerId, file.id), blob }]);
     const otherId = crypto.randomUUID();
     const next = structuredClone(appState);
@@ -214,6 +216,7 @@ async function testBackgroundSubtitles(page) {
     return { recordId, ownerId, otherId, fileId: file.id, prefix: btoa(String.fromCharCode(...firstBytes)) };
   });
 
+  page.once('dialog', dialog => dialog.accept());
   await page.locator('.video-subtitles [data-act="generate"]').click();
   await page.waitForFunction(() => qaRelease.messages.some(message => message.type === 'video-transcribe'));
   const request = await page.evaluate(() => qaRelease.messages.find(message => message.type === 'video-transcribe'));
@@ -243,11 +246,13 @@ async function testBackgroundSubtitles(page) {
     updateIdentity();
     render();
   }, otherId);
+  // 分两批识别，边识别边翻译：识别尚未结束时，两批英文字幕的中文都应逐条出现。
   await send({ type: 'video-transcribe-segments', segments: [{ start: 0, end: 0.2, en: 'Background result' }] });
-  // 边识别边翻译：识别尚未结束时，中文字幕已经逐条生成。
-  await page.waitForFunction(() => [...videoSubtitleJobs.values()].some(job => job.cues[0]?.zh === '译：Background result'));
+  await page.waitForFunction(() => [...videoSubtitleJobs.values()].some(job => job.cues[0]?.en === 'Background result' && job.cues[0]?.zh === '译：Background result'));
+  await send({ type: 'video-transcribe-segments', segments: [{ start: 0.25, end: 0.45, en: 'Second line' }] });
+  await page.waitForFunction(() => [...videoSubtitleJobs.values()].some(job => job.cues[1]?.en === 'Second line' && job.cues[1]?.zh === '译：Second line'));
   assert.equal(await page.evaluate(() => [...videoSubtitleJobs.values()].some(job => job.id)), true, '识别仍在进行时译文已出现');
-  await send({ type: 'video-transcribe-result', count: 1 });
+  await send({ type: 'video-transcribe-result', count: 2 });
   await page.waitForFunction(() => [...videoSubtitleJobs.values()].every(job => !job.kind));
   await page.reload();
   await page.waitForFunction(() => ready);
@@ -258,8 +263,11 @@ async function testBackgroundSubtitles(page) {
   }), { ownerId, recordId, fileId });
   assert.equal(state.activeId, otherId);
   assert.equal(state.otherRecords, 0);
-  assert.deepEqual(state.cues, [{ start: 0, end: 0.2, en: 'Background result', zh: '译：Background result' }]);
-  console.log('PASS background subtitles: range bytes, reopen progress, correct account, incremental translation and IndexedDB persistence');
+  assert.deepEqual(state.cues, [
+    { start: 0, end: 0.2, en: 'Background result', zh: '译：Background result' },
+    { start: 0.25, end: 0.45, en: 'Second line', zh: '译：Second line' }
+  ]);
+  console.log('PASS background subtitles: range bytes, reopen progress, correct account, incremental translation from the first cue and IndexedDB persistence');
 }
 
 const { chromium } = playwright();

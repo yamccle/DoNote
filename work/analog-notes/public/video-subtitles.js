@@ -141,9 +141,11 @@ function checkedAsrCues(values){
 function appendAsrCues(job,values){
  const cues=checkedAsrCues(values);
  if(!cues.length)return;
- const startIndex=job.cues.length;
+ // 重新生成时第一批结果会清空旧字幕：必须先重置，再取起始下标，
+ // 否则新字幕会按旧字幕的条数偏移，导致开头的字幕不进翻译队列。
  if(!job.recognitionCues)job.cues=[];
  job.recognitionCues=(job.recognitionCues||0)+cues.length;
+ const startIndex=job.cues.length;
  job.cues.push(...cues);
  videoSubtitleJobStatus(job,'正在识别，已显示 '+job.recognitionCues+' 条英文字幕'+videoSyncSuffix(job)+'…',job.percent);
  // 识别时同步翻译：新识别出的英文字幕立即进入翻译队列。
