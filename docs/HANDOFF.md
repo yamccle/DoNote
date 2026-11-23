@@ -28,8 +28,8 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 ## 当前状态（换手时）
 
 - 分支 `main`。发布使用的源码提交由修订标签定位。
-- 恢复基线 `source-baseline-recovered` 指向 `7913398`。当前发布标签 `r128` 指向 `69512f2`。
-- 最新发布 **r128 / 26.1128.0074**。在 `outputs/r128/` 提供完整包、增量包与 `DoNote-r128-release.json`。
+- 恢复基线 `source-baseline-recovered` 指向 `7913398`。当前发布标签 `r129` 指向 `5507f04`。
+- 最新发布 **r129 / 26.1129.0075**。在 `outputs/r129/` 提供完整包、增量包与 `DoNote-r129-release.json`。
 - 运行依赖锁定：`docs/releases/runtime-lock.json` 锁定 **r122**（`26.1121.0068`，SHA `6c4da1cf…`），**不要**改成 r123 及以后：发布包不含 `video-runtime/` 构建期资源，改了会构不出来
 - 工作树应为干净；脏树会被 `release.ps1` 直接拒绝
 
@@ -40,6 +40,7 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 | r125 | 视频字幕「识别时同步翻译」：识别一条翻一条，边看边有中文字幕；默认开，可在字幕面板关闭 |
 | r126 | 修复同步翻译漏掉**重新识别后的第一批**字幕（旧字幕条数把新字幕的入队下标带偏） |
 | r127 | 语音模型在线下载默认走 `hf-mirror.com`（原默认直连 huggingface.co，国内超时）；模型安装器加固（文件被占用不再中断）；模型说明按实测校正 |
+| r129 | 统一文件夹新建/导航/移动流程；长路径不挤出按钮、位置行可滚动、选择器输入框样式统一。 |
 | r128 | 总览新建时选择记录类型，栏目内直接新建。附件和关联资料移到正文前。切换类型保留输入，修复窄窗和夜间整页编辑。 |
 
 ### 模型包（不在 Git，发布用）
@@ -87,19 +88,19 @@ node tools/tests/test-workspace.mjs <候选 stage>/workspace 128
 
 字幕相关改动的额外自检：`tools/tests/test-workspace.mjs` 的 `testBackgroundSubtitles` 用模拟宿主（`qaRelease.post`）回放识别消息，并模拟 `subtitle-local:*` 离线翻译；改动消息契约或翻译流程时必须同步更新该测试。
 
-## 发布下一版（r129 示例）
+## 发布下一版（r130 示例）
 
 ```powershell
 $runtime  = '.\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'   # 运行依赖锁
-$previous = '.\outputs\r128\DoNote-Windows-x64-r128.zip'                   # 上一版完整包
+$previous = '.\outputs\r129\DoNote-Windows-x64-r129.zip'                   # 上一版完整包
 & $pwsh7 -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 `
-  -Revision r129 -Version 26.1129.0075 `
+  -Revision r130 -Version 26.1130.0076 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory outputs
 ```
 
-成功后在 `outputs/r129/` 得到三个文件。发布后按以下四步更新发布记录。
+成功后在 `outputs/r130/` 得到三个文件。发布后按以下四步更新发布记录。
 
-1. 打标签 `git tag -a r129 -m '…（版本）…' <本次构建用的提交>`。目标提交用发布记录里的 `sourceCommit`。
+1. 打标签 `git tag -a r130 -m '…（版本）…' <本次构建用的提交>`。目标提交用发布记录里的 `sourceCommit`。
 2. 更新 `docs/releases/runtime-lock.json` 的 `latestRelease`（运行依赖那段保持 r122 不动）
 3. 更新 `docs/releases/README.md` 的发布记录表与下一版命令示例
 4. `git add -A && git commit -m 'Record r129 release'`，确认 `git status` 干净。
@@ -110,7 +111,7 @@ $previous = '.\outputs\r128\DoNote-Windows-x64-r128.zip'                   # 上
 & $csc /nologo /target:exe /platform:x64 /codepage:65001 /main:UpdateProbe /out:$env:TEMP\UpdateProbe.exe `
   /reference:System.Web.Extensions.dll /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll `
   work/desktop/UpdateProbe.cs work/desktop/UpdatePackage.cs work/desktop/UpdateHost.cs
-& $env:TEMP\UpdateProbe.exe .\outputs\r128\DoNote-Windows-x64-r128.zip   # 输出 Verified package …
+& $env:TEMP\UpdateProbe.exe .\outputs\r129\DoNote-Windows-x64-r129.zip   # 输出 Verified package …
 ```
 
 ## 硬性约定（别踩）
@@ -118,7 +119,7 @@ $previous = '.\outputs\r128\DoNote-Windows-x64-r128.zip'                   # 上
 - **WebView2 来源必须是 `yams-one.example`**，否则现有 IndexedDB 打不开。
 - **互斥锁名 `YamsOne.Desktop`** 由宿主和更新器共用，升级时必须兼容。
 - 发布包**不含** `Data/` 与模型实体（只占位空目录）；更新器负责保护用户资料与模型。
-- `tools/release.ps1` 要求**工作树干净**，且 `-Version` 必须**大于**上一版完整包的版本，`-Revision` 形如 `r128`。
+- `tools/release.ps1` 要求**工作树干净**，且 `-Version` 必须**大于**上一版完整包的版本，`-Revision` 形如 `r130`。
 - `-RuntimeArchive` 只能传锁定文件里那个 r122 包（发布包不含构建期运行依赖）。
 - `work/desktop/*.ps1` 必须保存为 **UTF-8 带 BOM**：Windows PowerShell 5.1 读无 BOM 文件会把中文路径读成乱码（曾因此构建失败）。
 - 打 ZIP 必须用正斜杠条目（`package-release.ps1`）；用 `Compress-Archive` 会写反斜杠，更新器 `GetEntry` 找不到文件（r36 事故）。
@@ -142,7 +143,7 @@ cd H:\WorkSpace\Codex\2026-11-03\sites-plugin-sites-openai-curated-remote-2
 & $git log --oneline -8
 & $git tag -l
 & $git status --porcelain
-Get-ChildItem outputs\r128
+Get-ChildItem outputs\r129
 Get-ChildItem outputs -Filter 'DoNote-Models*'
 Get-Content docs\releases\runtime-lock.json
 & $git remote -v

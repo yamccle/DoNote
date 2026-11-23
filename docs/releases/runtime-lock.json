@@ -1,11 +1,11 @@
 {
-  "version": "26.1121.0068",
-  "archive": "DoNote-Windows-x64-2026-11-21-r122-交互优化.zip",
-  "sha256": "6c4da1cf8be194eed8b4b757bee3b2559168b1f6aa91e2145a51d5a2ceaf62c5",
-  "latestRelease": {
-    "revision": "r128",
-    "version": "26.1128.0074",
-    "archive": "DoNote-Windows-x64-r128.zip",
-    "sha256": "d35a4c6a6c66ea9e6ab5b7bc73e72c276df6b623043eb179f2f758c8d4a51ece"
-  }
+    "version":  "26.1121.0068",
+    "archive":  "DoNote-Windows-x64-2026-11-21-r122-交互优化.zip",
+    "sha256":  "6c4da1cf8be194eed8b4b757bee3b2559168b1f6aa91e2145a51d5a2ceaf62c5",
+    "latestRelease":  {
+                          "revision":  "r129",
+                          "version":  "26.1129.0075",
+                          "archive":  "DoNote-Windows-x64-r129.zip",
+                          "sha256":  "ce08006ea7270bdf20622371a520d4ea9aa557ef3afc4c49d0cff1e23c28b0fd"
+                      }
 }
