@@ -9,6 +9,7 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 ## 代码在哪
 
 - 仓库根：`H:\WorkSpace\Codex\2026-11-03\sites-plugin-sites-openai-curated-remote-2`
+- GitHub 远程：`https://github.com/yamccle/DoNote`（public，只含源码；模型包、发布包、`Data/`、`models/` 不进 Git）
 - 只纳入正式源码（见 `.gitignore`）。`outputs/`、`work/*stage*`、安装目录、`Data/`、`models/` 都在 Git 之外。
 
 目录速览：
@@ -143,6 +144,7 @@ cd H:\WorkSpace\Codex\2026-11-03\sites-plugin-sites-openai-curated-remote-2
 Get-ChildItem outputs\r127
 Get-ChildItem outputs -Filter 'DoNote-Models*'
 Get-Content docs\releases\runtime-lock.json
+& $git remote -v
 ```
 
 然后读 `AGENTS.md`、`work/desktop/AGENTS.md`、`work/analog-notes/public/AGENTS.md`、`tools/tests/AGENTS.md`、`docs/releases/README.md`。
