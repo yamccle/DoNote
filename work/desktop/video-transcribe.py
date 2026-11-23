@@ -11,7 +11,19 @@ WORKER_ROOT = os.path.dirname(os.path.abspath(__file__))
 RUNTIME_ROOT = os.path.dirname(WORKER_ROOT)
 APP_ROOT = os.path.dirname(RUNTIME_ROOT)
 
+def prepare_hf_endpoint():
+    # 国内网络通常无法直连 huggingface.co。默认使用社区镜像，可用环境变量覆盖：
+    #   DONOTE_HF_ENDPOINT=https://huggingface.co  或直接设置 HF_ENDPOINT。
+    if os.environ.get('HF_ENDPOINT'):
+        return
+    override = os.environ.get('DONOTE_HF_ENDPOINT', '').strip()
+    if override in ('official', 'huggingface'):
+        override = 'https://huggingface.co'
+    os.environ['HF_ENDPOINT'] = override or 'https://hf-mirror.com'
+
+
 def prepare_engine():
+    prepare_hf_endpoint()
     # Prefer the offline dependencies shipped alongside the application.
     bundled = os.path.join(RUNTIME_ROOT, 'dependencies')
     if os.path.isdir(bundled):
@@ -39,10 +51,14 @@ def prepare_engine():
     target = os.path.join(root, uuid.uuid4().hex)
     os.makedirs(target)
     from pip._internal.cli.main import main as pip_main
+    packages = ['faster-whisper==1.2.1', 'huggingface-hub==0.36.2', 'av<19']
     # pip logs go to stderr so stdout remains a single JSON result.
     with contextlib.redirect_stdout(sys.stderr):
-        code = pip_main(['install', '--disable-pip-version-check', '--no-input', '--target', target,
-                         'faster-whisper==1.2.1', 'huggingface-hub==0.36.2', 'av<19'])
+        code = pip_main(['install', '--disable-pip-version-check', '--no-input', '--target', target] + packages)
+        if code != 0:
+            # 部分网络无法直连 PyPI，退回到国内镜像重试一次。
+            code = pip_main(['install', '--disable-pip-version-check', '--no-input', '--target', target,
+                             '--index-url', 'https://pypi.tuna.tsinghua.edu.cn/simple'] + packages)
     if code != 0:
         raise RuntimeError('自动安装识别组件失败，请检查网络后重试。')
     sys.path.insert(0, target)
