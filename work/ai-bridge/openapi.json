@@ -1,0 +1,709 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Yam's ONE Assistant API",
+    "version": "1.0.0",
+    "description": "Assistant-scoped API for publishing tasks to a Yam's ONE offline workspace. The browser applies queued writes when connected."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:4318",
+      "description": "Local connector"
+    },
+    {
+      "url": "https://bridge.example.com",
+      "description": "Replace with your deployed HTTPS endpoint"
+    }
+  ],
+  "security": [
+    {
+      "assistantBearer": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "assistantBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Use an individual assistant token created in AI management."
+      }
+    },
+    "schemas": {
+      "CreateRecord": {
+        "type": "object",
+        "required": [
+          "type",
+          "title"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Category ID from GET /v1/workspace. Use resource for the library."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 150000
+          },
+          "author": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "fileIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "planStart": {
+            "type": "string",
+            "format": "date",
+            "description": "Start date for a plan. Supply with planEnd."
+          },
+          "planEnd": {
+            "type": "string",
+            "format": "date",
+            "description": "Inclusive end date for a plan."
+          },
+          "relatedResources": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "string"
+            },
+            "description": "Library resource IDs returned by search_records."
+          },
+          "folderPath": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "description": "Folder names from root to leaf. Missing folders are created. Use [] to move to unfiled."
+          },
+          "planTrack": {
+            "type": "string",
+            "enum": [
+              "",
+              "journal",
+              "study"
+            ],
+            "description": "Optional plan owner category: work journal or study journal. Empty clears it."
+          },
+          "literature": {
+            "$ref": "#/components/schemas/Literature",
+            "description": "Verified bibliographic fields; merges with existing literature on update."
+          }
+        }
+      },
+      "UpdateRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "baseUpdatedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "baseUpdatedAt": {
+            "type": "string",
+            "description": "Use updatedAt from the latest published record."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "author": {
+            "type": "string"
+          },
+          "appendBody": {
+            "type": "string",
+            "maxLength": 150000
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "fileIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "planStart": {
+            "type": "string",
+            "format": "date",
+            "description": "Start date for a plan. Supply with planEnd."
+          },
+          "planEnd": {
+            "type": "string",
+            "format": "date",
+            "description": "Inclusive end date for a plan."
+          },
+          "relatedResources": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "string"
+            },
+            "description": "Library resource IDs returned by search_records."
+          },
+          "folderPath": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "description": "Folder names from root to leaf. Missing folders are created. Use [] to move to unfiled."
+          },
+          "planTrack": {
+            "type": "string",
+            "enum": [
+              "",
+              "journal",
+              "study"
+            ],
+            "description": "Optional plan owner category: work journal or study journal. Empty clears it."
+          },
+          "literature": {
+            "$ref": "#/components/schemas/Literature",
+            "description": "Verified bibliographic fields; merges with existing literature on update."
+          }
+        }
+      },
+      "Task": {
+        "type": "object",
+        "required": [
+          "id",
+          "requestId",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "applied",
+              "rejected"
+            ]
+          },
+          "recordId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "File": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "size",
+          "sha256"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "DeleteRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "baseUpdatedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "baseUpdatedAt": {
+            "type": "string"
+          }
+        }
+      },
+      "Literature": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "doi": {
+            "type": "string",
+            "maxLength": 250
+          },
+          "publication": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "year": {
+            "type": "string",
+            "maxLength": 4
+          },
+          "abstract": {
+            "type": "string",
+            "maxLength": 12000
+          },
+          "translatedTitle": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "translatedAbstract": {
+            "type": "string",
+            "maxLength": 16000
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Connector information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workspace": {
+      "get": {
+        "operationId": "getWorkspace",
+        "description": "Requires records:read.",
+        "responses": {
+          "200": {
+            "description": "Categories, statuses and snapshot timestamp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/records": {
+      "get": {
+        "operationId": "listRecords",
+        "description": "Requires records:read. The response reflects the last snapshot published by the browser.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search title, author or tags"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Pagination offset"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "description": "Page size"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching snapshot records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tasks": {
+      "post": {
+        "operationId": "submitTask",
+        "description": "Requires records:create or records:update depending on operation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "operation",
+                      "requestId",
+                      "record"
+                    ],
+                    "properties": {
+                      "operation": {
+                        "const": "create"
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{1,100}$",
+                        "description": "Reuse this value when retrying exactly the same request."
+                      },
+                      "record": {
+                        "$ref": "#/components/schemas/CreateRecord"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "operation",
+                      "requestId",
+                      "record"
+                    ],
+                    "properties": {
+                      "operation": {
+                        "const": "update"
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{1,100}$",
+                        "description": "Reuse this value when retrying exactly the same request."
+                      },
+                      "record": {
+                        "$ref": "#/components/schemas/UpdateRecord"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "operation",
+                      "requestId",
+                      "record"
+                    ],
+                    "properties": {
+                      "operation": {
+                        "const": "delete"
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{1,100}$",
+                        "description": "Reuse this value when retrying exactly the same request."
+                      },
+                      "record": {
+                        "$ref": "#/components/schemas/DeleteRecord"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Previously completed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Queued for browser sync",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tasks/{id}": {
+      "get": {
+        "operationId": "getTaskStatus",
+        "description": "The assistant can poll tasks it submitted.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Task ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current task status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files": {
+      "post": {
+        "operationId": "uploadAttachment",
+        "description": "Requires files:write. Send raw file bytes (up to 100 MiB), then reference the returned ID in a task.",
+        "parameters": [
+          {
+            "name": "X-File-Name",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Percent-encoded original file name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "File stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files/{id}": {
+      "get": {
+        "operationId": "downloadAttachment",
+        "description": "Requires files:read. Only files in the connector workspace are available.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Connector file ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original file bytes",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/literature/search": {
+      "get": {
+        "summary": "Search Crossref metadata candidates without saving",
+        "parameters": [
+          {
+            "name": "title",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "doi",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candidates including title, author, materialType and literature. Verify before update_record."
+          }
+        }
+      }
+    }
+  }
+}

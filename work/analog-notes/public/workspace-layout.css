@@ -1,0 +1,244 @@
+/* The workbench uses rows and separators for information that is read in order. */
+.intro {
+  align-items: baseline;
+  gap: 12px 24px;
+  padding-bottom: 15px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid var(--line);
+}
+.intro h1, .library-mode #pageTitle {
+  margin: 0;
+  font-size: clamp(1.5rem, 1.36rem + .45vw, 2rem);
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: normal;
+  overflow-wrap: anywhere;
+}
+.intro p {margin-top: 5px; overflow-wrap: anywhere}
+.intro .date-block {
+  color: var(--muted);
+  font-size: var(--type-label);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.intro [hidden], .section-heading[hidden] {display: none}
+main[data-view]:not([data-view="all"]) .date-block {display: none}
+main[data-view="plan"] .section-heading:not([hidden]) {display: flex}
+.section-heading {margin-bottom: 10px}
+.section-heading h2 {font-size: 1.0625rem}
+#activeFilter:empty {display: none}
+.searchrow {align-items: center; margin-bottom: 14px}
+.searchrow :is(.searchbox, .secondary, .sort) {min-height: 36px}
+.searchrow .searchbox {border: 1px solid var(--field-border); border-radius: var(--radius-control)}
+.searchrow .sort {max-width: 160px}
+.searchrow .secondary {white-space: nowrap}
+.filterrow .tab {padding-inline: 8px}
+
+#workspaceRail {padding-block: 14px 10px}
+#workspaceRail button {border: 1px solid transparent; border-radius: var(--radius-control)}
+#workspaceRail button[aria-current] {
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface-soft));
+  color: var(--accent);
+  font-weight: 650;
+}
+#workspaceRail .rail-label {display: none}
+#workspaceRail .rail-initial {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface-soft));
+  color: var(--accent);
+  font-size: var(--type-label);
+  font-weight: 650;
+}
+#workspaceRail .rail-avatar {background: transparent; border-color: transparent}
+@media (min-width: 1120px) {
+  :root {--workspace-rail: 176px}
+  #workspaceRail {align-items: stretch; padding-inline: 10px; gap: 3px}
+  #workspaceRail button {
+    grid-template-columns: 20px minmax(0, 1fr);
+    justify-items: start;
+    gap: 9px;
+    width: 100%;
+    height: auto;
+    min-height: 38px;
+    padding: 5px 9px;
+    text-align: start;
+  }
+  #workspaceRail button[aria-current] {border-inline-start-color: var(--accent)}
+  #workspaceRail button.rail-avatar {
+    grid-template-columns: 28px minmax(0, 1fr);
+    width: 100%;
+    height: auto;
+    border-block-start-color: var(--line);
+    border-radius: 0;
+  }
+  #workspaceRail .rail-label {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--type-control);
+  }
+}
+
+#dashboardWidgets {margin-bottom: 22px}
+.dashboard-header {justify-content: space-between; margin-bottom: 2px}
+.dashboard-header h2 {font-size: var(--type-label); color: var(--muted)}
+.dashboard-header .secondary {border-color: transparent; background: transparent}
+.dashboard-header .secondary:hover {background: var(--surface-hover)}
+#dashboardTop {gap: 0; border-bottom: 1px solid var(--line)}
+#dashboardTop .dashboard-card {
+  flex: 1 1 146px;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding: 10px 14px;
+  background: transparent;
+}
+#dashboardTop .dashboard-interactive-slot {width: auto; flex: 1 1 min(100%, 270px)}
+#dashboardSide {gap: 0; margin-bottom: 14px}
+#dashboardSide .dashboard-card, .aside .box, #dashboardTop .dashboard-interactive {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding: 12px 0;
+  box-shadow: none;
+}
+.widget-label {color: var(--text-soft); font-size: var(--type-label)}
+.widget-label svg {color: var(--muted)}
+.widget-value {font-size: 1.375rem}
+#quickStartWidget .quick {min-height: 36px; padding: 3px 0; border-color: var(--line)}
+#quickStartWidget .quick b {flex: 1; min-width: 0; overflow-wrap: anywhere}
+#quickStartWidget .quickicon {background: transparent !important; color: var(--accent)}
+
+main[data-view] #records:not(.library-gallery,.achievement-display) .card {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding: 12px 8px;
+  margin: 0;
+  background: transparent;
+  box-shadow: none;
+}
+main[data-view] #records:not(.library-gallery,.achievement-display) .card:hover {background: var(--surface-hover)}
+#records .card h3 {font-size: 1rem; font-weight: 650; overflow-wrap: anywhere}
+#records .card :is(.status,.tag) {background: transparent; border: 0; border-radius: 0; padding: 0}
+#records .card .tags {gap: 8px}
+#records .card .card-excerpt {overflow-wrap: anywhere}
+#records .empty {
+  padding: 24px 8px;
+  text-align: start;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+#records .empty > svg {display: none}
+#records .empty h3 {margin: 0 0 8px}
+#records .empty p {margin: 0 0 12px}
+
+#records.library-gallery {display: block; border-bottom: 1px solid var(--line)}
+#records.library-gallery .card {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+}
+#records.library-gallery .card:hover {transform: none; background: var(--surface-hover)}
+#records.library-gallery .card.library-selected {
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  box-shadow: inset 2px 0 var(--accent);
+}
+.library-gallery .library-cover {
+  width: 66px;
+  height: 68px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--cover);
+}
+.library-gallery .library-cover > img {width: 100%; height: 100%; border-radius: 0; object-fit: cover}
+.library-gallery .cover-placeholder {color: var(--muted)}
+.library-gallery .cover-placeholder svg {width: 24px; height: 24px}
+.library-gallery .cover-progress {height: 3px}
+.library-gallery .cover-progress i {background: var(--accent)}
+.library-gallery .gallery-select {inset: 6px auto auto 6px}
+.library-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 18px;
+  min-width: 0;
+  padding: 0;
+}
+.library-gallery .library-card-body h3 {
+  grid-column: 1;
+  min-height: 0;
+  margin: 0;
+  display: block;
+  line-height: 1.45;
+}
+.library-item-meta, .library-card-tags {
+  grid-column: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  min-width: 0;
+  min-height: 0;
+  color: var(--muted);
+  font-size: var(--type-caption);
+  overflow-wrap: anywhere;
+}
+.library-item-meta span + span::before {content: "·"; padding-inline-end: 8px}
+.library-item-meta .library-subtitle-status {color: var(--accent)}
+.library-card-tags span {padding: 0; background: transparent; color: var(--text-soft)}
+.library-card-foot {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  margin: 0;
+  text-align: end;
+}
+.gallery-card-actions {gap: 5px}
+.gallery-card-actions button {padding: 5px 7px; border-radius: var(--radius-control)}
+.library-folder-card {border-radius: var(--radius-card); box-shadow: none}
+.library-toolbar-popup {border-radius: var(--radius-float); box-shadow: var(--shadow-float)}
+
+@media (max-width: 720px) {
+  .intro {flex-wrap: wrap; padding-bottom: 10px}
+  #dashboardTop .dashboard-card {flex-basis: 120px; padding-inline: 8px}
+  #records.library-gallery .card {grid-template-columns: 45px minmax(0, 1fr); gap: 9px; padding-inline: 4px}
+  .library-gallery .library-cover {width: 45px; height: 51px}
+  .library-card-body {display: flex; flex-direction: column; align-items: flex-start}
+  .library-card-foot {display: flex; justify-content: space-between; gap: 5px; width: 100%; text-align: start}
+}
+@media (max-width: 600px) {
+  .searchrow .searchbox {flex-basis: 100%}
+  .searchrow #resultCount {order: 1; flex-basis: 100%}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #workspaceRail button, #records .card {transition: background-color var(--motion-fast) var(--ease-standard)}
+}

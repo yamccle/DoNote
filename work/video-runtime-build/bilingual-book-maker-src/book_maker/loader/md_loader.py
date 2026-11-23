@@ -1,0 +1,843 @@
+import re
+import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from copy import copy
+from dataclasses import dataclass
+from pathlib import Path
+
+from rich import print
+from rich.markup import escape
+from tqdm import tqdm
+
+from book_maker.session_context import handoff_path
+from book_maker.translator.claude_batch import PARALLEL_SET_ASIDE
+from book_maker.utils import prompt_config_to_kwargs
+
+from .base_loader import BaseBookLoader
+from .helper import translate_list_or_singles
+
+
+@dataclass(frozen=True)
+class MarkdownBlock:
+    text: str
+    translatable: bool = True
+    # 1-based line in the source file where the block starts: the block's
+    # stable identity for anything reported back to the operator.
+    line: int | None = None
+
+
+@dataclass(frozen=True)
+class MarkdownBatch:
+    block_texts: list[str]
+    breadcrumb: str = ""
+    block_lines: tuple = ()
+
+
+class MarkdownBookLoader(BaseBookLoader):
+    # Set by the CLI from --quiet: no echo of each translated block.
+    quiet = False
+
+    def __init__(
+        self,
+        md_name,
+        model,
+        key,
+        resume,
+        language,
+        model_api_base=None,
+        is_test=False,
+        test_num=5,
+        prompt_config=None,
+        single_translate=False,
+        context_flag=False,
+        context_paragraph_limit=0,
+        context_mode="window",
+        context_compact_at=None,
+        no_context_compact=False,
+        glossary=None,
+        glossary_auto=None,
+        temperature=1.0,
+        source_lang="auto",
+        parallel_workers=1,
+    ) -> None:
+        self.md_name = md_name
+        # What --language asked for, as the translator is given it.
+        self.target_language = language
+        self.translate_model = model(
+            key,
+            language,
+            api_base=model_api_base,
+            temperature=temperature,
+            source_lang=source_lang,
+            context_flag=context_flag,
+            context_paragraph_limit=context_paragraph_limit,
+            context_mode=context_mode,
+            context_compact_at=context_compact_at,
+            no_context_compact=no_context_compact,
+            glossary=glossary,
+            glossary_auto=glossary_auto,
+            handoff_path=handoff_path(md_name),
+            **prompt_config_to_kwargs(prompt_config),
+        )
+        self.is_test = is_test
+        self.p_to_save = []
+        self.bilingual_result = []
+        self.bilingual_temp_result = []
+        self.test_num = test_num
+        self.batch_size = 10
+        self.md_chunk_char_budget = 2000
+        self.single_translate = single_translate
+        self.context_flag = context_flag
+        self.context_paragraph_limit = context_paragraph_limit
+        self.parallel_workers = max(1, parallel_workers)
+        self.md_blocks = []
+
+        try:
+            with open(f"{md_name}", encoding="utf-8") as f:
+                self.origin_book = f.read().splitlines()
+
+        except Exception as e:
+            raise Exception("can not load file") from e
+
+        self.resume = resume
+        self.bin_path = self._state_path(md_name)
+        if self.resume:
+            self.load_state()
+
+        self.process_markdown_content()
+
+    def _state_path(self, md_name):
+        """Where the resume file lives. A hidden sibling of the book.
+
+        Overridable so a caller that owns a directory layout of its own (the
+        PDF/Markdown bundle harness) can put the resume file where the rest
+        of its working state is, without this loader knowing about bundles.
+        """
+        return f"{Path(md_name).parent}/.{Path(md_name).stem}.temp.bin"
+
+    def _output_path(self):
+        """The bilingual Markdown this run writes, named after the source."""
+        return f"{Path(self.md_name).parent}/{Path(self.md_name).stem}_bilingual.md"
+
+    def _temp_output_path(self):
+        """Where an interrupted run leaves what it had translated so far."""
+        return (
+            f"{Path(self.md_name).parent}/"
+            f"{Path(self.md_name).stem}_bilingual_temp.txt"
+        )
+
+    def process_markdown_content(self):
+        """Split Markdown into translatable prose blocks and pass-through blocks."""
+        self.md_blocks = []
+        lines = self.origin_book
+        i = 0
+
+        if len(lines) >= 2 and lines[0].strip() == "---":
+            for end in range(1, len(lines)):
+                if lines[end].strip() == "---":
+                    self._append_block(lines[: end + 1], translatable=False, line=1)
+                    i = end + 1
+                    break
+
+        current_paragraph = []
+
+        def flush(end):
+            # A paragraph is the run of lines just before `end`, so its first
+            # line is known without tracking it separately.
+            self._flush_paragraph(
+                current_paragraph, line=end - len(current_paragraph) + 1
+            )
+
+        while i < len(lines):
+            line = lines[i]
+            stripped = line.strip()
+
+            if self._is_fence_start(stripped):
+                flush(i)
+                current_paragraph = []
+                start = i
+                fence_lines, i = self._collect_fence(lines, i)
+                self._append_block(fence_lines, translatable=False, line=start + 1)
+                continue
+
+            if self._is_table_start(lines, i):
+                flush(i)
+                current_paragraph = []
+                start = i
+                table_lines, i = self._collect_table(lines, i)
+                self._append_block(table_lines, translatable=False, line=start + 1)
+                continue
+
+            if self._is_pass_through_line(stripped) or (
+                self._is_thematic_break(stripped)
+                and not (current_paragraph and set(stripped) == {"-"})
+            ):
+                flush(i)
+                current_paragraph = []
+                self._append_block([line], translatable=False, line=i + 1)
+                i += 1
+                continue
+
+            if not line.strip():
+                if current_paragraph:
+                    flush(i)
+                    current_paragraph = []
+            elif line.strip().startswith("#"):
+                if current_paragraph:
+                    flush(i)
+                    current_paragraph = []
+                self._append_block([line], translatable=True, line=i + 1)
+            else:
+                current_paragraph.append(line)
+            i += 1
+
+        if current_paragraph:
+            flush(i)
+
+    def _append_block(self, lines, translatable=True, line=None):
+        text = "\n".join(lines)
+        block = MarkdownBlock(text=text, translatable=translatable, line=line)
+        self.md_blocks.append(block)
+
+    def _flush_paragraph(self, current_paragraph, line=None):
+        if current_paragraph:
+            self._append_block(current_paragraph, translatable=True, line=line)
+
+    @staticmethod
+    def _is_fence_start(stripped_line):
+        return bool(re.match(r"^(`{3,}|~{3,})", stripped_line))
+
+    def _collect_fence(self, lines, start):
+        opening = lines[start].strip()
+        marker = re.match(r"^(`{3,}|~{3,})", opening).group(1)
+        fence_char = marker[0]
+        min_len = len(marker)
+        fence_lines = [lines[start]]
+        i = start + 1
+
+        while i < len(lines):
+            fence_lines.append(lines[i])
+            stripped = lines[i].strip()
+            if re.match(rf"^{re.escape(fence_char)}{{{min_len},}}\s*$", stripped):
+                i += 1
+                break
+            i += 1
+
+        return fence_lines, i
+
+    @staticmethod
+    def _is_table_separator(line):
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) < 2:
+            return False
+        return all(re.match(r"^:?-{3,}:?$", cell or "") for cell in cells)
+
+    def _is_table_start(self, lines, index):
+        if "|" not in lines[index]:
+            return False
+        return index + 1 < len(lines) and self._is_table_separator(lines[index + 1])
+
+    def _collect_table(self, lines, start):
+        table_lines = [lines[start], lines[start + 1]]
+        i = start + 2
+        while i < len(lines) and "|" in lines[i] and lines[i].strip():
+            table_lines.append(lines[i])
+            i += 1
+        return table_lines, i
+
+    @staticmethod
+    def _is_pass_through_line(stripped_line):
+        return (
+            bool(re.match(r"^\{\d+\}-+$", stripped_line))
+            or stripped_line.startswith("![")
+            or bool(re.match(r"^<!--.*-->$", stripped_line))
+        )
+
+    @staticmethod
+    def _is_thematic_break(stripped_line):
+        # A rule has nothing to translate, and its echo inside a translation
+        # div opens a YAML metadata block for Pandoc. A bare run of `-` right
+        # under a paragraph line is that line's setext underline instead.
+        return bool(re.fullmatch(r"([-*_])( *\1){2,} *", stripped_line))
+
+    @staticmethod
+    def _is_special_text(text):
+        stripped = text.strip()
+        return stripped.isdigit() or len(stripped) == 0
+
+    def _make_new_book(self, book):
+        pass
+
+    def make_bilingual_book(self):
+        try:
+            self.bilingual_result = self._render_bilingual_result(
+                translate_missing=True
+            )
+
+            out_path = self._output_path()
+            self.save_file(out_path, self.bilingual_result)
+            self.announce_saved_book(out_path)
+
+        except KeyboardInterrupt:
+            print("Interrupted. Saving progress so you can resume later.")
+            self._save_progress()
+            self._save_temp_book()
+            sys.exit(0)
+        except Exception as e:
+            print(f"Error: {e}")
+            print("Saving progress so you can resume later.")
+            self._save_progress()
+            self._save_temp_book()
+            raise
+
+    def _render_bilingual_result(self, translate_missing):
+        render_items, batches = self._enumerate_render_items()
+        translated_batches = self._translate_batches(batches, translate_missing)
+        return self._assemble_render_items(render_items, batches, translated_batches)
+
+    def _enumerate_render_items(self):
+        render_items = []
+        batches = []
+        batch = []
+        batch_breadcrumb = ""
+        heading_stack = []
+        translated_count = 0
+        stop_after_batch = False
+
+        def flush_batch():
+            nonlocal batch, batch_breadcrumb, translated_count, stop_after_batch
+            if not batch:
+                return
+
+            batch_texts = [block.text for block in batch]
+            batch_text = "\n\n".join(batch_texts)
+            if self._is_special_text(batch_text):
+                batch = []
+                batch_breadcrumb = ""
+                return
+
+            batch_index = len(batches)
+            batches.append(
+                MarkdownBatch(
+                    batch_texts,
+                    batch_breadcrumb,
+                    tuple(block.line for block in batch),
+                )
+            )
+            render_items.append(("batch", batch_index))
+
+            translated_count += len(batch)
+            batch = []
+            batch_breadcrumb = ""
+            if self.is_test and translated_count >= self.test_num:
+                stop_after_batch = True
+
+        for block in self.md_blocks:
+            if stop_after_batch:
+                break
+
+            if not block.translatable or self._is_special_text(block.text):
+                flush_batch()
+                render_items.append(("text", block.text))
+                continue
+
+            if self.is_test and translated_count + len(batch) >= self.test_num:
+                flush_batch()
+                if stop_after_batch:
+                    break
+
+            if self._is_heading(block.text):
+                flush_batch()
+                heading_stack = self._update_heading_stack(heading_stack, block.text)
+            elif self._would_exceed_chunk_budget(batch, block):
+                flush_batch()
+
+            if not batch:
+                batch_breadcrumb = self._breadcrumb(heading_stack)
+
+            batch.append(block)
+            remaining = self.test_num - translated_count if self.is_test else None
+            target_size = (
+                min(self.batch_size, remaining) if remaining else self.batch_size
+            )
+            full = (
+                len(batch) >= target_size
+                or self._batch_char_count(batch) >= self.md_chunk_char_budget
+            )
+            if full and not self._batch_is_heading_only(batch):
+                flush_batch()
+
+        if not stop_after_batch:
+            flush_batch()
+
+        return render_items, batches
+
+    def _translate_batches(self, batches, translate_missing):
+        results = [None] * len(batches)
+
+        for index, batch in enumerate(batches):
+            if index < len(self.p_to_save):
+                results[index] = self._coerce_saved_batch(
+                    self.p_to_save[index],
+                    batch.block_texts,
+                )
+
+        if not translate_missing:
+            return [result if result is not None else [] for result in results]
+
+        pending = [
+            (index, batch)
+            for index, batch in enumerate(batches)
+            if results[index] is None
+        ]
+        if not pending:
+            return results
+        batched = getattr(self.translate_model, "batch_queue", None) is not None
+        if batched:
+            self._run_message_batch(pending)
+        # A batch replay answers from stored results on one thread: the shared
+        # translator swaps its prompt per request, and a worker entering
+        # mid-swap would build a body the batch never saw and pay for it live.
+        workers = 1 if batched else self.parallel_workers
+        if batched and self.parallel_workers > 1:
+            print(PARALLEL_SET_ASIDE)
+
+        pbar = tqdm(
+            total=len(batches),
+            initial=len(batches) - len(pending),
+            unit="batch",
+            leave=not self.is_test,
+            disable=self.quiet,
+        )
+        report_lock = threading.Lock()
+
+        def report(batch, translated):
+            # Lock so parallel workers emit each batch as one uninterleaved
+            # block; also serializes pbar updates.
+            with report_lock:
+                for source, target in zip(
+                    batch.block_texts, () if self.quiet else translated
+                ):
+                    # escape(): Markdown text is full of [bracketed] spans
+                    # that rich would otherwise eat or crash on as markup.
+                    print(escape(source))
+                    print(f"[bold green]{escape(target)}[/bold green]")
+                    print()
+                pbar.update(1)
+
+        try:
+            if self.context_flag and workers > 1:
+                self._translate_sections_parallel(pending, results, report)
+            elif self.context_flag or min(workers, len(pending)) <= 1:
+                for index, batch in pending:
+                    results[index] = self._translate_batch(
+                        batch.block_texts,
+                        batch.breadcrumb,
+                    )
+                    report(batch, results[index])
+            else:
+                effective_workers = min(workers, len(pending))
+                with ThreadPoolExecutor(max_workers=effective_workers) as executor:
+                    futures = {
+                        executor.submit(
+                            self._translate_batch,
+                            batch.block_texts,
+                            batch.breadcrumb,
+                        ): (index, batch)
+                        for index, batch in pending
+                    }
+                    for future in as_completed(futures):
+                        index, batch = futures[future]
+                        results[index] = future.result()
+                        report(batch, results[index])
+        except (KeyboardInterrupt, Exception):
+            self.p_to_save = self._contiguous_results(results)
+            raise
+        finally:
+            pbar.close()
+
+        self.p_to_save = self._contiguous_results(results)
+        return results
+
+    def _run_message_batch(self, pending):
+        """`--batch-api`: record every pending request, then batch them.
+
+        The collection pass walks the same `_translate_batch` the live run
+        does, so each request is built exactly as it will be replayed; the
+        translator records it and raises `BatchPending` instead of sending
+        it (`claude_batch`). Nothing is written to the book or the resume
+        state here. Once the batch has ended, the caller translates as
+        usual and every recorded request is answered from the batch.
+        """
+        from book_maker.translator.claude_batch import BatchPending
+
+        queue = self.translate_model.batch_queue
+        queue.mode = queue.COLLECT
+        for _, batch in pending:
+            try:
+                self._translate_batch(batch.block_texts, batch.breadcrumb)
+            except BatchPending:
+                continue
+        print(
+            f"--batch-api: {len(queue.pending)} new request(s) for "
+            f"{len(pending)} untranslated batch(es)"
+        )
+        self.translate_model.run_batch()
+        good, bad = queue.summary()
+        if bad:
+            print(
+                f"[yellow]--batch-api: {bad} request(s) came back without a "
+                f"usable translation; they are sent live now[/yellow]"
+            )
+
+    def _translate_sections_parallel(self, pending, results, report):
+        """Translate independent Markdown sections concurrently while keeping
+        per-section context intact.
+
+        Used when both --use_context and --parallel-workers are active. Pending
+        batches are grouped into heading-delimited sections; each section is
+        translated sequentially (so context accumulates in reading order) on
+        its own context-isolated translator clone, and sections run in
+        parallel. `results` is filled by batch index, so output order is
+        preserved regardless of completion order.
+        """
+        sections = self._group_sections(pending)
+        effective_workers = min(self.parallel_workers, len(sections))
+
+        if effective_workers <= 1:
+            for section in sections:
+                self._translate_section(section, results, report)
+            return
+
+        print(
+            f"Markdown parallel context: {len(sections)} sections "
+            f"across {effective_workers} workers."
+        )
+        # Largest-first submission so the longest sequential chain starts
+        # immediately (minimizes makespan); results are index-addressed, so
+        # submission order never affects output order.
+        ordered = sorted(sections, key=self._section_chars, reverse=True)
+        with ThreadPoolExecutor(max_workers=effective_workers) as executor:
+            futures = [
+                executor.submit(self._translate_section, section, results, report)
+                for section in ordered
+            ]
+            for future in as_completed(futures):
+                future.result()
+
+    def _group_sections(self, pending):
+        """Partition pending (index, batch) items into contiguous sections
+        that balance worker occupancy against context coherence.
+
+        Batches are first grouped into the finest heading-delimited units
+        (full breadcrumb). Heading units are atomic: context accumulates in
+        reading order inside them and never splits below a heading.
+        Breadcrumb-less runs (documents without headings) larger than one
+        worker share are windowed by char budget so they parallelize too.
+        Contiguous units are then coalesced greedily up to one worker share
+        (total chars / workers): small neighbors run sequentially on one
+        translator clone with context carried across them, while big units
+        keep a worker to themselves.
+        """
+        units = []
+        current = []
+        current_key = None
+        for index, batch in pending:
+            key = batch.breadcrumb or ""
+            if current and key != current_key:
+                units.append((current_key, current))
+                current = []
+            current.append((index, batch))
+            current_key = key
+        if current:
+            units.append((current_key, current))
+
+        total_chars = sum(self._section_chars(unit) for _, unit in units)
+        share = max(1, total_chars // max(1, self.parallel_workers))
+
+        windowed = []
+        for key, unit in units:
+            if key == "" and self._section_chars(unit) > share:
+                windowed.extend(self._window_entries(unit, share))
+            else:
+                windowed.append(unit)
+
+        sections = []
+        section = []
+        section_chars = 0
+        for unit in windowed:
+            unit_chars = self._section_chars(unit)
+            if section and section_chars + unit_chars > share:
+                sections.append(section)
+                section = []
+                section_chars = 0
+            section.extend(unit)
+            section_chars += unit_chars
+        if section:
+            sections.append(section)
+        return sections
+
+    @classmethod
+    def _section_chars(cls, entries):
+        return sum(cls._entry_chars(entry) for entry in entries)
+
+    @staticmethod
+    def _entry_chars(entry):
+        _, batch = entry
+        return sum(len(text) for text in batch.block_texts)
+
+    @classmethod
+    def _window_entries(cls, entries, share):
+        """Chunk a contiguous run of (index, batch) entries into windows of
+        roughly one worker share each; every window keeps at least one entry."""
+        windows = []
+        window = []
+        window_chars = 0
+        for entry in entries:
+            entry_chars = cls._entry_chars(entry)
+            if window and window_chars + entry_chars > share:
+                windows.append(window)
+                window = []
+                window_chars = 0
+            window.append(entry)
+            window_chars += entry_chars
+        if window:
+            windows.append(window)
+        return windows
+
+    def _translate_section(self, section, results, report):
+        """Translate one section's batches in reading order on an isolated
+        translator clone, writing each finished batch into `results` so an
+        interrupt only loses in-flight batches, not the whole section. Each
+        section owns a distinct set of indexes, so writes never collide."""
+        translator = self._clone_translator_for_context()
+        for index, batch in section:
+            results[index] = self._translate_batch(
+                batch.block_texts,
+                batch.breadcrumb,
+                translator=translator,
+            )
+            report(batch, results[index])
+
+    def _clone_translator_for_context(self):
+        """Return a translator with its own context buffers so parallel
+        sections do not share or clobber each other's context. Falls back to
+        the shared model if the translator cannot be cloned."""
+        if self.parallel_workers <= 1:
+            return self.translate_model
+        try:
+            clone = copy(self.translate_model)
+        except Exception:
+            return self.translate_model
+        if hasattr(clone, "context_list"):
+            clone.context_list = []
+        if hasattr(clone, "context_translated_list"):
+            clone.context_translated_list = []
+        if hasattr(clone, "create_convo"):
+            # gemini keeps its context in the chat object, not those lists;
+            # a shallow copy would share one conversation across sections,
+            # which is a thread race and cross-section context bleed. The
+            # epub loader's clone does the same.
+            clone.create_convo()
+        return clone
+
+    def _assemble_render_items(self, render_items, batches, translated_batches):
+        result = []
+        for item_type, value in render_items:
+            if item_type == "text":
+                self._emit_pass_through(result, value)
+                continue
+
+            batch = batches[value]
+            translated_texts = translated_batches[value] or []
+            batch_text = "\n\n".join(batch.block_texts)
+
+            if translated_texts:
+                source_items = (
+                    batch.block_texts
+                    if len(translated_texts) == len(batch.block_texts)
+                    else [batch_text]
+                )
+                for source_text, translated_text in zip(source_items, translated_texts):
+                    self._emit_pair(result, source_text, translated_text)
+            elif not self.single_translate:
+                self._emit_untranslated(result, batch_text)
+
+        return result
+
+    # The three places a rendered file gets its pieces. Split out so a
+    # reading-edition subclass can decide how a pair is laid out (blank
+    # lines, heading identifiers, a language region around the translation)
+    # without reimplementing the walk that pairs source with target — the
+    # one thing that must never be guessed back from the rendered text.
+    def _emit_pass_through(self, result, text):
+        """A block that was never sent to the model, once, as it stood."""
+        result.append(text)
+
+    def _emit_pair(self, result, source_text, translated_text):
+        """One source block and the translation that belongs to it."""
+        if not self.single_translate:
+            result.append(source_text)
+        result.append(translated_text)
+
+    def _emit_untranslated(self, result, source_text):
+        """A batch with no translation yet: the source keeps its place."""
+        result.append(source_text)
+
+    @staticmethod
+    def _contiguous_results(results):
+        contiguous = []
+        for result in results:
+            if result is None:
+                break
+            contiguous.append(result)
+        return contiguous
+
+    def _translate_batch(self, batch_texts, breadcrumb="", translator=None):
+        translator = translator if translator is not None else self.translate_model
+        protected_items = []
+        replacement_items = []
+        for text in batch_texts:
+            protected_text, replacements = self._protect_inline_markdown(text)
+            protected_items.append(protected_text)
+            replacement_items.append(replacements)
+
+        try:
+            translated_items = self._with_breadcrumb_context(
+                breadcrumb,
+                lambda: self._translate_list(protected_items, translator),
+                translator,
+            )
+            if len(translated_items) != len(batch_texts):
+                raise ValueError(
+                    f"Expected {len(batch_texts)} translations, got {len(translated_items)}"
+                )
+            return [
+                self._restore_inline_markdown(translated_text, replacements)
+                for translated_text, replacements in zip(
+                    translated_items,
+                    replacement_items,
+                )
+            ]
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            print(f"Translation failed: {e}")
+            raise Exception("Something is wrong when translating") from e
+
+    def _translate_list(self, texts, translator=None):
+        translator = translator if translator is not None else self.translate_model
+        return translate_list_or_singles(translator, texts)
+
+    def _coerce_saved_batch(self, saved_batch, batch_texts):
+        if isinstance(saved_batch, list):
+            return [str(item) for item in saved_batch]
+        if len(batch_texts) == 1:
+            return [str(saved_batch)]
+
+        parts = str(saved_batch).split("\n\n")
+        if len(parts) == len(batch_texts):
+            return parts
+        return [str(saved_batch)]
+
+    @staticmethod
+    def _is_heading(text):
+        return bool(re.match(r"^#{1,6}\s+\S", text.strip()))
+
+    @staticmethod
+    def _heading_level(text):
+        return len(re.match(r"^(#{1,6})", text.strip()).group(1))
+
+    @staticmethod
+    def _heading_label(text):
+        label = re.sub(r"^#{1,6}\s+", "", text.strip())
+        label = re.sub(r"[ \t]*\{#[A-Za-z0-9_-]+\}[ \t]*$", "", label)
+        return label.strip("*_` ")
+
+    def _update_heading_stack(self, heading_stack, heading_text):
+        level = self._heading_level(heading_text)
+        label = self._heading_label(heading_text)
+        next_stack = heading_stack[: level - 1]
+        next_stack.append(label)
+        return next_stack
+
+    @staticmethod
+    def _breadcrumb(heading_stack):
+        return " > ".join(item for item in heading_stack if item)
+
+    @staticmethod
+    def _batch_char_count(batch):
+        return sum(len(block.text) for block in batch)
+
+    def _would_exceed_chunk_budget(self, batch, next_block):
+        if not batch or self._batch_is_heading_only(batch):
+            return False
+        return (
+            self._batch_char_count(batch) + len(next_block.text)
+            > self.md_chunk_char_budget
+        )
+
+    def _batch_is_heading_only(self, batch):
+        return len(batch) == 1 and self._is_heading(batch[0].text)
+
+    def _with_breadcrumb_context(self, breadcrumb, translate, translator=None):
+        translator = translator if translator is not None else self.translate_model
+        if not self.context_flag or not breadcrumb:
+            return translate()
+        if not getattr(translator, "context_flag", False):
+            return translate()
+
+        context_list = getattr(translator, "context_list", None)
+        translated_list = getattr(translator, "context_translated_list", None)
+        if not isinstance(context_list, list) or not isinstance(translated_list, list):
+            return translate()
+
+        context_marker = f"Markdown section context: {breadcrumb}"
+        translated_marker = "Context acknowledged."
+        context_list.append(context_marker)
+        translated_list.append(translated_marker)
+        try:
+            return translate()
+        finally:
+            if context_marker in context_list:
+                context_list.remove(context_marker)
+            if translated_marker in translated_list:
+                translated_list.remove(translated_marker)
+
+    @staticmethod
+    def _protect_inline_markdown(text):
+        replacements = {}
+
+        def replace(match):
+            token = f"@@BBM_MD_PROTECT_{len(replacements)}@@"
+            replacements[token] = match.group(0)
+            return token
+
+        patterns = [
+            (r"!\[[^\]\n]*\]\([^)]+\)", 0),
+            (r"\[[^\]\n]+\]\([^)]+\)", 0),
+            (r"(?<!`)`[^`\n]+`(?!`)", 0),
+            (r"<https?://[^>\s]+>", 0),
+            (r"[ \t]*\{#[A-Za-z0-9_-]+\}[ \t]*$", re.MULTILINE),
+        ]
+        protected = text
+        for pattern, flags in patterns:
+            protected = re.sub(pattern, replace, protected, flags=flags)
+        return protected, replacements
+
+    @staticmethod
+    def _restore_inline_markdown(text, replacements):
+        # Newest first: a later pass can wrap an earlier token, as the reading
+        # edition's maths does around a "link" inside a formula
+        # (`$[(v_0 + \Delta v)/c](2Mc \Delta v/r)$`, Purcell 261026).
+        for token, original in reversed(replacements.items()):
+            text = text.replace(token, original)
+        return text
+
+    def _save_temp_book(self):
+        self.bilingual_temp_result = self._render_bilingual_result(
+            translate_missing=False
+        )
+
+        self.save_file(self._temp_output_path(), self.bilingual_temp_result)

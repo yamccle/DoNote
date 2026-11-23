@@ -1,0 +1,532 @@
+'use strict';
+
+function wellFormedText(value){
+ const text=String(value??'').replace(/\0/g,'');
+ let clean='';
+ for(let index=0;index<text.length;index++){
+  const code=text.charCodeAt(index);
+  if(code>=0xD800&&code<=0xDBFF){
+   const next=text.charCodeAt(index+1);
+   if(next>=0xDC00&&next<=0xDFFF){clean+=text[index]+text[index+1];index++;continue}
+   clean+='\uFFFD';continue;
+  }
+  clean+=code>=0xDC00&&code<=0xDFFF?'\uFFFD':text[index];
+ }
+ return clean;
+}
+const pdf2zhPending=new Map();
+const bilingualPairPending=new Map();
+const pdf2zhChunkSize=256*1024;
+const pdf2zhUploadWindow=4;
+function pdf2zhKey(type,id,seq=''){return type+':'+id+':'+seq}
+function pdf2zhEncode(bytes) {
+ if (typeof bytes.toBase64 === 'function') return bytes.toBase64();
+ let binary = '';
+ for (let index = 0; index < bytes.length; index += 8192) {
+  binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
+ }
+ return btoa(binary);
+}
+function pdf2zhDecode(encoded) {
+ if (typeof Uint8Array.fromBase64 === 'function') return Uint8Array.fromBase64(encoded);
+ const binary = atob(encoded);
+ const bytes = new Uint8Array(binary.length);
+ for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+ return bytes;
+}
+function pdf2zhRequest(host, message, response, signal, timeout = 60000) {
+ signal?.throwIfAborted();
+ const key = pdf2zhKey(response, message.id, response === 'ack' ? message.seq ?? -1 : '');
+ return new Promise((resolve, reject) => {
+  const finish = (error, value) => {
+   clearTimeout(timer);
+   pdf2zhPending.delete(key);
+   signal?.removeEventListener('abort', abort);
+   if (error) reject(error); else resolve(value);
+  };
+  const abort = () => finish(signal.reason);
+  const timer = setTimeout(() => finish(new Error('整页翻译响应超时，请重试。')), timeout);
+  signal?.addEventListener('abort', abort, {once: true});
+  pdf2zhPending.set(key, finish);
+  try { host.postMessage(message); } catch (error) { finish(error); }
+ });
+}
+if(window.chrome?.webview){
+ window.chrome.webview.addEventListener('message',event=>{
+  const data=event.data;
+  if(data?.type==='bilingual-pair-progress'){
+   bilingualPairPending.get(data.id)?.onPair(data.pair);
+   return;
+  }
+  if(data?.type==='bilingual-pair-result'){
+   const entry=bilingualPairPending.get(data.id);
+   if(!entry)return;
+   bilingualPairPending.delete(data.id);
+   if(data.error)entry.finish(new Error(data.error));else entry.finish(null,data);
+   return;
+  }
+  if (['pdf2zh-progress', 'pdf2zh-paragraph', 'pdf2zh-output'].includes(data?.type)) {
+   pdf2zhPending.get(data.type + ':' + data.id)?.(data);
+   return;
+  }
+  if (!['pdf2zh-ack', 'pdf2zh-ready', 'pdf2zh-result'].includes(data?.type)) return;
+  const resultType = data.type.slice('pdf2zh-'.length);
+  const key = pdf2zhKey(resultType, data.id, resultType === 'ack' ? data.seq : '');
+  const finish = pdf2zhPending.get(key);
+  if (data.error && !finish) {
+   // The host can reject any stage before sending the usual acknowledgement.
+   const pending = [...pdf2zhPending].find(([name]) => name.startsWith('ack:' + data.id + ':') || name === pdf2zhKey('ready', data.id));
+   pending?.[1](new Error(data.error));
+  } else {
+   finish?.(data.error ? new Error(data.error) : null, data);
+  }
+ });
+}
+window.BilingualBook={
+ available:!!window.chrome?.webview,
+ pair(blocks,{translate=false,preference='large',source='en',target='zh',signal,onPair=()=>{},timeout=13*60*1000}={}){
+  const host=window.chrome?.webview;
+  if(!host)return Promise.reject(new Error('智能排版翻译只在 DoNote 桌面版中可用。'));
+  if(signal?.aborted)return Promise.reject(signal.reason);
+  const id=crypto.randomUUID();
+  const cleanBlocks=blocks.map(({id,type,level,text,translation})=>({
+   id:wellFormedText(id),type:wellFormedText(type),level,text:wellFormedText(text),translation:wellFormedText(translation)
+  }));
+  return new Promise((resolve,reject)=>{
+   const finish=(error,value)=>{clearTimeout(timer);bilingualPairPending.delete(id);signal?.removeEventListener('abort',abort);error?reject(error):resolve(value)};
+   const cancel=error=>{finish(error);try{host.postMessage({type:'bilingual-pair-cancel',id})}catch{}};
+   const abort=()=>cancel(signal.reason);
+   const timer=setTimeout(()=>cancel(new Error('智能排版翻译响应超时。')),timeout);
+   signal?.addEventListener('abort',abort,{once:true});
+   bilingualPairPending.set(id,{finish,onPair});
+   try{host.postMessage({type:'bilingual-pair',id,blocks:cleanBlocks,translate,preference,source,target})}
+   catch(error){finish(error)}
+  });
+ }
+};
+window.PdfMathTranslate = {
+ available: !!window.chrome?.webview,
+ async open(blob, {signal, onProgress = () => {}} = {}) {
+  const host = window.chrome?.webview;
+  if (!host) throw new Error('整页对照翻译需要 DoNote 桌面版。');
+  if (!(blob instanceof Blob) || !blob.size) throw new Error('PDF 原件不可用。');
+  signal?.throwIfAborted();
+  const id = crypto.randomUUID();
+  const documentController = new AbortController();
+  const documentSignal = documentController.signal;
+  const send = (type, values, response, timeout, requestSignal = documentSignal) =>
+   pdf2zhRequest(host, {type: 'pdf2zh-' + type, id, ...values}, response, requestSignal, timeout);
+  const close = () => {
+   if (documentSignal.aborted) return;
+   documentController.abort(signal?.reason);
+   signal?.removeEventListener('abort', close);
+   try { host.postMessage({type: 'pdf2zh-close', id}); } catch {}
+  };
+  signal?.addEventListener('abort', close, {once: true});
+  try {
+   await send('open', {size: blob.size}, 'ack');
+   let previousPercent = -1;
+   const count = Math.ceil(blob.size / pdf2zhChunkSize);
+   for (let first = 0; first < count; first += pdf2zhUploadWindow) {
+    documentSignal.throwIfAborted();
+    const last = Math.min(count, first + pdf2zhUploadWindow);
+    const chunks = await Promise.all(Array.from({length: last - first}, async (_, index) => {
+     const offset = (first + index) * pdf2zhChunkSize;
+     return new Uint8Array(await blob.slice(offset, offset + pdf2zhChunkSize).arrayBuffer());
+    }));
+    documentSignal.throwIfAborted();
+    // Enqueue each window in order, without waiting for a round trip between chunks.
+    await Promise.all(chunks.map((bytes, index) =>
+     send('chunk', {seq: first + index, data: pdf2zhEncode(bytes)}, 'ack', 120000)));
+    const percent = Math.round(Math.min(last * pdf2zhChunkSize, blob.size) / blob.size * 100);
+    if (percent !== previousPercent) onProgress('正在准备 PDF · ' + percent + '%');
+    previousPercent = percent;
+   }
+   await send('ready', {}, 'ready');
+  } catch (error) {
+   close();
+   throw error;
+  }
+  return {
+   close,
+   async translate(page, {preference, signal: pageSignal, onProgress = () => {}, onParagraph = () => {}}) {
+    const requestSignal = pageSignal ? AbortSignal.any([documentSignal, pageSignal]) : documentSignal;
+    requestSignal.throwIfAborted();
+    const requestId = crypto.randomUUID();
+    const parts = [];
+    let bytes = 0;
+    let invalidOutput = false;
+    const progressKey = 'pdf2zh-progress:' + requestId;
+    const paragraphKey = 'pdf2zh-paragraph:' + requestId;
+    const outputKey = 'pdf2zh-output:' + requestId;
+    pdf2zhPending.set(progressKey, data => onProgress(data.status));
+    pdf2zhPending.set(paragraphKey, data => { if (typeof data.text === 'string') onParagraph(data.text); });
+    pdf2zhPending.set(outputKey, data => {
+     if (data.seq !== parts.length || typeof data.data !== 'string') {
+      invalidOutput = true;
+      return;
+     }
+     try {
+      const chunk = pdf2zhDecode(data.data);
+      bytes += chunk.byteLength;
+      parts.push(chunk);
+     } catch {
+      invalidOutput = true;
+     }
+    });
+    try {
+     const result = await send('translate', {id: requestId, documentId: id, start: page, end: page, preference, mode: 'full'},
+      'result', 26 * 60 * 1000, requestSignal);
+     if (invalidOutput || result.start !== page || bytes !== result.size || !bytes) {
+      throw new Error('译文 PDF 接收不完整，请重试。');
+     }
+     return {
+      blob: new Blob(parts, {type: 'application/pdf'}),
+      untranslated: result.untranslatedPages?.includes(page) || false,
+      skippedParagraphs: Number(result.skippedParagraphs) || 0,
+     };
+    } catch (error) {
+     if (!documentSignal.aborted) {
+      try { host.postMessage({type: 'pdf2zh-cancel-page', id: requestId, documentId: id}); } catch {}
+     }
+     throw error;
+    } finally {
+     pdf2zhPending.delete(progressKey);
+     pdf2zhPending.delete(paragraphKey);
+     pdf2zhPending.delete(outputKey);
+    }
+   },
+  };
+ }
+};
+function normalizePdfTranslationText(text){
+ return wellFormedText(text).replace(/\r\n?/g,'\n').replace(/\u00ad[ \t]*\n(?![ \t]*\n)[ \t]*/g,'').replace(/\u00ad/g,'')
+  .split(/\n[ \t]*\n+/).map(paragraph=>paragraph.trim()
+   .replace(/\b([A-Za-z]+)-[ \t]*\n[ \t]*(?=[a-z])/g,(match,word)=>
+    /^(?:low|high|wide|narrow|small|large|single|multi|two|three|four|closed|open|rail|full|half|non|ultra)$/i.test(word)?word+'-':word)
+   .replace(/-[ \t]*\n[ \t]*/g,'-')
+   .replace(/(?<=\p{Script=Han})[ \t]*\n[ \t]*(?=\p{Script=Han})/gu,'')
+   .replace(/[ \t]*\n[ \t]*/g,' ')).filter(Boolean).join('\n\n');
+}
+function onlineTranslationChunks(paragraph,limit=500){
+ // MyMemory accepts at most 500 UTF-8 bytes per query.
+ const encoder=new TextEncoder(),chunks=[];
+ while(paragraph){
+  let bytes=0,end=0,sentence=0,space=0;
+  for(const char of paragraph){
+   bytes+=encoder.encode(char).length;if(bytes>limit)break;
+   end+=char.length;
+   if(/[.!?。！？；;]/.test(char))sentence=end;
+   if(/\s/.test(char))space=end;
+  }
+  const cut=end===paragraph.length?end:sentence||space||end;
+  const chunk=paragraph.slice(0,cut).trim();
+  if(chunk)chunks.push(chunk);
+  paragraph=paragraph.slice(cut).trimStart();
+ }
+ return chunks;
+}
+async function translatePdfOnline(text,source,target,signal,progress,context='',provider=window.desktopTranslation?.provider()||'mymemory'){
+ const bridge=window.desktopTranslation;
+ if(provider==='localai'){progress(1,1);return bridge.request({action:'translate',provider,text,source,target,context},signal)}
+ if(provider==='azure'){progress(1,1);return bridge.request({action:'translate',provider,text,source,target},signal)}
+ const paragraphs=text.split('\n\n').map(part=>onlineTranslationChunks(part,provider==='baidu'?900:500)),total=paragraphs.reduce((sum,chunks)=>sum+chunks.length,0);
+ const pair=[source,target].map(lang=>lang==='zh'?'zh-CN':lang).join('|');
+ const translated=[];let current=0;
+ for(const chunks of paragraphs){
+  const parts=[];
+  for(const chunk of chunks){
+   progress(++current,total);
+   if(provider==='baidu'){
+    if(current>1)await new Promise(resolve=>setTimeout(resolve,1100));
+    parts.push(await bridge.request({action:'translate',provider,text:chunk,source,target},signal));continue;
+   }
+   const params=new URLSearchParams({q:chunk,langpair:pair});
+   const response=await fetch('https://api.mymemory.translated.net/get?'+params,{signal:AbortSignal.any([signal,AbortSignal.timeout(20000)]),credentials:'omit',referrerPolicy:'no-referrer'});
+   if(response.status===429)throw new Error('免费在线翻译额度暂不可用，请稍后再试。');
+   if(!response.ok)throw new Error('在线翻译暂不可用，请稍后再试。');
+   const data=await response.json();
+   if(data.quotaFinished||Number(data.responseStatus)===429)throw new Error('免费在线翻译额度已用完，请稍后再试。');
+   const value=data.responseData?.translatedText;
+   if(Number(data.responseStatus)!==200||typeof value!=='string'||!value.trim())throw new Error('在线服务未返回有效译文，请稍后重试。');
+   parts.push(value.trim());
+  }
+  translated.push(parts.join(target==='zh'?'':' '));
+ }
+ return translated.join('\n\n');
+}
+function installPdfTranslationPanel(session, panel, showPanel) {
+ const input = panel.querySelector('#pdfTranslateSource');
+ const result = panel.querySelector('#pdfTranslateResult');
+ const status = panel.querySelector('#pdfTranslationStatus');
+ const automaticToggle = panel.querySelector('#pdfAutoTranslate');
+ const {signal: sessionSignal} = session.controller;
+ const refreshGlossary=bindCircuitGlossary(session,panel,input,result);
+ let pending;
+ const pageContext=()=>{
+  const number=session.translationSelection?.page;
+  const slot=number
+   ? session.pageBox?.parentElement?.querySelector('[data-pdf-page="'+number+'"]')
+   : session.pageBox;
+  const text=normalizePdfTranslationText(slot?.querySelector('.pdf-text-layer')?.innerText||'');
+  const offset=text.indexOf(normalizePdfTranslationText(input.value));
+  const start=Math.max(0,offset-1800);
+  return text.slice(start,start+3600);
+ };
+
+ function cancelQueued() {
+  clearTimeout(pending);
+ }
+
+ function setSource(picked) {
+  if (!picked?.quote) return;
+  const text = normalizePdfTranslationText(picked.quote);
+  if (input.value !== text) {
+   session.translationController?.abort();
+   session.translationKey = null;
+   input.value = text;
+   result.value = '';
+  }
+  session.translationSelection = picked;
+  refreshGlossary();
+ }
+
+ async function translateSelection({automatic = false, online = false} = {}) {
+  const text = normalizePdfTranslationText(input.value);
+  if (!text) {
+   if (!automatic) toast('请先选择或输入待翻译文字。');
+   return;
+  }
+  if (sessionSignal.aborted) return;
+  if (!automatic) input.value = text;
+  const {source,target} = storedTranslateLanguage();
+  const bridge = window.desktopTranslation;
+  const key = JSON.stringify([source, target, text, bridge?.modelCacheKey?.()]);
+  if (automatic && session.translationKey === key) return;
+
+  session.translationController?.abort();
+  const controller = new AbortController();
+  const {signal} = controller;
+  session.translationController = controller;
+  session.translationKey = key;
+  const active = () => !sessionSignal.aborted && !signal.aborted;
+  const options = {sourceLanguage: source, targetLanguage: target};
+  let translator, translated, service;
+  result.value = '';
+
+  try {
+   if (source === target) {
+    translated = text;
+    result.value = text;
+    status.textContent = '原文与目标语言相同。';
+    return;
+   }
+   status.textContent = '正在准备翻译…';
+   try { await bridge?.ready?.(signal); }
+   catch (error) {
+    // Explicit online translation needs the configured credentials. A local
+    // request can still use the bundled engine when settings are unreadable.
+    if (online) throw error;
+   }
+   if (!active()) return;
+   const configured = bridge?.provider() || 'mymemory';
+   const provider = online && configured !== 'localai' ? configured : 'mymemory';
+   const useLlm = !online && bridge?.localConfigured?.();
+   const useOffline = !online && source === 'en' && target === 'zh' && window.BilingualBook?.available;
+
+   const limit = online ? 5000 : 10000;
+   if (text.length > limit) {
+    status.textContent = '每次最多翻译 ' + limit.toLocaleString('zh-CN') + ' 字符，请缩短原文。';
+    return;
+   }
+   if (online) {
+    service = bridge?.label?.(provider) || 'MyMemory';
+    translated = await translatePdfOnline(text, source, target, signal, (current, total) => {
+     if (active()) status.textContent = '正在在线翻译…' + (total > 1 ? ' ' + current + ' / ' + total : '');
+    }, '', provider);
+   } else if (useLlm || useOffline) {
+    if (useLlm) {
+     service = bridge.label('localai');
+     status.textContent = '本地大模型正在翻译…';
+     try {
+      translated = await bridge.request({action:'translate', provider:'localai', text, source, target, context:pageContext()}, signal);
+     } catch (error) {
+      if (!useOffline || !active()) throw error;
+     }
+    }
+    if (!translated) {
+     service = '快速离线';
+     status.textContent = '正在快速离线翻译…';
+     const blocks = text.split('\n\n').map((paragraph, index) => ({id:String(index), type:'para', text:paragraph}));
+     const response = await window.BilingualBook.pair(blocks, {translate:true, preference:'offline', source, target, signal});
+     const pairs = new Map((response.pairs || []).map(pair => [pair.id, pair.translation]));
+     const values = blocks.map(block => pairs.get(block.id)?.trim());
+     if (!values.some(Boolean)) throw new Error('快速离线未返回有效译文。');
+     translated = values.map((value, index) => value || blocks[index].text).join('\n\n');
+     if (values.some(value => !value)) service += '（部分保留原文）';
+    }
+   } else {
+    if (!('Translator' in window)) {
+     status.textContent = '此语言组合需要配置本地大模型，或点击「在线翻译」。';
+     return;
+    }
+    const availability = await Translator.availability(options);
+    if (!active()) return;
+    if (availability === 'unavailable') {
+     status.textContent = '此语言组合暂不支持本地翻译。';
+     return;
+    }
+    if (availability !== 'available' && automatic) {
+     status.textContent = '首次使用请点击「本地翻译」准备语言包。';
+     return;
+    }
+    translator = await Translator.create({
+     ...options,
+     signal,
+     monitor(monitor) {
+      monitor.addEventListener('downloadprogress', event => {
+       if (active()) status.textContent = '正在准备语言包 ' + Math.round(event.loaded * 100) + '%';
+      });
+     }
+    });
+    if (!active()) return;
+    service = '本地语言包';
+    status.textContent = '正在翻译所选文字…';
+    translated = await translator.translate(text, {signal});
+   }
+   if (!active()) return;
+   if (!translated?.trim()) throw new Error('未返回有效译文。');
+   result.value = translated;
+   status.textContent = '翻译完成 · ' + service;
+  } catch (error) {
+   if (!active()) return;
+   if (online && error.name === 'TimeoutError') status.textContent = '在线翻译超时，请重试。';
+   else if (online && error instanceof TypeError) status.textContent = '无法连接在线翻译服务。';
+   else status.textContent = (online ? '在线翻译未完成：' : '本地翻译未完成：') + (error.message || '请重试。');
+  } finally {
+   translator?.destroy();
+   if (session.translationController === controller) {
+    session.translationController = null;
+    if (!result.value) session.translationKey = null;
+   }
+  }
+ }
+
+ function queueSelection(picked) {
+  if (!automaticToggle.checked || !picked?.quote) return;
+  setSource(picked);
+  cancelQueued();
+  pending = setTimeout(() => {
+   if (!sessionSignal.aborted && !session.selectingText) void translateSelection({automatic: true});
+  }, 280);
+ }
+
+ async function openSelection(picked) {
+  setSource(picked);
+  cancelQueued();
+  await showPanel('translation', false, picked);
+  if (sessionSignal.aborted) return;
+  input.focus();
+  if (!result.value && !session.translationController) void translateSelection();
+ }
+
+ session.receiveOcrText = openSelection;
+ session.translateMark = async mark => {
+  await showPanel('translation');
+  if (sessionSignal.aborted) return;
+  input.value = normalizePdfTranslationText(mark.quote);
+  input.oninput();
+  session.translationSelection = mark;
+  input.focus();
+ };
+ sessionSignal.addEventListener('abort', () => {
+  cancelQueued();
+  session.translationController?.abort();
+ }, {once: true});
+
+ try { automaticToggle.checked = localStorage.getItem('analog-auto-translate') !== 'off'; } catch {}
+ automaticToggle.onchange = () => {
+  try { localStorage.setItem('analog-auto-translate', automaticToggle.checked ? 'on' : 'off'); } catch {}
+  if (!automaticToggle.checked) {
+   cancelQueued();
+   session.translationController?.abort();
+   status.textContent = '已关闭「选中即翻」。';
+  }
+ };
+ input.oninput = () => {
+  cancelQueued();
+  session.translationController?.abort();
+  session.translationKey = null;
+  session.translationSelection = null;
+  result.value = '';
+  status.textContent = '原文已修改，可点击「本地翻译」或「在线翻译」。';
+ };
+ input.onpaste = event => {
+  const pasted = event.clipboardData?.getData('text/plain');
+  if (!pasted || !/[\r\n]/.test(pasted)) return;
+  event.preventDefault();
+  input.setRangeText(normalizePdfTranslationText(pasted), input.selectionStart, input.selectionEnd, 'end');
+  input.oninput();
+ };
+ result.oninput = () => {
+  cancelQueued();
+  session.translationController?.abort();
+ };
+ document.addEventListener('translate-language-change', () => {
+  refreshTranslateLanguageLabel();
+  cancelQueued();
+  session.translationController?.abort();
+  session.translationController = null;
+  session.translationKey = null;
+  result.value = '';
+  status.textContent = '';
+  if (automaticToggle.checked && normalizePdfTranslationText(input.value)) void translateSelection({automatic: true});
+ }, {signal: sessionSignal});
+
+ const useSelection = panel.querySelector('#pdfUseSelection');
+ useSelection.onmousedown = event => {
+  capturePdfSelection(session);
+  event.preventDefault();
+ };
+ useSelection.onclick = () => {
+  const picked = capturePdfSelection(session);
+  if (!picked) {
+   toast('请先选中文字。');
+   return;
+  }
+  setSource(picked);
+  cancelQueued();
+  void translateSelection();
+ };
+ panel.querySelector('#pdfLocalTranslate').onclick = () => {
+  cancelQueued();
+  void translateSelection();
+ };
+ panel.querySelector('#pdfOnlineTranslate').onclick = () => {
+  cancelQueued();
+  void translateSelection({online: true});
+ };
+ panel.querySelector('#savePdfTranslation').onclick = () => {
+  const text = input.value.trim();
+  const translation = result.value.trim();
+  const picked = session.translationSelection;
+  if (!text || !translation) {
+   toast('请先填写原文和译文。');
+   return;
+  }
+  const mark = addPdfMark(session, 'translation', {
+   quote: text,
+   note: translation,
+   page: picked?.page ?? session.page,
+   rects: picked?.rects ?? []
+  });
+  if (mark) status.textContent = '译文已保存，可在「批注」查看。';
+ };
+ refreshTranslateLanguageLabel();
+ return {
+  cancelQueued,
+  openSelection,
+  queueSelection,
+  get automaticEnabled() { return automaticToggle.checked; }
+ };
+}

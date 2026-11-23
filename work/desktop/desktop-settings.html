@@ -1,0 +1,92 @@
+<section id="desktopSettings" popover aria-labelledby="desktopSettingsTitle">
+ <header><h2 id="desktopSettingsTitle">设置</h2></header>
+ <section aria-labelledby="desktopAppearance"><h3 id="desktopAppearance">外观</h3>
+  <label class="desktop-palette-row" for="desktopPalette"><span>色彩方案</span><select id="desktopPalette" aria-label="色彩方案"><option value="default">默认</option><option value="warm">暖灰</option><option value="mist">雾蓝</option><option value="sage">鼠尾草绿</option><option value="sand">柔沙棕</option></select></label>
+  <label class="desktop-palette-row" for="desktopThemeMode"><span>显示模式</span><select id="desktopThemeMode" aria-label="显示模式"><option value="system">跟随系统</option><option value="light">白天</option><option value="dark">夜间</option></select><span id="desktopThemeValue" hidden></span></label>
+  <button type="button" id="desktopSplashToggle" data-command="toggle-startup" role="switch" aria-checked="false" disabled><span>播放开场动画</span><span class="desktop-switch" aria-hidden="true"></span></button>
+  <button type="button" id="desktopPdfInvertToggle" data-command="toggle-pdf-invert" role="switch" aria-checked="false" title="开启后，暗色模式下 PDF 页面会整页反转" disabled><span>暗色下反转 PDF 页面</span><span class="desktop-switch" aria-hidden="true"></span></button>
+  <button type="button" data-control="openVideoCaptionSettings"><span>视频字幕样式</span><span aria-hidden="true">›</span></button>
+ </section>
+ <section aria-labelledby="desktopWorkspace"><h3 id="desktopWorkspace">工作台</h3>
+  <button type="button" data-control="usersBtn"><span>用户管理与切换</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-control="categoriesBtn"><span>栏目管理</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-control="openTranslationSettings"><span>翻译服务</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-control="openTranslateLangDialog"><span>翻译语言</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-control="openSpeechModelSettings"><span>语音识别模型</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-control="openAiModelSettings"><span>AI 模型服务</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-control="openAiManager"><span>AI 管理</span><span aria-hidden="true">›</span></button>
+ </section>
+ <section aria-labelledby="desktopStorage"><h3 id="desktopStorage">资料与备份</h3>
+  <button type="button" data-control="backupBtn"><span>备份与恢复</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-control="openTrash"><span>回收站</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-command="view-data-folder"><span>查看资料目录</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-command="choose-data-folder"><span>更改资料目录</span><span aria-hidden="true">›</span></button>
+ </section>
+ <footer>
+  <button type="button" data-command="install-update"><span>检查更新包…</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-control="aboutDoNote"><span>关于 DoNote</span><span aria-hidden="true">›</span></button>
+  <button type="button" data-command="exit-desktop">退出软件…</button>
+ </footer>
+</section>
+
+<dialog id="aboutDoNote" class="about-donote" aria-labelledby="aboutDoNoteTitle">
+ <div class="about-donote-head"><span>关于 DoNote</span><button type="button" data-close-about aria-label="关闭">×</button></div>
+ <div class="about-donote-body">
+  <img src="brand-logo.png" alt="DoNote 图标" width="86" height="86">
+  <h2 id="aboutDoNoteTitle">DoNote</h2>
+  <button type="button" id="aboutVersion" class="about-version" aria-label="版本 {{DONOTE_VERSION}}">版本 {{DONOTE_VERSION}}</button>
+  <p>发布于 2026 年 11 月 5 日</p>
+  <p>© PJH</p>
+ </div>
+ <div class="about-donote-foot"><button type="button" data-close-about>确定</button></div>
+</dialog>
+
+<dialog id="analogFlashcard" class="analog-flashcard-dialog" aria-labelledby="analogFlashcardTitle">
+ <div class="about-donote-head"><span id="analogFlashcardTitle">DoNote · 设计闪卡</span><button type="button" data-close-flashcard aria-label="关闭">×</button></div>
+ <div class="analog-flashcard-body">
+  <button type="button" id="flashcardFlip" class="analog-flashcard" aria-label="翻转闪卡" aria-pressed="false">
+   <span class="analog-flashcard-inner"><span class="analog-flashcard-face analog-flashcard-front"><img src="analog-flashcard.png" draggable="false" alt="金色差分电路和信号线的艺术插画"><span class="analog-flashcard-number">DoNote / 01</span></span><span class="analog-flashcard-face analog-flashcard-back"><small>ANALOG DESIGN NOTE · 01</small><strong>先理解信号路径，<br>再优化每个指标。</strong><span>从输入到输出，标出增益、带宽、噪声与反馈。每次改动，都回到这条路径验证。</span><em>点击翻回正面</em></span></span>
+  </button>
+  <p>点击卡片翻面，解锁后可从「成就殿宇」再次打开。</p>
+ </div>
+ <div class="about-donote-foot"><button type="button" id="flashcardSave">查看成就殿宇</button><button type="button" data-close-flashcard>关闭</button></div>
+</dialog>
+
+<button id="openTranslationSettings" hidden type="button">翻译服务设置</button>
+<button id="openSpeechModelSettings" hidden type="button">语音识别模型设置</button>
+<button id="openVideoCaptionSettings" hidden type="button">视频字幕样式设置</button>
+<dialog id="videoCaptionSettings" aria-labelledby="videoCaptionSettingsTitle"><form id="videoCaptionSettingsForm">
+<div class="modalhead"><h2 id="videoCaptionSettingsTitle">视频字幕样式</h2><button type="button" class="icon-button" data-close-caption-settings aria-label="关闭">✕</button></div>
+<div class="modalbody">
+ <p class="section-note">这些显示设置只在视频字幕中使用，修改后正在播放的字幕会立即更新。</p>
+ <div class="field"><label for="captionSize">字号 <output id="captionSizeValue"></output></label><input id="captionSize" type="range" min="12" max="64" step="1"></div>
+ <div class="field"><label for="captionOpacity">不透明度 <output id="captionOpacityValue"></output></label><input id="captionOpacity" type="range" min="20" max="100" step="5"></div>
+ <div class="field-row"><div class="field"><label for="captionFont">字体</label><select id="captionFont"><option value="sans-serif">无衬线</option><option value="Microsoft YaHei">微软雅黑</option><option value="serif">衬线</option><option value="Arial">Arial</option><option value="monospace">等宽</option></select></div><div class="field"><label for="captionColor">颜色</label><input id="captionColor" type="color"></div></div>
+</div>
+<div class="modalfoot"><button type="button" class="secondary" id="captionReset">恢复默认</button><button type="submit" class="primary">完成</button></div>
+</form></dialog>
+<dialog id="speechModelSettings" aria-labelledby="speechModelSettingsTitle"><form id="speechModelSettingsForm">
+<div class="modalhead"><h2 id="speechModelSettingsTitle">语音识别模型</h2><button type="button" class="icon-button" data-close-speech-model aria-label="关闭">✕</button></div>
+<div class="modalbody">
+ <p class="section-note">识别模型按用途统一保存在 <code>models\asr</code>，可以从设置页打开目录。旧版模型文件夹会在首次使用时自动迁移。</p>
+ <div class="field"><label for="speechModelSelect">默认识别模型</label><select id="speechModelSelect">
+  <option value="base">轻量 · base（约 148 MB）</option>
+  <option value="small">轻量 · small（约 486 MB）</option>
+  <option value="large-v3-turbo">均衡 · large-v3-turbo（约 1.62 GB）</option>
+  <option value="large-v3">高准确 · large-v3（约 3.09 GB）</option>
+ </select></div>
+ <div class="field"><label>当前模型目录</label><p id="speechModelPath" class="section-note"></p><button type="button" class="secondary" id="openAsrModelFolder">打开语音模型目录</button></div>
+ <p class="section-note">模型文件下载方法见 DoNote 目录中的《视频模型下载说明.md》。未手动下载时，程序仍会尝试在线获取。</p>
+</div>
+<div class="modalfoot"><button type="button" class="secondary" data-close-speech-model>关闭</button><button type="submit" class="primary" id="speechModelSave">保存选择</button></div>
+</form></dialog>
+<dialog id="translationSettings" aria-labelledby="translationSettingsTitle"><form id="translationSettingsForm">
+<div class="modalhead"><h2 id="translationSettingsTitle">翻译服务</h2><button type="button" class="icon-button" data-close-translation aria-label="关闭">✕</button></div>
+<div class="modalbody"><div class="field"><label for="translationProvider">翻译源</label><select id="translationProvider"><option value="localai">本地大模型</option><option value="mymemory">MyMemory · 在线免费额度</option><option value="baidu">百度翻译 · 在线</option><option value="azure">微软 Translator（Bing）· 在线</option></select></div>
+<div class="field" id="translationAppIdField" hidden><label for="translationAppId">百度 APP ID</label><input id="translationAppId" autocomplete="off" maxlength="40"></div>
+<div class="field" id="translationKeyField" hidden><label for="translationKey">服务密钥</label><input id="translationKey" type="password" autocomplete="new-password" maxlength="160"></div>
+<div class="field" id="translationRegionField" hidden><label for="translationRegion">Azure 区域（全球资源可留空）</label><input id="translationRegion" maxlength="40"></div>
+<div class="field" id="localModelField"><label for="translationLocalModel">本地模型规模</label><select id="translationLocalModel"><option value="large">高质量 · Qwen3-4B</option><option value="compact">轻量 · Qwen3-1.7B</option><option value="tiny">极速 · Qwen3-0.6B</option></select><p id="translationLocalStatus" class="section-note"></p><button type="button" class="secondary" id="openLocalModelFolder">打开本地模型目录</button></div>
+<p id="translationHelp" class="section-note"></p><p id="translationSettingsStatus" class="form-message" role="status"></p></div>
+<div class="modalfoot"><button type="button" class="secondary" data-close-translation>取消</button><button type="submit" id="translationSettingsSave" class="primary">保存翻译源</button></div>
+</form></dialog>

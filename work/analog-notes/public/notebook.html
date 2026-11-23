@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="模拟集成电路设计的个人学习与工作手记"><title>DoNote</title><link rel="icon" href="brand-logo.png">
+<script src="theme.js"></script><link rel="stylesheet" href="katex/katex.min.css"><link rel="stylesheet" href="notebook.css"><link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="design-system.css"><link rel="stylesheet" href="web-reader.css"><link rel="stylesheet" href="reader-panels.css"><link rel="stylesheet" href="reader-toolbar.css"><link rel="stylesheet" href="pdf-page-comparison.css"><link rel="stylesheet" href="video-subtitles.css"><link rel="stylesheet" href="video-frame-notes.css"><link rel="stylesheet" href="video-player-learning.css"><link rel="stylesheet" href="video-caption-overlay.css"><link rel="stylesheet" href="workspace-layout.css"><link rel="stylesheet" href="record-editor.css"></head><body>
+<nav id="workspaceRail" aria-label="快捷导航"></nav><div id="workspaceRailTip" role="tooltip" hidden></div>
+<header class="topbar"><div class="workspace-top-left"><img class="workspace-brand-mark" src="brand-logo.png" alt="DoNote"><div class="window-navigation" aria-label="栏目导航"><button type="button" id="navBack" class="icon-button" title="返回上一栏目" aria-label="返回上一栏目" disabled>←</button><button type="button" id="navForward" class="icon-button" title="前往下一栏目" aria-label="前往下一栏目" disabled>→</button></div><div class="breadcrumb"><b id="crumb">总览</b></div></div><div class="top-actions"><button class="secondary" type="button" id="openAiManager">AI 管理</button><button type="button" class="secondary" id="themeToggle" data-theme-toggle>☀ 白天</button><button class="secondary user-switch" id="usersBtn" title="添加、修改或切换用户"><span id="activeUser">我的工作台</span> ▾</button><button class="icon-button" id="categoriesBtn" title="管理栏目" aria-label="管理栏目">☷</button><span class="sync" id="sync"><span class="dot"></span>正在连接记录库</span><button type="button" class="icon-button desktop-gear" id="desktopSettingsButton" aria-label="设置" title="设置" aria-controls="desktopSettings" aria-expanded="false" popovertarget="desktopSettings" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3h4l.5 2.5 2 .9 2.2-1.1 2 3.5-1.7 1.6v2.3l1.7 1.6-2 3.5-2.2-1.1-2 .9L14 20h-4l-.5-2.4-2-.9-2.2 1.1-2-3.5L5 12.7v-2.3L3.3 8.8l2-3.5 2.2 1.1 2-.9L10 3Z"/><circle cx="12" cy="11.5" r="3"/></svg></button><button class="icon-button" id="backupBtn" title="备份与资料夹" aria-label="备份与资料夹"><i data-icon="download"></i></button><button class="primary" id="newBtn"><i data-icon="plus"></i>新建记录</button></div></header><div class="shell">
+<main>
+<div class="intro">
+ <div><h1 id="pageTitle">总览</h1><p id="pageSub" hidden></p></div>
+ <div class="date-block"><time id="dateLabel"></time></div>
+</div>
+<div class="banner" id="banner"></div>
+<section id="dashboardWidgets" aria-labelledby="dashboardTitle" hidden><div class="dashboard-header"><h2 id="dashboardTitle">总览组件</h2><button type="button" class="secondary" id="dashboardCustomize">自定义组件</button></div><div id="dashboardTop"></div></section>
+<div class="workspace"><section><div class="section-heading"><h2 id="listTitle">最近记录</h2></div><div class="filterrow" id="tabs"><button class="tab active" data-tab="all">全部记录</button><button class="tab" data-tab="paper">文献阅读</button><button class="tab" data-tab="issue">设计问题</button><button class="tab" data-tab="journal">工作学习日志</button></div><div id="libraryControls" class="library-controls" hidden><button type="button" class="primary" id="captureWebPage">收藏网页</button><button class="secondary" id="importResources">导入文件</button><input type="file" id="resourceFileInput" multiple hidden><button class="secondary" type="button" id="importResourceFolder">导入文件夹</button><input type="file" id="resourceFolderInput" webkitdirectory multiple hidden><button class="secondary" id="newReadingNote" type="button">新建阅读笔记</button><select id="libraryKind" aria-label="资料类型"><option value="">全部类型</option><option value="resource">原始资料</option><option value="web">已收藏网页</option><option value="paper">阅读笔记</option></select><section id="workspaceTopics" aria-label="研究方向"><div class="workspace-topics-heading"><strong>研究方向</strong><button type="button" class="icon-button" id="topicsBtn" aria-label="管理研究方向" title="管理研究方向">⚙</button></div><div class="side-tags" id="sideTags"></div><select id="allSidebarTopics" aria-label="全部研究方向" hidden></select></section><select id="libraryStatus" aria-label="阅读状态"><option value="">全部进度</option><option>待读</option><option>在读</option><option>已读</option></select><button type="button" class="secondary" id="openLiteratureMatrix">批注汇总</button><button class="secondary" type="button" id="openTrash">回收站</button><button type="button" class="secondary" id="librarySelection" aria-pressed="false">多选</button><div id="libraryBatchActions" class="library-batch-actions" hidden><span id="librarySelectedCount" aria-live="polite">已选 0 份</span><button type="button" class="secondary" id="librarySelectAll">全选当前结果</button><button type="button" class="primary" id="libraryDeleteSelected" disabled>删除所选</button></div></div><div id="recordTools" class="library-controls" hidden><button class="primary" type="button" id="importGrokPlan" hidden>导入计划</button><button class="secondary" id="importExisting" title="支持 DOCX、PPT、PPTX、PDF、MD、MP4 和 MP3">导入文件</button><input type="file" id="existingFileInput" accept=".docx,.ppt,.pptx,.pdf,.md,.markdown,.mp4,.mp3,image/png,image/jpeg,image/webp,image/gif,image/bmp" multiple hidden><button class="secondary" id="workWeeklyBtn">本周工作周志</button><button class="secondary" id="studyWeeklyBtn" hidden>本周学习周志</button><select id="issueTrackFilter" aria-label="按问题归属筛选" hidden><option value="">全部问题</option><option value="work">工作问题</option><option value="study">学习问题</option><option value="unclassified">未分类</option></select><button class="secondary" id="weeklyBtn">本周组会</button><select id="meetingWeek" aria-label="日志周次"><option value="">全部周次</option></select><label id="weeklyFilterLabel"><input type="checkbox" id="weeklyOnly"> 仅看周志 / 周报</label></div><div class="searchrow"><label class="searchbox"><i data-icon="search"></i><input id="search" type="search" placeholder="搜索标题、作者、正文或标签…" aria-label="搜索记录"></label><span class="tiny" id="resultCount">共 0 条记录</span><button type="button" class="secondary" id="openPdfSearch">全文检索</button><select class="sort" id="sort" aria-label="排序方式"><option value="date">记录日期 ↓</option><option value="updated">最近更新 ↓</option><option value="old">最早记录 ↑</option><option value="title">标题 A→Z</option><option value="author">作者 A→Z</option></select></div><section id="journalPlans" class="box" aria-label="本栏目计划" hidden></section><div id="recordFolderBar" class="library-controls" hidden><select id="recordFolderFilter" aria-label="按文件夹筛选"></select><button class="secondary" type="button" id="openFolderManager">文件夹管理</button></div><div id="activeFilter" class="tiny" style="margin-bottom:12px"></div><div id="libraryFolders" class="library-folders" hidden></div><div id="records" aria-live="polite"><div class="empty">正在读取你的记录…</div></div><nav id="libraryPager" class="library-pager" aria-label="分页" hidden></nav></section>
+<aside class="aside"><div id="dashboardSide" hidden></div><section class="box"><h2>待推进的问题</h2><div class="pending" id="pending">暂无待排查的问题。</div></section></aside></div><footer class="footer"><span>DoNote</span></footer></main></div>
+<div id="dashboardWidgetParking" hidden><section id="remindersWidget" class="box reminders dashboard-interactive" aria-labelledby="reminderTitle"><h2 id="reminderTitle">临时提醒 <span id="reminderCount" class="tiny" aria-live="polite">0 项待办</span></h2><form id="reminderForm"><label class="visually-hidden" for="reminderInput">写下临时事项</label><input id="reminderInput" maxlength="240" placeholder="写下要做的事…" required><button type="submit" class="secondary">添加</button></form><p id="reminderStatus" class="form-message" role="status"></p><ul id="reminderList"></ul></section><section id="quickStartWidget" class="box dashboard-interactive"><h2>快速开始<i data-icon="plus"></i></h2><button class="quick" data-new="paper"><span class="quickicon"><i data-icon="book"></i></span><span><b>读一篇文献</b><small>提炼思路、指标与启发</small></span><span class="arrow">↗</span></button><button class="quick" data-new="issue"><span class="quickicon" style="color:#7591a8;background:#edf3f6"><i data-icon="circuit"></i></span><span><b>记录一个设计问题</b><small>现象 → 假设 → 验证 → 结论</small></span><span class="arrow">↗</span></button><button class="quick" data-new="journal"><span class="quickicon" style="color:#789987;background:#eef4f0"><i data-icon="pen"></i></span><span><b>写下今天的进展</b><small>记录工作与学习中的一小步</small></span><span class="arrow">↗</span></button></section></div><dialog id="grokPlanDialog" aria-labelledby="grokPlanTitle"><form id="grokPlanForm"><div class="modalhead"><h2 id="grokPlanTitle">导入计划</h2><button type="button" class="icon-button" data-close="grokPlanDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">粘贴 Grok Bot 的完整计划，或选取 Markdown / 文本文件。预览时可以调整标题、起止日期和关联资料。</p><div class="field"><label for="grokPlanText">计划原文</label><textarea id="grokPlanText" required maxlength="150000" placeholder="例如：**W2 · Loop filter 设计与稳定性**"></textarea></div><input id="grokPlanFile" type="file" accept=".md,.markdown,.txt,text/plain,text/markdown" hidden><button type="button" class="secondary" id="grokPlanChooseFile">选择文件</button><p class="form-message" id="grokPlanMessage" role="status"></p></div><div class="modalfoot"><button type="button" class="secondary" data-close="grokPlanDialog">取消</button><button type="submit" class="primary">预览并编辑</button></div></form></dialog><dialog id="folderManager" aria-labelledby="folderManagerTitle"><div class="modalhead"><h2 id="folderManagerTitle">文件夹</h2><button type="button" class="icon-button" data-close="folderManager" aria-label="关闭">✕</button></div><div class="modalbody"><form id="folderForm"><div class="field-row" style="grid-template-columns:1fr 1fr"><div class="field"><label for="folderName">文件夹名称</label><input id="folderName" required maxlength="60"></div><div class="field"><label for="folderParent">上一级</label><select id="folderParent"></select></div></div><button type="submit" class="primary" id="folderSave">新建文件夹</button> <button type="button" class="secondary" id="folderCancelEdit" hidden>取消编辑</button></form><p id="folderMessage" class="form-message" role="status"></p><div id="folderRows" class="manager-list"></div></div></dialog><dialog id="dashboardWidgetDialog" aria-labelledby="widgetDialogTitle"><form id="dashboardWidgetForm">
+<div class="modalhead"><h2 id="widgetDialogTitle">自定义总览组件</h2><button type="button" class="icon-button" data-close="dashboardWidgetDialog" aria-label="关闭">✕</button></div>
+<div class="modalbody"><p class="section-note">选择组件和摆放位置，再拖动左侧把手调整顺序。也可以用上移、下移按钮调整。</p>
+<div class="widget-picker"><label>组件 <select id="widgetKind"></select></label><label>位置 <select id="widgetZone"><option value="top">总览上方</option><option value="side">右侧栏</option></select></label><button type="button" class="secondary" id="widgetAdd">添加组件</button></div>
+<div class="widget-zones"><section aria-labelledby="widgetTopTitle"><h3 id="widgetTopTitle">总览上方</h3><div id="widgetEditTop" data-widget-zone="top"></div></section><section aria-labelledby="widgetSideTitle"><h3 id="widgetSideTitle">右侧栏</h3><div id="widgetEditSide" data-widget-zone="side"></div></section></div><p id="widgetMessage" class="form-message" role="status"></p></div>
+<div class="modalfoot"><span class="tiny">布局仅用于当前工作台</span><div class="right"><button type="button" class="secondary" data-close="dashboardWidgetDialog">取消</button><button type="submit" class="primary" id="widgetSave">保存布局</button></div></div></form></dialog><dialog id="captureWebDialog" aria-labelledby="captureWebTitle"><form id="captureWebForm"><div class="modalhead"><h2 id="captureWebTitle">收藏网页</h2><button type="button" class="icon-button" data-close="captureWebDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">粘贴公开网页链接，正文和原网页快照会自动缓存到本机。部分需要登录或运行脚本的页面可能只能保存其公开内容。</p><div class="field"><label for="captureWebUrl">网页地址</label><input id="captureWebUrl" type="url" maxlength="2048" placeholder="https://…" required></div><p id="captureWebStatus" class="form-message" role="status"></p></div><div class="modalfoot"><span></span><div class="right"><button type="button" class="secondary" data-close="captureWebDialog">取消</button><button class="primary" id="captureWebSubmit" type="submit">收藏并缓存</button></div></div></form></dialog>
+<dialog id="editor" aria-labelledby="editorTitle"><form id="noteForm"><div class="modalhead"><h2 id="editorTitle">新建记录</h2><div class="editor-head-actions"><button type="button" class="secondary" id="editorModeBtn">展开为整页</button></div><button type="button" class="icon-button" data-close="editor" aria-label="关闭">✕</button></div>
+ <div class="modalbody editor-body">
+  <div class="editor-record-heading"><div class="field"><label for="title">标题 *</label><input id="title" required maxlength="240" placeholder="填写标题"></div><div class="field"><label for="type">记录类型</label><select id="type"><option value="paper">文献阅读</option><option value="issue">设计问题</option><option value="journal">工作学习日志</option></select></div></div>
+  <div id="planFields" hidden><div class="field"><label for="planStart">开始日期</label><input type="date" id="planStart"></div><div class="field"><label for="planEnd">结束日期</label><input type="date" id="planEnd"></div></div>
+  <div class="field editor-content"><label id="bodyLabel" for="richBody">正文</label>
+   <div class="rich-wrap">
+    <div class="rich-toolbar editor-toolbar" role="toolbar" aria-label="正文格式工具"><button type="button" id="richBold" class="rich-tool" aria-label="加粗" aria-pressed="false" title="加粗（Ctrl+B）"><b>B</b></button><button type="button" id="richItalic" class="rich-tool" aria-label="斜体" aria-pressed="false" title="斜体（Ctrl+I）"><i>I</i></button><button type="button" id="insertInlineImage" class="rich-clear">插入图片</button><input type="file" id="inlineImageInput" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" multiple hidden>
+     <details id="editorFormatting"><summary>更多格式</summary><div class="editor-format-options"><div class="rich-size"><label for="fontSize">字号</label><input id="fontSize" type="number" min="10" max="72" value="16" step="1" aria-label="文字字号"><span>px</span><button type="button" id="applyFontSize" title="应用字号到选中文字">应用</button></div><div class="rich-colors" role="group" aria-label="文字颜色"><button type="button" data-color="#202932" aria-label="墨黑" title="墨黑" style="--swatch:#202932"></button><button type="button" data-color="#c43c39" aria-label="朱红" title="朱红" style="--swatch:#c43c39"></button><button type="button" data-color="#c36a23" aria-label="赭橙" title="赭橙" style="--swatch:#c36a23"></button><button type="button" data-color="#28745b" aria-label="松绿" title="松绿" style="--swatch:#28745b"></button><button type="button" data-color="#2768b3" aria-label="湖蓝" title="湖蓝" style="--swatch:#2768b3"></button><button type="button" data-color="#7952b3" aria-label="鸢紫" title="鸢紫" style="--swatch:#7952b3"></button></div><button type="button" id="clearRich" class="rich-clear" title="清除选中文字格式">清除格式</button></div></details>
+    </div>
+    <div id="imageTools" class="image-tools" hidden><span id="imageToolName">图片排版</span><label>宽度 <input id="imageWidth" type="number" min="10" max="100" step="1" value="70"> %</label><button type="button" data-image-align="center">居中独占一行</button><button type="button" data-image-align="left">居左环绕</button><button type="button" data-image-align="right">居右环绕</button><button type="button" id="imageOriginal">查看原图</button><button type="button" id="removeInlineImage">移出正文</button></div><div id="richBody" class="rich-content rich-editor" contenteditable="true" role="textbox" aria-labelledby="bodyLabel" aria-multiline="true" spellcheck="false"></div></div><textarea id="body" hidden aria-hidden="true" tabindex="-1"></textarea>
+  </div>
+  <section class="editor-files" aria-label="附件">
+   <div class="editor-file-actions"><button type="button" class="secondary" id="addAttachments" title="单个文件最多 2 GB">＋ 添加附件</button><input type="file" id="attachmentInput" multiple hidden></div>
+   <div id="draftFiles"></div>
+  </section>
+  <details class="editor-disclosure" id="editorResources">
+   <summary>关联资料库<span class="editor-resource-count" id="editorResourceCount"></span></summary>
+   <div class="field" id="resourceLinksField"><select id="resourceLinkFolder" aria-label="关联资料文件夹"></select><input id="resourceLinkSearch" aria-label="搜索关联资料" placeholder="搜索标题或作者"><div id="resourceLinkChoices" class="resource-link-choices"></div></div>
+  </details>
+  <details class="editor-disclosure" id="editorMetadata"><summary>记录信息</summary><div class="editor-metadata-grid"><div class="field" id="recordDateField"><label for="date">记录日期</label><input type="date" id="date" required></div><div class="field"><label for="status">当前状态</label><select id="status"></select></div><div class="field" id="authorField"><label for="author">作者 / 主讲人</label><input id="author" maxlength="200" placeholder="作者姓名、团队或视频主讲人"></div><div class="field" id="journalKindField"><label for="journalKind">日志类型</label><select id="journalKind"><option value="daily">按日记录</option><option value="work-weekly">工作周志</option><option value="weekly">组会周报</option></select></div><div class="field" id="issueTrackField" hidden><label for="issueTrack">问题归属</label><select id="issueTrack"><option value="">未分类</option><option value="work">工作问题</option><option value="study">学习问题</option></select></div><div class="field" data-plan-option hidden><label for="planTrack">计划归属</label><select id="planTrack"><option value="">未指定</option><option value="journal">工作日志</option><option value="study">学习日志</option></select></div><div class="field" data-plan-option hidden><label for="planPeriod">计划周期</label><select id="planPeriod"><option value="week">一周</option><option value="month">一个月</option><option value="custom">自定义</option></select></div><div id="referenceFields"><div class="field"><label for="reference">文献信息</label><input id="reference" placeholder="作者 · 期刊 / 会议 · 年份，例如 JSSC / ISSCC"></div><div class="field"><label for="url">文献链接 / DOI 链接</label><input type="url" id="url" placeholder="https://doi.org/…"></div></div><div class="field"><label for="tagsInput">标签 · 用逗号分隔</label><input id="tagsInput" placeholder="运放, 噪声, 稳定性"></div><div class="field"><label for="recordFolder">归档文件夹</label><select id="recordFolder"></select></div><label class="editor-pin"><input type="checkbox" id="pinned"> 置顶收藏</label></div></details>
+ </div>
+ <div class="modalfoot"><div class="editor-save-state"><p class="form-message" id="formMessage" role="alert"></p><span class="tiny" id="saveHint">保存后可随时继续编辑</span></div><div class="right"><button type="button" class="secondary" data-close="editor">取消</button><button type="submit" class="primary" id="saveBtn">保存记录</button></div></div>
+</form></dialog>
+<dialog id="deleteConfirmDialog" aria-labelledby="deleteConfirmTitle" aria-describedby="deleteConfirmText"><form method="dialog"><div class="modalhead"><h2 id="deleteConfirmTitle">确认删除</h2></div><div class="modalbody"><p id="deleteConfirmText"></p></div><div class="modalfoot"><div class="right"><button type="submit" class="secondary" value="cancel" autofocus>取消</button><button type="submit" class="primary" value="delete">确认删除</button></div></div></form></dialog><dialog id="detail" aria-labelledby="detailTitle"><div class="modalhead"><span class="tiny">RECORD / 记录详情</span><button class="icon-button" data-close="detail" aria-label="关闭">✕</button></div><div class="modalbody" id="detailContent"></div><div class="modalfoot" id="detailActions"><button type="button" class="danger" id="deleteBtn">删除记录</button><p id="detailDeleteError" class="form-message" role="alert"></p><div class="right"><button class="secondary" id="pinBtn">置顶收藏</button><button class="primary" id="editBtn">编辑记录</button></div></div><div class="modalfoot detail-delete-confirm" id="detailDeleteConfirm" hidden role="group" aria-label="确认删除记录"><p id="detailDeleteText"></p><div class="right"><button type="button" class="secondary" id="detailDeleteCancel">取消</button><button type="button" class="primary" id="detailDeleteAccept">确认删除</button></div></div></dialog>
+<dialog id="backup" aria-labelledby="backupTitle"><div class="modalhead"><h2 id="backupTitle">备份与资料夹</h2><button class="icon-button" data-close="backup" aria-label="关闭">✕</button></div><div class="modalbody"><p style="font-size:12px;line-height:1.9;color:#84909a">备份当前用户的记录、研究方向和附件。大文件使用原生流式备份，导出前检查磁盘空间；导入前检查可用空间，并按记录编号与内容特征跳过重复项。</p><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="secondary" id="exportJson">完整备份 JSON · 500 MB 内</button><button class="secondary" id="exportFolder">离线资料夹 ZIP · 500 MB 内</button><button class="primary" id="writeFolder">流式备份到文件夹（大文件）</button><button class="secondary" id="exportMd">导出 Markdown</button><button class="secondary" id="importBtn">导入 JSON / ZIP · 500 MB 内</button><input type="file" accept=".json,.zip,application/json,application/zip" id="importFile" hidden></div><button class="secondary" id="restoreDraft" style="margin-top:14px">恢复最近草稿</button><p class="import-note" id="reliabilityStatus"></p><p class="import-note" id="storageNote"></p><div class="form-message" id="importMessage" role="alert"></div></div></dialog><dialog id="trashDialog" aria-labelledby="trashTitle"><div class="modalhead"><h2 id="trashTitle">回收站</h2><button class="icon-button" data-close="trashDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">删除的记录会先到这里，保留 30 天，之后自动清理。恢复会回到原栏目；彻底删除后附件一并清除，无法找回。</p><div class="library-controls"><span class="tiny" id="trashCount"></span><span style="flex:1"></span><button type="button" class="secondary" id="trashEmptyAll">清空回收站</button></div><div id="trashList" class="manager-list"></div><p id="trashMessage" class="form-message" role="status"></p></div></dialog><button type="button" id="openAiModelSettings" hidden>AI 模型服务</button><button type="button" id="openTranslateLangDialog" hidden>翻译语言</button><dialog id="translateLangDialog" aria-labelledby="translateLangTitle"><div class="modalhead"><h2 id="translateLangTitle">翻译语言</h2><button type="button" class="icon-button" data-close="translateLangDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">在 PDF 里选中文字时，会按这里的语言对自动翻译。本地大模型与在线翻译源都在「设置 → 翻译与模型 → 翻译服务」中配置。</p><div class="field-row" style="grid-template-columns:1fr auto 1fr;align-items:end"><div class="field"><label for="pdfSourceLang">原文语言</label><select id="pdfSourceLang" aria-label="原文语言"><option value="en">英语</option><option value="zh">中文</option><option value="de">德语</option><option value="fr">法语</option></select></div><span class="tiny" aria-hidden="true">→</span><div class="field"><label for="pdfTargetLang">译文语言</label><select id="pdfTargetLang" aria-label="翻译目标语言"><option value="zh">中文</option><option value="en">英语</option></select></div></div></div><div class="modalfoot"><div class="right"><button type="button" class="secondary" data-close="translateLangDialog">取消</button><button type="button" class="primary" id="translateLangSave">保存</button></div></div></dialog><dialog id="aiModelDialog" aria-labelledby="aiModelTitle"><div class="modalhead"><h2 id="aiModelTitle">AI 模型服务</h2><button type="button" class="icon-button" data-close="aiModelDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">用于阅读器里的 AI 问答，支持 Chat Completions 兼容服务。密钥只保留在当前页面内存中，刷新后需重新填写，不进入笔记和备份。</p><div class="field"><label for="readerAiUrl">服务地址</label><input id="readerAiUrl" placeholder="https://api.openai.com/v1"></div><div class="field"><label for="readerAiModel">模型名称</label><input id="readerAiModel" placeholder="填写你的服务提供的模型名称"></div><div class="field"><label for="readerAiKey">API 密钥（本次会话）</label><input id="readerAiKey" type="password" autocomplete="off" placeholder="本地服务不需要时可留空"></div><p id="aiModelStatus" class="form-message" role="status"></p></div><div class="modalfoot"><span class="tiny">设置只影响本机阅读助手</span><div class="right"><button type="button" class="secondary" data-close="aiModelDialog">取消</button><button type="button" class="primary" id="saveReaderAiSettings">保存并使用</button></div></div></dialog><dialog id="pdfSearchDialog" aria-labelledby="pdfSearchTitle"><div class="modalhead"><h2 id="pdfSearchTitle">PDF 全文检索</h2><button class="icon-button" data-close="pdfSearchDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">搜索文献库中 PDF 的正文内容，命中后可跳到对应页。首次使用会先为 PDF 建立索引（大文档需要一些时间）。</p><label class="searchbox" style="margin-bottom:10px"><i data-icon="search"></i><input id="pdfSearchQuery" placeholder="输入要搜索的词或短语…" aria-label="搜索 PDF 内容"></label><p id="pdfSearchStatus" class="form-message" role="status"></p><div id="pdfSearchResults"></div></div></dialog>
+
+
+<dialog id="categoriesDialog" aria-labelledby="categoriesTitle"><div class="modalhead"><h2 id="categoriesTitle">管理工作台栏目</h2><button class="icon-button" data-close="categoriesDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">可以改名、添加或调整顺序。删除栏目时可将记录转移到其他栏目，保留正文和附件；资料库独立保留。</p><form id="navLabelsForm"><div class="field-row" style="grid-template-columns:1fr 1fr"><div class="field"><label for="workspaceName">工作台名称</label><input id="workspaceName" maxlength="30" required></div><div class="field"><label for="overviewName">总览名称</label><input id="overviewName" maxlength="30" required></div><div class="field"><label for="libraryName">资料库名称</label><input id="libraryName" maxlength="30" required></div><div class="field"><label for="pinnedName">收藏名称</label><input id="pinnedName" maxlength="30" required></div></div><button class="secondary" style="margin-bottom:22px">保存导航名称</button></form><form id="navDescriptionForm"><div class="field-row" style="grid-template-columns:minmax(120px,1fr) 2fr"><div class="field"><label for="navDescriptionCategory">栏目</label><select id="navDescriptionCategory"></select></div><div class="field"><label for="navDescriptionText">栏目标题下方的说明</label><input id="navDescriptionText" maxlength="160"></div></div><button type="submit" class="secondary">保存栏目说明</button><p id="navDescriptionStatus" class="form-message" role="status">留空可恢复默认说明。</p></form><form id="categoryForm" class="field topic-editor"><input id="categoryName" maxlength="30" required placeholder="例如：电路设计、仿真验证" aria-label="栏目名称"><button class="primary" id="categorySave">添加栏目</button></form><div class="field"><label for="categoryDestination">删除有记录的栏目时，记录转移目标</label><select id="categoryDestination"></select></div><div id="categoryList" class="manager-list"></div><div id="categoryMessage" class="form-message" role="alert"></div></div></dialog><dialog id="topicsDialog" aria-labelledby="topicsTitle"><div class="modalhead"><h2 id="topicsTitle">管理研究方向</h2><button class="icon-button" data-close="topicsDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">改名或删除会同步更新当前工作台所有使用该标签的文档和记录。改成已有标签时会合并。</p><form id="topicForm" class="field topic-editor"><input id="topicName" aria-label="新研究方向" placeholder="例如：SAR ADC、低噪声放大器" maxlength="60" required><button class="primary" id="topicSave">添加</button><button type="button" class="secondary" id="topicCancel" hidden>取消改名</button></form><div id="topicList" class="manager-list"></div><div id="topicMessage" class="form-message" role="alert"></div></div></dialog>
+<dialog id="usersDialog" aria-labelledby="usersTitle"><div class="modalhead"><h2 id="usersTitle">本地用户</h2><button class="icon-button" data-close="usersDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">每个用户拥有各自的记录、研究方向与附件。这里用于本机资料分类，无密码登录，也不提供隐私权限隔离。</p><div id="userList" class="manager-list"></div><section id="profileDeleteConfirm" hidden aria-labelledby="profileDeleteText"><p id="profileDeleteText"></p><div class="right"><button type="button" class="secondary" id="profileDeleteCancel">取消</button><button type="button" class="primary" id="profileDeleteAccept">确认删除用户</button></div><p id="profileDeleteError" class="form-message" role="alert"></p></section><form id="profileForm" class="account-form"><h3 style="font-size:13px" id="profileFormTitle">添加用户</h3><div class="field-row"><div class="field"><label for="profileName">用户名称 *</label><input id="profileName" required maxlength="40" placeholder="例如：我的学习工作台"></div><div class="field"><label for="profileRole">说明 / 研究方向</label><input id="profileRole" maxlength="80" placeholder="例如：模拟集成电路设计"></div></div><div style="display:flex;gap:10px"><button class="primary" id="saveProfile">添加用户</button><button type="button" class="secondary" id="cancelProfileEdit" hidden>取消修改</button></div><div id="userMessage" class="form-message" role="alert"></div></form></div></dialog>
+
+<dialog id="aiManager" aria-labelledby="aiManagerTitle">
+ <div class="modalhead"><h2 id="aiManagerTitle">AI 管理</h2><button type="button" class="icon-button" data-close="aiManager" aria-label="关闭">✕</button></div>
+ <div class="modalbody bridge">
+  <div class="bridge-hero">
+   <div><p class="eyebrow">连接器与授权</p><h3>让助手安全地读写这个工作台</h3><p class="section-note">当前用户 <strong id="bridgeCurrentProfile"></strong>。原附件留在本机，只有被授权的助手能读取发布的内容。</p></div>
+   <p id="bridgeStatus" class="bridge-status" role="status">尚未连接。</p>
+  </div>
+  <section class="bridge-card">
+   <header class="bridge-card-head"><h3><span class="bridge-step">1</span>连接服务</h3><div class="bridge-card-actions"><button class="primary" type="button" id="bridgeDesktopConnect" hidden>启动并连接本机服务</button><button class="primary" type="button" id="bridgeConnect">连接并发布快照</button><button class="secondary" type="button" id="bridgeImportConnection">导入连接文件</button><input type="file" id="bridgeConnectionFile" accept=".json" hidden><button class="secondary" type="button" id="bridgeDisconnect">断开</button></div></header>
+   <div class="bridge-fields">
+    <div class="field"><label for="bridgeUrl">服务地址</label><input id="bridgeUrl" type="url" value="http://127.0.0.1:4318" spellcheck="false"></div>
+    <div class="field"><label for="bridgeAdminToken">管理令牌</label><input id="bridgeAdminToken" type="password" autocomplete="off" placeholder="点「启动并连接本机服务」后自动填入"></div>
+   </div>
+   <div class="bridge-options" role="group" aria-label="快照内容">
+    <span class="bridge-options-label">快照包含</span>
+    <label><input type="checkbox" id="bridgeIncludeBody"> 正文</label>
+    <label><input type="checkbox" id="bridgeIncludePdf"> 近期 PDF 文本摘录</label>
+    <label><input type="checkbox" id="bridgeAutoSync" checked> 软件运行时自动同步，无需逐条确认</label>
+    <label id="bridgeRememberOption" hidden><input type="checkbox" id="bridgeRemember" checked> 记住连接，下次打开自动连接</label>
+   </div>
+   <p class="section-note" id="bridgeCredentialNote">默认发布标题、作者、标签、状态与附件清单；网页版连接凭证只在本次打开的页面中使用。</p>
+  </section>
+  <section class="bridge-card">
+   <header class="bridge-card-head"><h3><span class="bridge-step">2</span>助手与权限</h3><p class="section-note">权限只作用于当前工作台，可随时撤销或删除。</p></header>
+   <form id="bridgeAgentForm">
+    <div class="bridge-fields"><div class="field"><label for="bridgeAgentName">助手名称</label><input id="bridgeAgentName" maxlength="60" placeholder="例如 Grok bot" required></div></div>
+    <div class="bridge-scopes" role="group" aria-label="助手权限">
+     <label><input type="checkbox" data-bridge-scope="records:read"> <span>读取快照<small>浏览标题、标签与已发布正文</small></span></label>
+     <label><input type="checkbox" data-bridge-scope="records:create" checked> <span>新增记录<small>创建计划、笔记或整理结果</small></span></label>
+     <label><input type="checkbox" data-bridge-scope="records:update"> <span>更新记录<small>改标签、追加总结（需版本校验）</small></span></label>
+     <label><input type="checkbox" data-bridge-scope="records:delete"> <span>删除记录及附件<small>删除会先进入回收站</small></span></label>
+     <label><input type="checkbox" data-bridge-scope="files:read"> <span>读取服务附件<small>下载已上传的附件</small></span></label>
+     <label><input type="checkbox" data-bridge-scope="files:write"> <span>上传附件<small>把代码或资料存入资料库</small></span></label>
+     <label><input type="checkbox" data-bridge-scope="subtitles:read"> <span>读取视频字幕<small>查找视频并按需读取字幕文本</small></span></label>
+     <label><input type="checkbox" data-bridge-scope="subtitles:write"> <span>写入视频字幕<small>回填中文字幕或追加定时字幕</small></span></label>
+    </div>
+    <div class="bridge-presets">
+     <span class="bridge-options-label">快速选择</span>
+     <button type="button" class="secondary" data-bridge-preset="read">只读</button>
+     <button type="button" class="secondary" data-bridge-preset="write">可写</button>
+     <button type="button" class="secondary" id="bridgeGrantFull">完整工作台权限</button>
+     <span class="bridge-preset-gap"></span>
+     <button type="submit" class="primary">创建助手凭证</button>
+    </div>
+   </form>
+   <div class="bridge-token" id="bridgeNewTokenPanel" hidden>
+    <div class="field"><label for="bridgeNewToken">助手令牌 · 仅此处显示</label><textarea id="bridgeNewToken" rows="2" readonly></textarea></div>
+    <div class="field"><label for="bridgeMcpUrl">Grok 连接器地址（MCP）</label><input id="bridgeMcpUrl" type="text" readonly></div>
+    <p class="section-note">Grok 网页版需要公网可访问的 HTTPS 地址；本机地址可用于本地验证。只把这个令牌交给助手，不要提供管理令牌。</p>
+    <div class="bridge-actions"><button class="secondary" type="button" id="bridgeCopyToken">复制令牌</button><button class="secondary" type="button" id="bridgeCopyMcp">复制连接器地址</button><button class="secondary" type="button" id="bridgeTestMcp">验证 MCP 接入</button></div>
+    <p class="section-note" id="bridgeMcpStatus" role="status"></p>
+   </div>
+   <div id="bridgeAgentList" class="bridge-agent-list"></div>
+  </section>
+  <section class="bridge-card">
+   <header class="bridge-card-head"><h3><span class="bridge-step">3</span>同步队列</h3><div class="bridge-card-actions"><button class="primary" type="button" id="bridgeSync">立即同步</button><button class="secondary" type="button" id="bridgePublish">更新快照</button></div></header>
+   <div id="bridgeTaskList"></div>
+  </section>
+  <details class="bridge-card bridge-audit"><summary>近期操作</summary><pre id="bridgeAudit"></pre></details>
+  <div class="bridge-foot"><button class="secondary" type="button" id="bridgeDownloadGuide">下载当前助手接入说明</button></div>
+ </div>
+</dialog>
+<dialog id="reader" class="attachment-reader" aria-labelledby="readerTitle">
+ <div class="reader-chrome">
+  <div class="modalhead">
+   <h2 id="readerTitle">附件阅读</h2>
+   <button type="button" class="secondary reader-theme-toggle" id="readerThemeToggle" data-theme-toggle>☀ 白天</button>
+   <button type="button" class="secondary" id="readerDownload" title="下载原文件" aria-label="下载原文件">
+    <svg class="reader-download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg>
+    <span class="reader-download-label">下载原文件</span>
+   </button>
+   <button type="button" class="icon-button" id="readerExpandVideo" title="全屏预览" aria-label="全屏预览" aria-pressed="false" hidden>
+    <svg class="reader-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+     <path class="reader-expand-glyph" d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/>
+     <path class="reader-restore-glyph" d="M4 9h5V4m11 5h-5V4M4 15h5v5m11-5h-5v5"/>
+    </svg>
+   </button>
+   <button type="button" class="icon-button" data-close="reader" aria-label="关闭">✕</button>
+  </div>
+  <nav id="readerTabs" class="reader-tabs" aria-label="已打开的文档" hidden>
+   <div class="reader-tab-scroll"></div>
+   <button type="button" class="reader-tab-add" id="readerTabAdd" title="再打开一份文档" aria-label="再打开一份文档">＋</button>
+  </nav>
+ </div>
+ <div id="readerContent"></div>
+</dialog>
+
+<script>
+'use strict';
+const icons={grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',book:'<path d="M12 5v16M12 5C9 3 5 3 2 4v15c4-1 7-1 10 2 3-3 6-3 10-2V4c-3-1-7-1-10 1Z"/>',circuit:'<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4M10 10h4v4h-4z"/>',pen:'<path d="m16 3 5 5-12 12-6 1 1-6L16 3Zm-3 3 5 5M3 21h18"/>',pin:'<path d="m15 3 6 6-4 1-4 6-3-2-6 7 5-8-2-3 6-4 2-3Z"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6m10-6v6M3 11h18m-12 4h3"/>',search:'<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>',plus:'<path d="M12 5v14M5 12h14"/>',download:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>'};
+Object.assign(icons,{
+ navOverview:'<rect x="3.25" y="3.25" width="17.5" height="17.5" rx="3"/><path d="M3.25 9h17.5m-11 0v11.75"/>',
+ navDesign:'<rect x="5.25" y="5.25" width="13.5" height="13.5" rx="2.5"/><path d="M9 2.5v2.75m6-2.75v2.75M9 18.75v2.75m6-2.75v2.75M2.5 9h2.75m-2.75 6h2.75m13.5-6h2.75m-2.75 6h2.75M8 13h2l1.5-3 1.5 4 1.2-2H16"/>',
+ navWork:'<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 12.5a23 23 0 0 0 18 0m-9 .6v2"/>',
+ navStudy:'<path d="M2.5 9.25 12 4l9.5 5.25L12 14.5 2.5 9.25Zm4 2.25v4.75a9.6 9.6 0 0 0 11 0V11.5M21.5 9.25v6"/>',
+ navLibrary:'<rect x="3.25" y="4" width="4.25" height="15.5" rx="1"/><rect x="9" y="4" width="4.25" height="15.5" rx="1"/><path d="m15.2 5.7 3.6-.9 3.25 13.9-3.6.9-3.25-13.9ZM3.25 8h4.25M9 8h4.25"/>',
+ navPinned:'<path d="m14.5 3.5 6 6-2.75.75-3.5 3.5-.5 3-2.8-2.8L5 20l5.95-6.05-2.8-2.8 3-.5 3.35-3.4V3.5Z"/>',
+});
+const svg=name=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[name]||icons.pen)+'</svg>';
+document.querySelectorAll('[data-icon]').forEach(el=>el.outerHTML=svg(el.dataset.icon));
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const key='analog-notes-v1',names={all:'总览',paper:'文献阅读',issue:'设计问题',journal:'工作学习日志',pinned:'置顶收藏'},statusOptions={paper:['待读','在读','已读'],issue:['待排查','进行中','已解决'],journal:['已记录','进行中']},templates={paper:'研究问题\n\n核心思路 / 电路结构\n\n关键指标与测试条件\n\n我的理解与疑问\n\n对当前设计的启发\n\n下一步\n',issue:'问题现象\n\n电路 / 工艺 / 仿真条件\n\n可能原因与假设\n\n排查过程与验证结果\n\n解决方案与结论\n\n下一步\n',journal:'今日目标\n\n完成的工作 / 学习内容\n\n关键发现与思考\n\n遇到的问题\n\n下一步计划\n'};
+let records=[],view='all',tab='all',topic='',editing=null,current=null,ready=false,busy=false;
+const today=(d=new Date())=>{return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+$('dateLabel').textContent=new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+function toast(text,action){document.querySelector('.toast')?.remove();const el=document.createElement('div');el.className='toast';el.role='status';el.append(text);if(action){const b=document.createElement('button');b.type='button';b.textContent=action.label;b.onclick=()=>{el.remove();Promise.resolve(action.run()).catch(e=>toast(e.message))};el.append(b)}document.body.append(el);setTimeout(()=>el.remove(),action?7000:4200)}
+function validate(n){return n&&typeof n.id==='string'&&/^[a-zA-Z0-9-]{1,80}$/.test(n.id)&&typeof n.title==='string'&&n.title.trim()&&n.title.length<=240&&/^(paper|issue|journal|study|plan|resource|custom-[a-zA-Z0-9-]{1,64})$/.test(n.type)&&(n.type!=='plan'||validPlanDates(n.planStart,n.planEnd)&&validPlanTrack(n.planTrack))&&validLiteratureData(n.literature)&&validCitationRecord(n.citation)&&validPdfNoteSource(n.pdfSource)&&(n.pdfEvidence===undefined||(Array.isArray(n.pdfEvidence)&&n.pdfEvidence.length<=240&&n.pdfEvidence.every(source=>source&&validPdfNoteSource(source))))&&(n.researchLinks===undefined||(Array.isArray(n.researchLinks)&&n.researchLinks.length<=100&&n.researchLinks.every(id=>typeof id==='string'&&/^[a-zA-Z0-9-]{1,80}$/.test(id))))&&Array.isArray(n.tags)&&n.tags.length<=30&&n.tags.every(t=>typeof t==='string'&&t.length<100)&&typeof n.body==='string'&&n.body.length<=150000&&(n.bodyHtml===undefined||(typeof n.bodyHtml==='string'&&n.bodyHtml.length<=600000))&&/^\d{4}-\d{2}-\d{2}$/.test(n.date)&&!isNaN(new Date(n.date+'T00:00:00').getTime())&&typeof n.status==='string'&&n.status.length>0&&n.status.length<=30&&(!n.url||(typeof n.url==='string'&&/^https?:\/\//i.test(n.url)))&&(!n.reference||typeof n.reference==='string')&&(!n.author||typeof n.author==='string')&&(!n.relatedResources||(Array.isArray(n.relatedResources)&&n.relatedResources.length<=100&&n.relatedResources.every(id=>typeof id==='string'&&/^[a-zA-Z0-9-]{1,80}$/.test(id))))}
+function render(){
+ renderCategoryNavigation();renderReminders();renderDashboardWidgets();const folderFilter=renderRecordFolderBar(),folderMatch=view==='resource'&&typeof libraryFolderMatcher==='function'?libraryFolderMatcher():recordFolderMatcher(folderScope(view),folderFilter);if(typeof renderLibraryFolders==='function')renderLibraryFolders();
+ renderSidebarTopics();renderPlanArchiveControl();
+ const q=$('search').value.trim().toLowerCase();let list=records.filter(r=>!r.flashcardKind&&(view==='all'||view==='pinned'&&r.pinned||r.type===view||view==='resource'&&r.type==='paper')&&(tab==='all'||r.type===tab||tab==='resource'&&r.type==='paper')&&(!topic||r.tags.includes(topic))&&(!q||[r.title,r.author||'',r.body,r.reference,...Object.values(r.literature||{}),r.webArticle?.searchText,...r.tags,...(r.attachments||[]).map(a=>a.name)].join(' ').toLowerCase().includes(q)));
+ list=list.filter(r=>view==='plan'?archivedPlan(r)===planArchiveMode:!archivedPlan(r));
+ if(view==='issue'&&$('issueTrackFilter').value){const filter=$('issueTrackFilter').value;list=list.filter(r=>(issueTrack(r)||'unclassified')===filter)}
+ if(view==='resource'){const ls=$('libraryStatus').value,kind=$('libraryKind').value;list=list.filter(r=>(!kind||(kind==='web'?!!r.webArticle:r.type===kind))&&matchesReadingList(r.id)&&(!ls||r.status===ls))}if(['journal','study'].includes(view)){if($('weeklyOnly').checked)list=list.filter(weeklyJournal);if($('meetingWeek').value)list=list.filter(r=>getWeekKey(r.date)===$('meetingWeek').value)}
+ list=list.filter(folderMatch);renderJournalPlans();const sort=$('sort').value;list.sort((a,b)=>Number(b.pinned)-Number(a.pinned)||(sort==='old'?recordTimelineDate(a).localeCompare(recordTimelineDate(b)):sort==='updated'?(b.updatedAt||'').localeCompare(a.updatedAt||''):sort==='title'?String(a.title).localeCompare(String(b.title),'zh-Hans-CN'):sort==='author'?String(a.author||'').localeCompare(String(b.author||''),'zh-Hans-CN'):recordTimelineDate(b).localeCompare(recordTimelineDate(a))));
+ $('activeFilter').innerHTML=topic?'当前标签：'+esc(topic)+' <button class="icon-button" id="clearTopic" style="display:inline;font-size:10px">清除 ×</button>':'';$('clearTopic')?.addEventListener('click',()=>{topic='';render()});
+ const recentTotal=list.length,visibleList=view==='all'?list.slice(0,10):list;
+ const page=libraryPageSlice(visibleList);document.querySelector('main').dataset.view=view;const from=page.items.length?(libraryPage-1)*libraryPageSize()+1:0;$('resultCount').textContent=view==='all'?'最近 '+page.items.length+' 条 / 共 '+recentTotal+' 条':page.total>libraryPageSize()?'第 '+from+'–'+(from+page.items.length-1)+' 条 / 共 '+page.total+' 条':'共 '+page.total+' 条记录';
+ $('records').innerHTML=page.items.length?page.items.map(r=>'<article class="card" role="button" tabindex="0" data-id="'+esc(r.id)+'" aria-label="查看 '+esc(r.title)+'"><div class="card-meta"><span class="kind '+r.type+'">'+svg(r.type==='paper'?'book':r.type==='issue'?'circuit':'pen')+names[r.type]+'</span>'+journalBadge(r)+planBadge(r)+issueTrackBadge(r)+(r.pinned?'<span class="pin">⌑ 已置顶</span>':'')+((r.attachments||[]).length?'<span class="tiny"> · '+r.attachments.length+' 个附件</span>':'')+(r.type==='plan'?'':'<time class="card-date">'+esc(r.date.replaceAll('-','.'))+'</time>')+'</div><h3>'+esc(r.title)+'</h3>'+(r.author?'<p class="tiny" style="margin:0 0 10px">作者 / 主讲人：'+esc(r.author)+'</p>':'')+'<p class="card-excerpt">'+(legacyPptxExcerpt(r)?'':esc(r.body.slice(0,100)+(r.body.length>100?'…':'')))+'</p><div class="card-bottom"><div class="tags">'+r.tags.slice(0,4).map(t=>'<span class="tag">'+esc(t)+'</span>').join('')+'</div><span class="status '+(['已读','已解决','已记录'].includes(r.status)?'done':'')+'" data-status="'+esc(r.status)+'">'+esc(r.status)+(r.readerProgress?' · '+esc(progressLabel(r.readerProgress)):'')+'</span></div></article>').join(''):'<div class="empty"><h3>'+(!ready?'暂时无法读取记录':records.length?'没有匹配结果':'暂无记录')+'</h3>'
+  +(!ready?'<p>请重新打开工作台。</p>':records.length?'<p>试试其他关键词，或调整筛选条件。</p>':'')
+  +(ready?'<button type="button" class="primary" id="firstNote">'+(view==='resource'?'导入文件':'新建记录')+'</button>':'')+'</div>';
+ $('firstNote')?.addEventListener('click',()=>{if(view==='resource'){$('resourceFileInput').click();return}openEditor(view in templates?view:'paper')});$('records').querySelectorAll('.card').forEach(el=>{el.onclick=()=>showDetail(el.dataset.id);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();showDetail(el.dataset.id)}}});
+ renderPendingIssues();renderLibraryGallery(page.items,visibleList);renderLibraryPager(page.total);window.renderAchievementHall?.();
+}
+const ISSUE_TRACK_LABELS={work:'工作问题',study:'学习问题','':'未分类'};
+function issueTrack(note){return ['work','study'].includes(note?.issueTrack)?note.issueTrack:''}
+function issueTrackBadge(note){return note.type==='issue'?'<span class="meeting-badge">'+ISSUE_TRACK_LABELS[issueTrack(note)]+'</span>':''}
+function renderPendingIssues(){
+ const pending=records.filter(r=>r.type==='issue'&&r.status!=='已解决').sort((a,b)=>b.date.localeCompare(a.date));
+ $('pending').innerHTML=pending.length?['work','study',''].map(track=>{
+  const group=pending.filter(r=>issueTrack(r)===track);
+  return group.length?'<div class="pending-group"><strong>'+ISSUE_TRACK_LABELS[track]+' · '+group.length+'</strong>'+group.slice(0,4).map(r=>'<button data-id="'+esc(r.id)+'">'+esc(r.title)+' <span class="tiny">↗</span></button>').join('')+'</div>':'';
+ }).join(''):'暂无待排查的问题。';
+ $('pending').querySelectorAll('button').forEach(b=>b.onclick=()=>showDetail(b.dataset.id));
+}
+function switchView(next,{fromHistory=false}={}){
+ if(next==='paper')next='resource';
+ const changed=view!==next;
+ if(changed&&!fromHistory)rememberWorkspaceView(next);
+ if(changed){$('weeklyOnly').checked=false;$('meetingWeek').value='';$('issueTrackFilter').value=''}
+ view=next;tab='all';topic='';$('search').value='';
+ $('crumb').textContent=names[next];$('listTitle').textContent=next==='all'?'最近记录':names[next];
+ $('pageTitle').textContent=names[next];
+ document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===next));
+ $('tabs').style.display=next==='all'||next==='pinned'?'flex':'none';
+ document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab==='all'));
+ if(changed)document.scrollingElement.scrollTop=0;
+ render();
+ if(changed)animateWorkspaceView();
+}
+document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>switchView(b.dataset.nav));document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('[data-tab]').forEach(a=>a.classList.toggle('active',a===b));render()});$('search').oninput=render;$('sort').onchange=render;
+function typeFields(status){const type=$('type').value;$('status').innerHTML=statusOptions[type].map(s=>'<option>'+esc(s)+'</option>').join('');if(status&&statusOptions[type].includes(status))$('status').value=status;$('referenceFields').style.display=['paper','resource'].includes(type)?'block':'none';if(typeof updateLibraryEditorType==='function')updateLibraryEditorType()}
+function openEditor(type='paper',note=null){
+ if(!ready){toast('记录库未连接，请先连接或登录。');return}
+ discardMinimizedWorkspaceDialog('editor');
+ if(!statusOptions[type])type=defaultRecordType();
+ editing=note?.id||null;
+ $('noteForm').reset();
+ for(const id of ['editorMetadata','editorResources','editorFormatting'])$(id).open=false;
+ $('type').value=note?.type||type;
+ $('type').disabled=!!note?.webArticle;
+ typeFields(note?.status);
+ setupPlanFields($('type').value,note);
+ const scope=folderScope(type);
+ setEditorFolder($('type').value,note?note.folderId:scope===folderScope(view)?activeFolderFilter(scope):'');
+ $('date').value=note?.date||today();
+ $('title').value=note?.title||'';
+ $('reference').value=note?.reference||'';
+ $('url').value=note?.url||'';
+ $('tagsInput').value=note?.tags.join(', ')||topic;
+ $('body').value=note?.body??templates[type];
+ $('pinned').checked=!!note?.pinned;
+ resetAttachments(note);
+ loadLibraryEditorFields(note);
+ loadRichBody(note);
+ $('formMessage').textContent='';
+ $('editorTitle').textContent=note?'编辑记录':'新建'+names[type];
+ setEditorMode(false);
+ $('editor').showModal();
+ $('editor').querySelector('.editor-body').scrollTop=0;
+ $('title').focus({preventScroll:true});
+}
+$('noteForm').addEventListener('invalid',event=>{
+ const details=event.target.closest('details');
+ if(details)details.open=true;
+},true);
+$('type').onchange=()=>{typeFields();setupPlanFields($('type').value,null);setEditorFolder($('type').value,$('recordFolder').value);$('editorTitle').textContent=editing?'编辑记录':'新建'+names[$('type').value];if(Object.values(templates).includes($('body').value)||!$('body').value){$('body').value=templates[$('type').value];loadRichBody(null)}};$('newBtn').onclick=()=>openEditor(view in templates?view:'paper');document.querySelectorAll('[data-new]').forEach(b=>b.onclick=()=>openEditor(b.dataset.new));document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(!busy)$(b.dataset.close).close()});$('editor').addEventListener('cancel',e=>{e.preventDefault();if(busy)e.stopPropagation()});
+function showDetail(id){const n=records.find(r=>r.id===id);if(!n)return;discardMinimizedWorkspaceDialog('detail');$('detailDeleteError').textContent='';current=id;$('deleteBtn').textContent=n.type==='resource'?'删除资料':'删除记录';$('detailContent').innerHTML='<div class="card-meta"><span class="kind '+n.type+'">'+esc(names[n.type])+'</span>'+(n.type==='plan'?'':'<span>'+esc(n.date)+'</span>')+'<span class="status" data-status="'+esc(n.status)+'">'+esc(n.status)+'</span>'+journalBadge(n)+planBadge(n)+issueTrackBadge(n)+'</div><h2 class="detail-title" id="detailTitle">'+esc(n.title)+'</h2><div class="tags">'+n.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join('')+'</div>'+(n.aiSource?.agentName?'<p class="detail-ref">AI 助手 · '+esc(n.aiSource.agentName)+'</p>':'')+(n.author?'<p class="detail-ref">作者 / 主讲人：'+esc(n.author)+'</p>':'')+(n.reference?'<p class="detail-ref">'+esc(n.reference)+'</p>':'')+(n.url&&/^https?:\/\//i.test(n.url)?'<a style="display:inline-block;margin-top:15px;font-size:11px" href="'+esc(n.url)+'" target="_blank" rel="noopener noreferrer">打开文献链接 ↗</a>':'')+'<div class="detail-body rich-content">'+noteBodyHtml(n)+'</div>';$('pinBtn').textContent=n.pinned?'取消置顶':'置顶收藏';renderDetailAttachments(n);renderResourceLinks(n);renderLiteratureDetails(n);renderPdfSourceLinks(n);const body=$('detailContent').querySelector('.detail-body');hideLegacyPptxExcerpt(n,body,appState.activeId).then(()=>{if(body.isConnected)hydrateDocumentImages(body,n,false)});if(!$('detail').open)$('detail').showModal();refreshWorkspaceLauncher()}
+$('editBtn').onclick=()=>{const n=records.find(r=>r.id===current);$('detail').close();openEditor(n.type,n)};$('pinBtn').onclick=async()=>{const n=records.find(r=>r.id===current);$('pinBtn').disabled=true;try{await put({...n,pinned:!n.pinned});render();showDetail(n.id)}catch(e){toast(e.message)}finally{$('pinBtn').disabled=false}};
+$('backupBtn').onclick=()=>$('backup').showModal();function download(name,text,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+</script>
+<dialog id="literatureDialog" aria-label="文献信息"><form id="literatureForm"><div class="modalhead"><h2>文献信息</h2><button type="button" class="icon-button" data-close="literatureDialog" aria-label="关闭">✕</button></div><div class="modalbody"><div class="library-controls"><button type="button" class="secondary" id="literaturePdf">读取 PDF 信息</button><button type="button" class="secondary" id="literatureLookup">用 DOI / 标题查 Crossref</button></div><div class="library-controls" id="literatureCandidates"></div><div class="library-controls" id="literatureMatchTools"><button type="button" class="secondary" id="literatureMatch">从文件夹匹配 PDF</button><input type="file" id="literatureMatchInput" webkitdirectory multiple hidden></div><div id="literatureMatches" class="library-controls"></div><div id="literatureFields"></div><div class="library-controls"><select id="literatureSource" aria-label="源语言"><option value="en">英语</option><option value="zh">中文</option><option value="ja">日语</option></select><select id="literatureTarget" aria-label="目标语言"><option value="en">英语</option><option value="zh" selected>中文</option><option value="ja">日语</option></select><button type="button" class="secondary" id="translateLiteratureTitle">在线翻译标题</button><button type="button" class="secondary" id="translateLiteratureAbstract">在线翻译摘要</button></div><p class="tiny">点击查询会向 Crossref 发送 DOI 或标题。点击翻译会向当前设置的翻译服务发送所选字段。</p><p id="literatureMessage" role="status"></p></div><div class="modalfoot"><button type="submit" class="primary" id="literatureSave">保存文献信息</button></div></form></dialog><dialog id="literatureMatrix" aria-label="批注汇总"><div class="modalhead"><h2>批注汇总</h2><button type="button" class="icon-button" data-close="literatureMatrix" aria-label="关闭">✕</button></div><div class="modalbody" id="literatureMatrixContent"></div></dialog><script src="jszip.min.js"></script>
+<dialog id="citationManager" aria-labelledby="citationManagerTitle">
+ <div class="modalhead"><h2 id="citationManagerTitle">文献引用</h2><button type="button" class="icon-button" data-close="citationManager" aria-label="关闭">✕</button></div>
+ <div class="modalbody">
+  <div class="library-controls">
+   <button type="button" id="citationImport" class="primary">导入 BibTeX / RIS</button>
+   <input type="file" id="citationFileInput" accept=".bib,.bibtex,.ris" multiple hidden>
+   <select id="citationExportFormat" aria-label="导出格式"><option value="bibtex">BibTeX (.bib)</option><option value="ris">RIS (.ris)</option></select>
+   <button type="button" id="citationExport" class="secondary">导出引用</button>
+  </div>
+  <p class="tiny">导出所选文献。未多选时导出当前筛选结果。</p>
+  <p id="citationImportStatus" class="form-message" role="status"></p>
+ </div>
+</dialog>
+<dialog id="citationDetail" aria-labelledby="citationDetailTitle">
+ <div class="modalhead"><h2 id="citationDetailTitle">复制 / 导出引用</h2><button type="button" class="icon-button" data-close="citationDetail" aria-label="关闭">✕</button></div>
+ <div class="modalbody">
+  <div class="field"><label for="citationStyle">引用样式</label><select id="citationStyle"><option value="standard">纯文本</option><option value="numbered">带序号</option></select></div>
+  <div class="field"><label for="citationPreview">引用预览</label><textarea id="citationPreview" rows="4" readonly></textarea></div>
+  <div class="library-controls">
+   <button type="button" id="citationCopy" class="primary">复制引用</button>
+   <button type="button" id="citationDownloadBib" class="secondary">导出 BibTeX</button>
+   <button type="button" id="citationDownloadRis" class="secondary">导出 RIS</button>
+  </div>
+  <p id="citationDetailStatus" class="form-message" role="status"></p>
+ </div>
+</dialog>
+<template id="pdfReaderPanels">
+ <div class="pdf-tools">
+  <button type="button" id="togglePdfOutline" aria-controls="pdfOutline">目录 / 书签</button>
+  <button type="button" id="pdfMarkToolsToggle" popovertarget="pdfMarkTools">标注工具 ▾</button>
+  <div id="pdfMarkTools" popover aria-label="标注工具">
+   <button type="button" data-pdf-draw="select">选择文字</button>
+   <button type="button" data-pdf-mark="highlight" aria-pressed="false">高亮</button>
+   <button type="button" data-pdf-mark="underline" aria-pressed="false">下划线</button>
+   <button type="button" data-pdf-mark="strike" aria-pressed="false">删除线</button>
+   <div class="pdf-mark-colors" role="group" aria-label="批注颜色"></div>
+   <button type="button" data-pdf-mark="comment">注释</button>
+   <button type="button" data-pdf-draw="rect">矩形</button>
+   <button type="button" data-pdf-draw="pen">手绘</button>
+   <button type="button" data-pdf-draw="erase">橡皮擦</button>
+   <button type="button" data-pdf-draw="text">文字框</button>
+   <button type="button" data-pdf-mark="bookmark">添加书签</button>
+  </div>
+  <button type="button" id="pdfOcrMode" title="扫描页或无法选字时，框选页面区域并离线识别" aria-pressed="false">框选识字</button>
+  <button type="button" id="togglePdfTranslation" data-pdf-panel-toggle="translation" aria-controls="pdfSide">翻译</button>
+  <button type="button" id="togglePdfNotes" data-pdf-panel-toggle="annotations" aria-controls="pdfSide">批注</button>
+  <button type="button" id="openReaderAi" data-pdf-panel-toggle="ai" aria-controls="pdfSide">询问 AI</button>
+ </div>
+ <div id="pdfWorkspace" class="pdf-workspace">
+  <aside id="pdfOutline" class="pdf-outline" aria-label="文档导航">
+   <div class="pdf-nav-tabs" role="tablist" aria-label="文档导航">
+    <button type="button" id="pdfNavOutline" data-pdf-nav="outline" role="tab" aria-controls="pdfOutlinePane" aria-selected="true">目录</button>
+    <button type="button" id="pdfNavBookmarks" data-pdf-nav="bookmarks" role="tab" aria-controls="pdfBookmarksPane" aria-selected="false">书签</button>
+    <button type="button" id="pdfNavFind" data-pdf-nav="find" role="tab" aria-controls="pdfFindPane" aria-selected="false">查找</button>
+   </div>
+   <section id="pdfOutlinePane" class="pdf-nav-pane" role="tabpanel" aria-labelledby="pdfNavOutline">
+    <div id="pdfOutlineList">正在读取目录…</div>
+   </section>
+   <section id="pdfBookmarksPane" class="pdf-nav-pane" role="tabpanel" aria-labelledby="pdfNavBookmarks" hidden>
+    <div id="pdfBookmarkList"></div>
+   </section>
+   <section id="pdfFindPane" class="pdf-nav-pane" role="tabpanel" aria-labelledby="pdfNavFind" hidden></section>
+  </aside>
+  <aside id="pdfSide" class="pdf-side">
+   <div class="reader-panel-tabs" role="tablist" aria-label="阅读侧栏">
+    <button type="button" id="showPdfTranslation" data-pdf-panel-tab="translation" aria-controls="pdfTranslationZone" role="tab">翻译</button>
+    <button type="button" id="showPdfAnnotations" data-pdf-panel-tab="annotations" aria-controls="pdfAnnotationsZone" role="tab">批注</button>
+    <button type="button" id="showReaderAi" data-pdf-panel-tab="ai" aria-controls="readerAiPanel" role="tab">AI 问答</button>
+   </div>
+   <section id="pdfTranslationZone" data-pdf-panel="translation" aria-labelledby="showPdfTranslation" role="tabpanel">
+    <header class="pdf-panel-head">
+     <h3>翻译</h3>
+     <label class="ai-checkbox" title="在 PDF 中选中文字后自动翻译"><input type="checkbox" id="pdfAutoTranslate"> 选中即翻</label>
+    </header>
+    <div class="pdf-panel-scroll">
+     <div class="pdf-lang-bar">
+      <span class="pdf-lang-pair"><b id="pdfLangFrom">英语</b><span aria-hidden="true">→</span><b id="pdfLangTo">中文</b></span>
+      <button type="button" class="link-button" id="pdfLangSettings">更改语言</button>
+     </div>
+     <div class="pdf-translate-doc">
+      <div class="pdf-translate-block">
+       <span class="pdf-translate-label" id="pdfTranslateResultLabel">翻译</span>
+       <textarea id="pdfTranslateResult" class="pdf-plain-text" aria-labelledby="pdfTranslateResultLabel" placeholder="译文会自动出现在这里，也可手动编辑…"></textarea>
+      </div>
+      <div class="pdf-translate-block">
+       <span class="pdf-translate-label" id="pdfTranslateSourceLabel">原文</span>
+       <textarea id="pdfTranslateSource" class="pdf-plain-text" aria-labelledby="pdfTranslateSourceLabel" placeholder="在 PDF 里选中文字，会自动出现在这里…"></textarea>
+      </div>
+     </div>
+     <div class="pdf-action-row">
+      <button type="button" id="pdfLocalTranslate">本地翻译</button>
+      <button type="button" id="pdfOnlineTranslate">在线翻译</button>
+      <button type="button" id="savePdfTranslation">保存为批注</button>
+     </div>
+     <button type="button" id="pdfUseSelection" hidden>重新读取所选文字</button>
+     <p id="pdfTranslationStatus" class="pdf-panel-help" role="status"></p>
+     <p class="pdf-panel-help pdf-privacy-note">「选中即翻」在本机处理。点击「在线翻译」会把原文发送到翻译服务。</p>
+    </div>
+   </section>
+   <section id="pdfAnnotationsZone" data-pdf-panel="annotations" aria-labelledby="showPdfAnnotations" role="tabpanel" hidden>
+    <header class="pdf-panel-head"><h3>批注</h3><span class="tiny" id="pdfAnnotationCount"></span></header>
+    <div class="pdf-panel-scroll">
+     <div class="pdf-field-card" id="pdfAnnotationFilters">
+      <input type="search" id="pdfAnnotationSearch" aria-label="搜索批注" placeholder="搜索摘录、批注或页码…">
+      <select id="pdfAnnotationType" aria-label="批注类型"><option value="">全部类型</option></select>
+      <select id="pdfAnnotationOrder" aria-label="批注排序"><option value="recent">最新添加</option><option value="page">按页码</option></select>
+     </div>
+     <div id="pdfAnnotationList"></div>
+     <details class="pdf-annotation-compose">
+      <summary>添加文字批注</summary>
+      <label>新批注内容<textarea id="pdfComment" placeholder="输入内容后，在页面上选中文字或添加文字框。"></textarea></label>
+     </details>
+     <div class="pdf-annotation-footer">
+      <button type="button" id="exportPdfMarks">导出批注</button>
+      <p id="markSaveStatus" class="pdf-panel-help">批注保存在本机并随完整备份导出，原始 PDF 不改写。</p>
+     </div>
+    </div>
+   </section>
+  </aside>
+ </div>
+</template>
+<script src="ocr/tesseract.min.js"></script>
+<script src="katex/katex.min.js"></script><script src="katex/contrib/auto-render.min.js"></script><script src="marked.umd.js"></script><script src="rich-text.js"></script>
+<script src="workspace-dialogs.js"></script>
+<script src="document-layout.js"></script>
+<script src="categories.js"></script><script src="workspace-navigation.js"></script>
+<script src="pdf-assets.js"></script>
+<script src="presentation-preview.js"></script>
+<script src="library.js"></script><script src="video-player-learning.js"></script><script src="video-caption-overlay.js"></script><script src="video-translation-chooser.js"></script><script src="video-subtitles.js"></script><script src="video-frame-notes.js"></script><script src="reader-session.js"></script><script src="pdf-viewer.js"></script>
+<script src="import-progress.js"></script><script src="translate-lang.js"></script><script src="pdf-ocr.js"></script>
+<script src="pdf-lib.min.js"></script><script src="pdf-annotation-export.js"></script><script src="pdf-annotations.js"></script><script src="circuit-glossary.js"></script><script src="pdf-translation.js"></script><script src="pdf-research-notes.js"></script><script src="pdf-tools.js"></script>
+<script src="reader-ai.js"></script><script src="video-translation.js"></script><script src="mineru-reflow.js"></script><script src="pdf-preview-cache.js"></script><script src="pdf-page-comparison.js"></script><script src="pdf-reflow.js"></script>
+<script src="import-documents.js"></script>
+<script src="citation-engine.js"></script><script src="citation-tools.js"></script>
+<script src="library-gallery.js"></script><script src="literature-tools.js"></script><script src="library-organization.js"></script><script src="readability.js"></script><script src="web-capture.js"></script><script src="web-reader.js"></script><script src="web-library.js"></script><script src="sha256.min.js"></script><script src="reliability.js"></script><script src="large-backup.js"></script>
+<script src="reminders.js"></script><script src="dashboard-widgets.js"></script><script src="record-folders.js"></script><script src="plans.js"></script><script src="ai-subtitles.js"></script><script src="ai-management.js"></script><script src="notebook-v2.js"></script><script src="trash.js"></script><script src="pdf-search.js"></script><script src="pdf-research.js"></script>
+<script src="library-folders.js"></script><script src="reader-tabs.js"></script><script src="folder-context-menu.js"></script><script src="workspace-context-menu.js"></script>
+<script src="minisearch.min.js"></script><script src="workspace-search.js"></script>
+</body></html>

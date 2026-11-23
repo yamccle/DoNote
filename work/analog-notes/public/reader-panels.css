@@ -1,0 +1,211 @@
+/**
+ * [INPUT]: 读取目录和阅读侧栏的可见状态。
+ * [OUTPUT]: 提供页签反馈及窄窗口侧栏动效。
+ * [POS]: 仅装饰 PDF 侧栏与导航控件。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+#reader.reader-enhanced .pdf-outline {
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+  padding:0;
+  background:var(--surface);
+  color:var(--ink);
+  border-right:1px solid var(--line);
+}
+#reader.reader-enhanced .pdf-workspace.hide-outline .pdf-outline,
+#reader.reader-enhanced .pdf-workspace.pdf-focus-mode .pdf-outline {display:none}
+#reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) {
+  display:flex;
+  flex:none;
+  gap:4px;
+  padding:4px 10px 0;
+  border-bottom:1px solid var(--line);
+  background:var(--pdf-chrome);
+}
+#reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button {
+  display:block;
+  flex:1 1 0;
+  min-width:0;
+  min-height:36px;
+  width:auto;
+  padding:6px 3px;
+  border:0;
+  border-bottom:2px solid transparent;
+  border-radius:0;
+  background:transparent;
+  color:var(--text-soft);
+  font:500 var(--type-label)/1.4 var(--font-ui);
+  text-align:center;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+#reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button[aria-selected=true] {
+  border-bottom-color:var(--accent);
+  color:var(--accent);
+  font-weight:600;
+}
+#reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button:is(:hover,:focus-visible) {
+  background:var(--surface-hover);
+}
+#reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button:focus-visible {outline-offset:-2px}
+.pdf-nav-pane {
+  flex:1 1 auto;
+  min-height:0;
+  min-width:0;
+  overflow:auto;
+  overflow-wrap:anywhere;
+  padding:8px 8px 18px;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+}
+.pdf-nav-pane[hidden] {display:none}
+#pdfOutlineList, #pdfBookmarkList, #pdfFindResults {min-width:0;overflow-wrap:anywhere}
+.pdf-outline-row {display:flex;align-items:flex-start;min-width:0}
+#reader.reader-enhanced .pdf-outline-row .pdf-outline-entry,
+#reader.reader-enhanced #pdfOutlineList > button,
+#reader.reader-enhanced #pdfBookmarkList > button {
+  display:block;
+  flex:1 1 auto;
+  min-width:0;
+  width:100%;
+  padding:6px 7px;
+  border:0;
+  border-radius:var(--pdf-control-radius);
+  background:transparent;
+  color:var(--text-soft);
+  font:inherit;
+  font-size:var(--type-label);
+  line-height:1.45;
+  text-align:left;
+  overflow-wrap:anywhere;
+}
+#reader.reader-enhanced .pdf-outline-row .pdf-outline-entry:is(:hover,:focus-visible),
+#reader.reader-enhanced #pdfOutlineList > button:is(:hover,:focus-visible),
+#reader.reader-enhanced #pdfBookmarkList > button:is(:hover,:focus-visible) {background:var(--surface-hover);color:var(--ink)}
+#reader.reader-enhanced .pdf-outline-row .pdf-outline-entry.active {
+  background:var(--pdf-active);box-shadow:inset 2px 0 0 var(--accent);color:var(--accent);font-weight:600;
+}
+#reader.reader-enhanced .pdf-outline-row .pdf-outline-expand,
+.pdf-outline-spacer {
+  display:grid;
+  place-items:center;
+  flex:0 0 22px;
+  width:22px;
+  height:30px;
+  padding:0;
+  border:0;
+  border-radius:var(--pdf-control-radius);
+  background:transparent;
+  color:var(--muted);
+  font-size:20px;
+  line-height:1;
+}
+#reader.reader-enhanced .pdf-outline-row .pdf-outline-expand[aria-expanded=true] {rotate:90deg}
+#reader.reader-enhanced .pdf-outline-row .pdf-outline-expand:is(:hover,:focus-visible) {background:var(--surface-hover);color:var(--ink)}
+.pdf-outline-children[hidden] {display:none}
+#pdfFindPane .pdf-find {display:grid;gap:8px;min-width:0;margin:0;padding:0;border:0}
+#pdfFindPane .pdf-find-row {display:block;min-width:0}
+#pdfFindPane #pdfFindInput {width:100%;min-width:0;box-sizing:border-box}
+#pdfFindPane #pdfFindCount {margin:0;color:var(--muted);line-height:1.45;overflow-wrap:anywhere}
+#pdfFindPane #pdfFindCount:empty {display:none}
+#pdfFindResults {display:grid;gap:0;max-height:none;overflow:visible}
+#reader.reader-enhanced #pdfFindResults button {
+  display:block;
+  width:100%;
+  min-width:0;
+  padding:8px;
+  border-radius:0;
+  text-align:left;
+  line-height:1.5;
+  overflow-wrap:anywhere;
+}
+#reader.reader-enhanced #pdfFindResults button + button {border-top:1px solid var(--line)}
+#reader.reader-enhanced #pdfFindResults button:hover {background:var(--surface-hover)}
+
+/* Side panels share the navigation strip and use rules between sections. */
+#pdfSide {min-height:0;border-left:1px solid var(--line)}
+#pdfSide .pdf-panel-head {align-items:center;flex-wrap:wrap;min-height:38px;padding:7px 12px}
+#pdfSide .pdf-panel-head h3 {font-weight:600}
+#pdfSide .pdf-panel-head :is(.ai-checkbox,.link-button) {margin:0 0 0 auto}
+#pdfSide .pdf-panel-scroll {
+ grid-auto-rows:max-content;align-content:start;gap:10px;padding:12px;
+ overscroll-behavior:contain;scrollbar-width:thin;
+}
+#pdfSide .pdf-lang-bar {
+ flex-wrap:wrap;padding:0 0 7px;border:0;border-bottom:1px solid var(--line);
+ border-radius:0;background:transparent;
+}
+#pdfSide .pdf-lang-pair {flex-wrap:wrap;min-width:0}
+#pdfSide .pdf-lang-pair b {overflow-wrap:anywhere}
+#pdfSide .pdf-translate-doc {border-radius:var(--pdf-control-radius)}
+#pdfSide .pdf-translate-block {padding:10px}
+#pdfSide .pdf-translate-label {font-weight:600;letter-spacing:normal}
+#pdfSide .pdf-translate-block + .pdf-translate-block {background:var(--pdf-chrome)}
+#pdfSide .pdf-translate-block:focus-within {background:var(--pdf-active)}
+#pdfSide .pdf-plain-text {font-family:var(--font-ui);line-height:1.65}
+#pdfSide .pdf-privacy-note {padding-top:8px;border-top:1px solid var(--line);line-height:1.6}
+#pdfSide .pdf-panel-foot {padding:8px 12px;background:var(--pdf-chrome)}
+#pdfSide :is(input[type=search],select,textarea,button:not([role=tab])) {
+ max-width:100%;border-radius:var(--pdf-control-radius);
+}
+#pdfAnnotationFilters {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px;
+  padding:0;
+  border:0;
+  background:transparent;
+}
+#pdfAnnotationFilters input {grid-column:1 / -1}
+#pdfAnnotationFilters :is(input,select) {width:100%;min-width:0;margin:0;box-sizing:border-box}
+#pdfAnnotationList {min-width:0;overflow-wrap:anywhere}
+.pdf-annotation-compose {border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.pdf-annotation-compose summary {padding:8px 10px;color:var(--text-soft);font-size:var(--type-label);cursor:pointer}
+.pdf-annotation-compose label {margin:0;padding:0 10px 10px}
+.pdf-annotation-compose textarea {width:100%;min-height:80px;box-sizing:border-box}
+.pdf-annotation-footer {
+ display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding-top:2px;
+}
+.pdf-annotation-footer .pdf-panel-help {flex-basis:100%;margin:2px 0 0;color:var(--muted);line-height:1.5}
+#pdfSide .pdf-ai-context {
+ border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 10px;
+}
+#pdfSide .ai-exchange {
+ gap:6px;padding:8px 0 12px;border-bottom:1px solid var(--line);
+}
+#pdfSide .ai-bubble-user {
+ max-width:100%;justify-self:stretch;padding:6px 0 6px 10px;border-inline-start:2px solid var(--accent);
+ border-radius:0;background:transparent;
+}
+#pdfSide .ai-bubble-assistant {border:0;padding:4px 0 0;background:transparent}
+@media(prefers-reduced-motion:no-preference) {
+ #reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button {
+  transition:color var(--motion-fast) var(--ease-standard),
+   background-color var(--motion-fast) var(--ease-standard),border-color var(--motion-fast) var(--ease-standard);
+ }
+ #reader.reader-enhanced .pdf-outline-row .pdf-outline-expand {
+  transition:rotate var(--motion-fast) var(--ease-standard);
+ }
+ #reader.reader-enhanced .pdf-nav-pane:not([hidden]) {
+  animation:donote-fade-in var(--motion-fast) var(--ease-standard);
+ }
+}
+@keyframes donote-pdf-drawer-in {
+ from {opacity:.78;translate:var(--pdf-drawer-offset) 0}
+ to {opacity:1;translate:0 0}
+}
+@media(max-width:850px) and (prefers-reduced-motion:no-preference) {
+ #reader.reader-enhanced .pdf-workspace:not(.pdf-focus-mode,.hide-outline) .pdf-outline,
+ #reader.reader-enhanced .pdf-workspace:not(.pdf-focus-mode,.hide-notes) .pdf-side {
+  animation:donote-pdf-drawer-in var(--motion-fast) var(--ease-standard);
+ }
+ #reader.reader-enhanced .pdf-outline {--pdf-drawer-offset:-6px}
+ #reader.reader-enhanced .pdf-side {--pdf-drawer-offset:6px}
+}
+@media(max-width:360px){
+ #pdfAnnotationFilters {grid-template-columns:1fr}
+ #pdfAnnotationFilters input {grid-column:auto}
+}

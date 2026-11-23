@@ -1,0 +1,16 @@
+{
+  "name": "donote-citation-bundle",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@citation-js/core": "0.9.0",
+    "@citation-js/plugin-bibtex": "0.9.0",
+    "@citation-js/plugin-ris": "0.9.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.0"
+  }
+}

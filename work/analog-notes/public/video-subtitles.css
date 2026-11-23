@@ -1,0 +1,74 @@
+/**
+ * [INPUT]: 使用工作台主题变量和字幕面板状态。
+ * [OUTPUT]: 呈现任务、时间轴和字幕控件的响应式布局。
+ * [POS]: 视频预览的字幕样式，保持播放、编辑与任务反馈可区分。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+.video-subtitles{width:calc(100% - 36px);max-width:none;min-width:0;margin:18px auto;padding:clamp(16px,1.6vw,24px);border:1px solid var(--line);border-radius:12px;background:var(--surface,#fff);box-shadow:0 8px 28px #1f29370a}
+.video-subtitles-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:13px;border-bottom:1px solid var(--line)}
+.video-subtitles-title{display:grid;gap:2px;min-width:210px}
+.video-subtitles-title strong{color:var(--ink,#202932);font-size:15px;font-weight:700}
+.video-subtitles-caption{color:var(--muted,#75818c);font-size:var(--type-caption,12px)}
+.video-subtitles-head p,.video-subtitles-note{margin:5px 0;color:var(--muted,#68777a);font-size:13px}
+.video-subtitles-head>.video-subtitles-actions{margin-left:auto;justify-content:flex-end}
+.video-subtitles-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.video-subtitles-actions button,.video-subtitles-actions select,.video-subtitle-time,.video-subtitles-task button,.video-subtitles-playhead button{min-height:32px;padding:6px 10px;border:1px solid var(--line,#cbd8d8);border-radius:7px;background:var(--surface);color:inherit;cursor:pointer;white-space:nowrap}
+.video-subtitles :is(button:not(.primary),summary):is(:hover,:focus-visible){background:var(--surface-hover,#f2f4f3)}
+.video-translation-chooser{margin:0 0 12px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft,#f7f8fa)}
+.video-translation-chooser>.video-subtitles-actions{margin:0 0 8px}
+.video-subtitles-task,.video-subtitles-playhead{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-soft)}
+.video-subtitles-task{margin-block-end:10px}
+.video-subtitles-task-line,.video-subtitles-playhead{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
+.video-subtitles-status,.video-subtitles-current{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
+.video-subtitles-status{margin:0;color:var(--text-soft);font-size:13px}
+.video-subtitles-progress{display:block;width:100%;height:6px;margin:7px 0 0;accent-color:var(--accent)}
+.video-subtitles-current{color:var(--text-soft);font-size:13px;line-height:1.55}
+.video-subtitles-playhead.has-cue{border-inline-start:3px solid var(--accent)}
+.video-subtitles-playhead.has-cue .video-subtitles-current{color:var(--ink)}
+.video-subtitles-current>div:empty{display:none}
+.video-subtitles:has(.video-subtitle-row.is-current[hidden]) [data-act="locate"]{display:none}
+.video-subtitles-list{margin-top:12px;max-height:clamp(180px,48vh,680px);overflow:auto;overscroll-behavior:contain}
+.video-subtitle-row{display:grid;grid-template-columns:minmax(72px,90px) minmax(0,1fr);gap:10px;padding:6px 4px;border-bottom:1px solid var(--line,#e2e8e8);content-visibility:auto;contain-intrinsic-size:auto 45px}
+.video-subtitle-row.is-current{background:var(--surface-soft);box-shadow:inset 3px 0 var(--accent)}
+.video-subtitle-time{align-self:start;font-variant-numeric:tabular-nums}
+.video-subtitle-time[aria-current="time"]{border-color:var(--accent);font-weight:600}
+.video-subtitle-detail{min-width:0}
+.video-subtitle-detail summary{display:flex;align-items:center;gap:8px;min-height:32px;padding:4px 8px;border-radius:5px;cursor:pointer;list-style:none}
+.video-subtitle-detail summary::-webkit-details-marker{display:none}
+.video-subtitle-detail summary::before{content:'›';flex:none;color:var(--text-soft)}
+.video-subtitle-detail[open] summary::before{transform:rotate(90deg)}
+.video-subtitle-detail summary:focus-visible{outline-offset:-2px}
+.video-subtitle-preview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0;flex:1}
+.video-subtitle-preview span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.video-subtitle-preview span:empty{display:none}
+.video-subtitle-preview span:only-child,.video-subtitle-preview span:first-child:has(+ span:empty){grid-column:1/-1}
+.video-subtitle-texts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.video-subtitle-texts textarea{width:100%;min-width:0;resize:vertical;padding:8px;border:1px solid var(--field-border,#d4dddd);border-radius:5px;background:var(--surface,#fff);color:var(--ink);font:inherit;box-sizing:border-box}
+@media(max-width:700px){
+ .video-subtitles{width:calc(100% - 16px);padding:12px;border-radius:8px}
+ .video-subtitles-head{align-items:stretch}
+ .video-subtitles-title{min-width:0;width:100%}
+ .video-subtitles-head>.video-subtitles-actions{width:100%;margin-left:0;justify-content:flex-start}
+ .video-subtitles-head>.video-subtitles-actions button{flex:1 1 auto;max-inline-size:100%;white-space:normal}
+ .video-subtitle-row{grid-template-columns:auto minmax(0,1fr);gap:6px;contain-intrinsic-size:auto 50px}
+ .video-subtitle-texts,.video-subtitle-preview{grid-template-columns:1fr}
+ .video-learning-controls .video-learning-search{margin-left:0}
+ .video-learning-controls .video-learning-search input{min-width:0;width:100%}
+}
+
+.video-subtitles-actions button.primary {background:var(--ink,#263634);color:var(--surface,#fff)}
+.video-subtitles :is(.video-subtitles-actions,.video-subtitles-task) button:disabled {opacity:.55;cursor:default}
+.video-translation-chooser [data-instruction] {display:block;width:100%;margin-top:8px}
+.video-translation-chooser [data-instruction][hidden] {display:none}
+.video-subtitles :is(.video-subtitles-task,.video-subtitles-progress,.video-subtitle-row,button)[hidden],
+.video-subtitles-playhead:has(.video-subtitles-current[hidden]),
+.video-subtitles-current [hidden]{display:none}
+@media(prefers-reduced-motion:no-preference){
+ .video-subtitles :is(button,summary):not(:disabled){transition:background-color 140ms ease,border-color 140ms ease}
+ .video-subtitle-detail summary::before{transition:transform 140ms ease}
+ .video-translation-chooser:not([hidden]),.video-subtitle-detail[open] .video-subtitle-texts{animation:video-controls-enter 150ms ease-out both}
+}
+@keyframes video-controls-enter{
+ from{opacity:.55;transform:translateY(-3px)}
+ to{opacity:1;transform:none}
+}

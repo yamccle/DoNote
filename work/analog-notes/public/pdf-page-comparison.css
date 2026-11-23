@@ -1,0 +1,44 @@
+
+.pdf-page-comparison {display:flex;flex:1;min-height:0;flex-direction:column;background:var(--pdf-canvas)}
+.pdf-page-comparison[hidden],.pdf-compare-toolbar [hidden] {display:none}
+.pdf-compare-toolbar {
+ display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:5px 12px;
+ background:var(--surface);border-bottom:1px solid var(--line);
+}
+.pdf-compare-toolbar :is(input,select,button) {
+ min-height:30px;padding:3px 7px;border:1px solid var(--field-border);
+ border-radius:var(--pdf-control-radius);background:var(--surface);color:var(--ink);
+ font:var(--type-label)/1.4 var(--font-ui);
+}
+.pdf-compare-toolbar button:hover {background:var(--surface-hover)}
+.pdf-compare-toolbar button:disabled {opacity:.45;cursor:default}
+.pdf-compare-toolbar button[data-return] {color:var(--accent)}
+.pdf-compare-toolbar .pdf-toolbar-group > button {width:30px;font-size:17px;border-color:transparent}
+.pdf-compare-toolbar input {width:7ch;text-align:center;font-variant-numeric:tabular-nums;appearance:textfield}
+.pdf-compare-toolbar input::-webkit-inner-spin-button {appearance:none}
+.pdf-compare-toolbar select {max-width:min(100%,12em)}
+.pdf-compare-toolbar [data-total] {
+ padding-inline:3px;color:var(--muted);font-size:var(--type-label);font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.pdf-compare-toolbar [role="status"] {
+ min-width:0;overflow-wrap:anywhere;color:var(--muted);font-size:var(--type-caption);
+}
+.pdf-compare-scroll {position:relative;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;overflow-anchor:none;padding-inline:12px}
+.pdf-compare-pages {width:calc(2 * var(--compare-page-width, 152px) + 12px);margin-inline:auto}
+.pdf-compare-captions,.pdf-compare-row {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.pdf-compare-captions {
+ padding-block:8px;color:var(--text-soft);font-size:var(--type-label);font-weight:600;
+}
+.pdf-compare-captions span {padding-inline:2px}
+.pdf-compare-stack {padding-bottom:max(0px,calc(var(--compare-window-height,0px) - var(--compare-page-width,152px) / var(--compare-last-ratio,var(--compare-default-ratio,.75))))}
+.pdf-compare-row {height:calc(var(--compare-page-width,152px) / var(--compare-page-ratio,var(--compare-default-ratio,.75)))}
+.pdf-compare-row>div {
+ min-height:0;background:white;color:#24282c;overflow:auto;box-shadow:0 0 0 1px var(--line);
+}
+.pdf-compare-pages canvas {display:block;width:100%;height:auto}
+.pdf-compare-message {display:grid;place-content:start center;min-height:8rem;margin:0;padding:30px 12px;text-align:center;font-size:var(--type-label)}
+.pdf-compare-snippets {padding:16px 20px;overflow-wrap:anywhere;line-height:1.6}
+.pdf-compare-snippets p {margin:0 0 1em}
+.pdf-compare-error-details {padding:0 16px 16px;font-size:var(--type-caption)}
+.pdf-compare-error-details summary {cursor:pointer}
+.pdf-compare-error-details pre {white-space:pre-wrap;overflow-wrap:anywhere;max-height:12rem;overflow:auto}

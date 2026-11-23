@@ -1,0 +1,142 @@
+/**
+ * [INPUT]: 读取桌面设置结构和工作台主题。
+ * [OUTPUT]: 提供设置浮层、子菜单和控件状态样式。
+ * [POS]: 桌面设置样式，在系统允许时显示轻量过渡。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+.desktop-host {
+ --desktop-hover:var(--surface-hover);
+ --desktop-menu-shadow:0 6px 18px #2028201c,0 1px 3px #20282012;
+}
+:root.desktop-host[data-theme=dark] {
+ --desktop-menu-shadow:0 6px 18px #0005,0 1px 3px #0004;
+}
+.desktop-host .top-actions .sync {display:flex;margin-inline-end:0}
+.desktop-host .desktop-gear:not([hidden]) {
+ width:34px;height:34px;flex:none;border-radius:var(--radius-control);color:var(--ink);
+}
+.desktop-host .desktop-gear:is(:hover,[aria-expanded=true]) {background:var(--desktop-hover)}
+@media(max-width:850px) {.desktop-host .top-actions .sync {display:none}}
+#desktopSettings {
+ position:fixed;inset:auto;margin:0;width:min(320px, calc(100vw - 44px));max-height:calc(100dvh - 14px);
+ padding:5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);
+ border-radius:6px;box-shadow:var(--desktop-menu-shadow);
+ overflow:auto;overscroll-behavior:contain;
+}
+#desktopSettings header {padding:6px 9px 8px;border-bottom:1px solid var(--line)}
+#desktopSettings h2 {margin:0;font-size:var(--type-control);line-height:1.4;font-weight:600}
+#desktopSettings [hidden] {display:none!important}
+#desktopSettings .settings-root {padding:4px 0}
+#desktopSettings .desktop-settings-submenu {
+ position:fixed;inset:auto;margin:0;width:min(320px,calc(100vw - 16px));max-height:calc(100dvh - 16px);
+ padding:5px;background:var(--surface);color:var(--ink);border:1px solid var(--line);
+ border-radius:6px;box-shadow:var(--desktop-menu-shadow);overflow:auto;overscroll-behavior:contain;
+}
+#desktopSettings .desktop-settings-submenu:not(:popover-open) {display:none}
+#desktopSettings[data-submenu-side=stack] {
+ background:transparent;border-color:transparent;box-shadow:none;pointer-events:none;
+}
+#desktopSettings[data-submenu-side=stack] > :is(header,.settings-root,footer) {visibility:hidden}
+#desktopSettings[data-submenu-side=stack] .desktop-settings-submenu {pointer-events:auto}
+#desktopSettings [data-settings-group][aria-expanded="true"] {
+ background:color-mix(in srgb, var(--accent) 10%, var(--surface));
+ color:var(--accent);box-shadow:inset 2px 0 var(--accent);
+}
+#desktopSettings footer {border-top:1px solid var(--line);padding-top:4px}
+#desktopSettings button {
+ width:100%;border:0;border-radius:4px;background:transparent;padding:5px 9px;
+ text-align:start;color:var(--ink);font-size:var(--type-label);line-height:1.45;min-height:32px;
+ display:flex;justify-content:space-between;align-items:center;gap:12px;
+}
+#desktopSettings button:enabled:is(:hover,:focus-visible) {background:var(--desktop-hover)}
+#desktopSettings button:focus-visible {outline-offset:-2px}
+#desktopSettings button:disabled {color:var(--muted)}
+#desktopSettings button span+span {color:var(--text-soft)}
+#desktopSettings .desktop-settings-submenu:not([data-side=stack]) .desktop-settings-submenu-back {display:none}
+#desktopSettings .desktop-settings-submenu-back {
+ justify-content:flex-start;margin-bottom:4px;border-bottom:1px solid var(--line);
+ border-radius:4px 4px 0 0;color:var(--text-soft);
+}
+.desktop-switch {
+ flex:none;width:28px;height:16px;border-radius:8px;display:grid;align-items:center;padding:2px;
+ background:color-mix(in srgb,var(--ink) 40%,var(--surface));
+}
+.desktop-switch::before {content:'';width:12px;height:12px;border-radius:50%;background:var(--surface)}
+[aria-checked=true] .desktop-switch {background:var(--accent)}
+[aria-checked=true] .desktop-switch::before {transform:translateX(12px)}
+@media(prefers-reduced-motion:no-preference) {
+ .desktop-host :is(.primary,.secondary,.icon-button,.nav,.tab,.side-tags button,#desktopSettings button) {
+  transition:background-color var(--motion-fast) var(--ease-standard),border-color var(--motion-fast) var(--ease-standard),color var(--motion-fast) var(--ease-standard);
+ }
+ .desktop-host .nav:hover:not(.active) {background:var(--desktop-hover)}
+ .desktop-host .desktop-switch,.desktop-host .desktop-switch::before {transition:background-color var(--motion-fast) var(--ease-standard),transform var(--motion-fast) var(--ease-standard)}
+ #desktopSettings:popover-open {animation:desktop-settings-enter var(--motion-fast) var(--ease-standard) backwards}
+ #desktopSettings .desktop-settings-submenu:popover-open {
+  animation:workspace-float-enter var(--motion-fast) var(--ease-standard) backwards;
+ }
+}
+@keyframes desktop-settings-enter {from {opacity:.72}}
+:root.desktop-host {--workspace-top:0px}
+.desktop-host .topbar {display:none}
+
+.about-donote {
+ width:min(460px,calc(100vw - 28px));max-height:calc(100dvh - 28px);padding:0;
+ border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);
+ box-shadow:var(--desktop-menu-shadow);overflow:auto;overscroll-behavior:contain;
+}
+.about-donote-head,.about-donote-foot {display:flex;align-items:center;padding:10px 14px;background:var(--surface-soft)}
+.about-donote-head {justify-content:space-between;border-bottom:1px solid var(--line);font-size:var(--type-control)}
+.desktop-palette-row {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 9px;font-size:var(--type-label);color:var(--ink)}
+.desktop-palette-row select {min-width:0;max-width:55%;background:var(--surface);color:var(--ink);border:1px solid var(--field-border);border-radius:4px;padding:4px 6px}
+.about-donote-head button {border:0;background:transparent;color:var(--text-soft);font-size:22px;line-height:1;width:28px;height:28px;border-radius:6px}
+.about-donote-head button:hover {background:var(--surface-hover);color:var(--ink)}
+.about-donote-body {display:flex;flex-direction:column;align-items:center;padding:28px 22px 24px;text-align:center}
+.about-donote-body img {display:block;width:56px;height:56px;object-fit:contain;margin-bottom:12px}
+.about-donote-body h2 {margin:0 0 14px;font-size:21px;font-weight:600;letter-spacing:-.02em}
+.about-donote-body p {margin:0 0 14px;color:var(--text-soft);font-size:var(--type-control)}
+.about-donote-body p:last-child {margin:8px 0 0}
+@media(max-height:480px) {
+ .about-donote-body {padding:16px}
+ .about-donote-body h2 {margin-bottom:10px}
+}
+.about-donote-foot {justify-content:flex-end;border-top:1px solid var(--line)}
+.about-donote-foot button {min-width:82px;padding:7px 16px;border:1px solid var(--field-border);border-radius:7px;background:var(--surface);color:var(--ink)}
+.about-donote-foot button:hover {background:var(--surface-hover)}
+.about-version{border:0;background:none;color:var(--text-soft);font-size:var(--type-control);padding:2px 8px;margin:0 0 12px;border-radius:6px;cursor:pointer;-webkit-user-select:none;user-select:none}
+.about-version:hover,.about-version:focus-visible{background:var(--surface-hover);color:var(--ink)}
+.analog-flashcard-dialog{width:min(460px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:0;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);box-shadow:var(--shadow-float);overflow:auto}
+.analog-flashcard-body{padding:20px 24px 10px;text-align:center}
+.analog-flashcard-body>p{font-size:12px;color:var(--text-soft);margin:12px 0}
+.analog-flashcard{display:block;width:min(295px,100%);aspect-ratio:3/4;margin:auto;border:0;padding:0;background:transparent;perspective:1100px;cursor:pointer;outline-offset:5px;-webkit-user-select:none;user-select:none}
+.analog-flashcard-inner{display:block;position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform 520ms cubic-bezier(.2,.65,.2,1);pointer-events:none}
+.analog-flashcard[aria-pressed=true] .analog-flashcard-inner{transform:rotateY(180deg)}
+.analog-flashcard-face{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:11px;border:1px solid #c4b49a;box-shadow:0 10px 25px #27201824}
+.analog-flashcard-front{background:#f6ede0}
+.analog-flashcard-front img{width:100%;height:100%;object-fit:cover}
+.analog-flashcard-number{position:absolute;left:12px;bottom:12px;padding:5px 8px;background:#f8f2e8d9;color:#3b3328;font:600 11px var(--font-ui);letter-spacing:.09em;border-radius:3px}
+.analog-flashcard-back{transform:rotateY(180deg);align-items:flex-start;justify-content:center;gap:25px;padding:30px;text-align:left;background:#242726;color:#eae3d5}
+.analog-flashcard-back small{color:#c5a875;font-size:10px;letter-spacing:.14em}
+.analog-flashcard-back strong{font-size:22px;line-height:1.55;font-weight:600}
+.analog-flashcard-back span{font-size:13px;line-height:1.8;color:#d6d0c4}
+.analog-flashcard-back em{position:absolute;bottom:25px;font-size:11px;color:#b8ae9c;font-style:normal}
+.analog-flashcard-dialog .about-donote-foot{gap:8px;flex-wrap:wrap}
+#flashcardSave{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+#flashcardSave:disabled{opacity:.6;cursor:default}
+@media(prefers-reduced-motion:reduce){.analog-flashcard-inner{transition:none}}
+button,.about-donote-head,.about-donote-body,#journalPlans>h2,.aside .box>h2{-webkit-user-select:none;user-select:none}
+.searchrow[hidden]{display:none!important}
+#records.achievement-display{display:block!important}
+.achievement-hall{padding:28px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.achievement-hall-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px}
+.achievement-hall-heading span{display:block;font-size:10px;font-weight:700;letter-spacing:.16em;color:#9b805b}
+.achievement-hall-heading h3{font-size:27px;margin:8px 0 5px;letter-spacing:-.03em}
+.achievement-hall-heading p{margin:0;color:var(--text-soft);font-size:13px}
+.achievement-hall-heading>strong{font-size:12px;font-weight:500;color:var(--text-soft);white-space:nowrap}
+.achievement-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,230px));gap:20px}
+.achievement-tile{display:flex;flex-direction:column;align-items:stretch;overflow:hidden;text-align:left;padding:0;border:1px solid #c6b599;border-radius:11px;background:#f5efe5;color:#2d2923;box-shadow:0 8px 24px #281d1314;transition:transform .18s ease,box-shadow .18s ease}
+.achievement-tile:hover{transform:translateY(-3px);box-shadow:0 14px 30px #281d1322}
+.achievement-tile img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;pointer-events:none;-webkit-user-drag:none}
+.achievement-tile span{margin:15px 16px 3px;color:#96764a;font-size:10px;font-weight:700;letter-spacing:.14em}
+.achievement-tile strong{margin:0 16px 17px;font-size:17px}
+@media(max-width:600px){.achievement-hall{padding:18px}.achievement-hall-heading{flex-wrap:wrap}.achievement-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
+@media(prefers-reduced-motion:reduce){.achievement-tile{transition:none}}

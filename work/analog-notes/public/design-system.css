@@ -1,0 +1,526 @@
+/**
+ * [INPUT]: 读取主题颜色和系统的动态效果偏好。
+ * [OUTPUT]: 提供通用的字体、状态色、焦点和动画。
+ * [POS]: 位于主题层之后，为各工作区提供统一样式。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+
+@font-face {
+  font-family: 'DoNote CJK';
+  src: url('NotoSansSC.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', 'Hiragino Sans GB', 'DoNote CJK', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', 'SF Mono', ui-monospace, 'DoNote CJK', monospace;
+  --accent: #3a654e;
+  --info: #3a6ea8;
+  --ok: #3f7a5e;
+  --radius-control: 6px;
+  --radius-card: 6px;
+  --radius-float: 9px;
+  --shadow-float: 0 6px 22px #202c241f;
+  --motion-fast: 120ms;
+  --motion-slow: 200ms;
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --space-1: 4px; --space-2: 8px; --space-3: 12px;
+  --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --pdf-paper: #fff;
+  --orange: var(--accent);
+}
+html {scrollbar-gutter: stable}
+:root[data-theme=dark] {
+  --accent: #a1c6aa;
+  --info: #8ab4e8;
+  --ok: #8fceb0;
+  --shadow-float: 0 7px 22px #0007;
+  --pdf-paper: #f4f2ee;
+}
+
+/* 1 · one typeface, and only real weights (650 silently rounds on system fonts) */
+:root[data-palette=warm] {--paper:#f3f1ee;--surface:#fdfcfb;--surface-soft:#f3f0eb;--surface-hover:#eae5de;--line:#dcd6cf;--field-border:#c8c0b7;--accent:#77685b;--cover:#e8e2da;--reader-bg:#e6e1da}
+:root[data-palette=mist] {--paper:#eff2f5;--surface:#fcfdfe;--surface-soft:#f0f3f6;--surface-hover:#e2e9ef;--line:#d5dde5;--field-border:#bac7d3;--accent:#4f6c86;--cover:#e0e7ed;--reader-bg:#dfe5ec}
+:root[data-palette=sage] {--paper:#f0f3ef;--surface:#fcfdfb;--surface-soft:#eff3ed;--surface-hover:#e3e9df;--line:#d5ded0;--field-border:#bccbb5;--accent:#587252;--cover:#e2e9de;--reader-bg:#e0e7dc}
+:root[data-palette=sand] {--paper:#f5f1e9;--surface:#fffdf8;--surface-soft:#f5f0e6;--surface-hover:#ece3d3;--line:#e0d6c5;--field-border:#cdbea7;--accent:#886d49;--cover:#ece3d3;--reader-bg:#eae1d1}
+:root[data-theme=dark][data-palette=warm] {--paper:#1b1917;--surface:#25221f;--surface-soft:#2c2824;--surface-hover:#37312b;--line:#494039;--field-border:#65584c;--accent:#c6b29e;--cover:#342e28;--reader-bg:#1b1917}
+:root[data-theme=dark][data-palette=mist] {--paper:#171c22;--surface:#20272f;--surface-soft:#28313b;--surface-hover:#323e4a;--line:#3e4c5b;--field-border:#596a7c;--accent:#a5bed5;--cover:#2c3743;--reader-bg:#171c22}
+:root[data-theme=dark][data-palette=sage] {--paper:#191e18;--surface:#232b21;--surface-soft:#2b3428;--surface-hover:#364232;--line:#43523d;--field-border:#5f7057;--accent:#b2c6a8;--cover:#303c2c;--reader-bg:#191e18}
+:root[data-theme=dark][data-palette=sand] {--paper:#211d17;--surface:#2b261f;--surface-soft:#342d23;--surface-hover:#413729;--line:#554734;--field-border:#746147;--accent:#d0b78e;--cover:#3d3327;--reader-bg:#211d17}
+body, body :is(input, textarea, select, button) {font-family: var(--font-ui)}
+body {line-height: 1.6}
+:is(.dashboard-header h2, .widget-value,
+   .web-reader-modes [aria-pressed=true], .web-reader-settings h3, .web-reader-notes h3) {font-weight: 600}
+:is(code, pre, kbd, samp) {font-family: var(--font-mono)}
+
+/* 2 · semantic colour, used sparingly */
+a {color: var(--accent)}
+:focus-visible {outline: 2px solid var(--accent); outline-offset: 2px}
+:is(#workspaceRail button[aria-current], .nav.active) {
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  color: var(--accent);
+}
+#workspaceRail button[aria-current] {box-shadow: inset 2px 0 var(--accent)}
+:is(.tab.active, .side-tags button.active) {border-color: var(--accent)}
+.side-tags button.active {color: var(--accent)}
+.library-mode .filterrow .tab.active::after {background: var(--accent)}
+[data-status] {font-variant-numeric: tabular-nums}
+:is(.status, [data-status])[data-status="在读"],
+:is(.status, [data-status])[data-status="进行中"] {color: var(--info)}
+:is(.status, [data-status])[data-status="已读"],
+:is(.status, [data-status])[data-status="已解决"],
+:is(.status, [data-status])[data-status="已完成"] {color: var(--ok)}
+:is(.status, [data-status])[data-status="待读"],
+:is(.status, [data-status])[data-status="待排查"],
+:is(.status, [data-status])[data-status="已记录"],
+:is(.status, [data-status])[data-status="待开始"] {color: var(--muted)}
+
+/* 3 · one radius scale and one shadow scale */
+:is(dialog, #desktopSettings, #pdfMarkTools, .pdf-selection-menu,
+   .library-toolbar-popup, #workspaceRailTip) {
+  border-radius: var(--radius-float);
+  box-shadow: var(--shadow-float);
+}
+:is(.card, .library-gallery .card, .dashboard-card, .widget-edit-row, .box,
+   .pdf-reflow-view article, .literature-matrix-entry) {border-radius: var(--radius-card)}
+:is(button, .icon-button, .secondary, .primary, .tab, .gallery-select,
+   .web-cover-preview span, #reminderInput, #allSidebarTopics, .library-toolbar-action,
+   .widget-picker select, .widget-date-fields input,
+   #workspaceRail button, .window-navigation button) {border-radius: var(--radius-control)}
+
+/* 4 · one motion curve, two durations */
+@media (prefers-reduced-motion: no-preference) {
+  :is(button, a, .nav, .tab, .side-tags button, .card, .library-gallery .card,
+     .quick, .icon-button, .pinned) {
+    transition-property: background-color, border-color, color, box-shadow, transform;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--ease-standard);
+  }
+  dialog[open]:not(#reader, .startup-splash, .workspace-minimizing) {
+    animation: workspace-float-enter 150ms var(--ease-standard) backwards;
+  }
+  dialog[open]:not(#reader, .startup-splash, .workspace-minimizing)::backdrop {
+    animation: workspace-scrim-enter 150ms var(--ease-standard) backwards;
+  }
+  .library-toolbar-popup:popover-open, .toast {
+    animation: workspace-float-enter var(--motion-fast) var(--ease-standard) backwards;
+  }
+}
+@keyframes workspace-float-enter {from {opacity: .72; translate: 0 4px}}
+@keyframes workspace-scrim-enter {from {opacity: 0}}
+@media (prefers-reduced-motion: reduce) {
+  :is(button, a, .nav, .tab, .card, .library-gallery .card) {transition: none !important; animation: none !important}
+}
+
+/* 5 · spacing rhythm on the primary surfaces */
+main {padding: var(--space-6)}
+.box {padding: var(--space-4)}
+.workspace, #records.library-gallery {gap: var(--space-5)}
+#dashboardTop {gap: var(--space-3)}
+@media (max-width: 760px) {main {padding: var(--space-5) var(--space-4)}}
+
+/* 6 · reading: keep the paper light in dark mode, tune CJK leading */
+.pdf-page {background: var(--pdf-paper)}
+[data-theme=dark] .pdf-page > canvas {filter: none}
+/* Opt-in (设置 → 外观 → 暗色下反转 PDF 页面): the page itself goes dark. */
+:root[data-pdf-invert=on][data-theme=dark] .pdf-page {background: #161616}
+:root[data-pdf-invert=on][data-theme=dark] .pdf-page > canvas {filter: invert(.9) hue-rotate(180deg)}
+:root[data-pdf-invert=on][data-theme=dark] .mark-text {color: #e6dfd2}
+:root[data-pdf-invert=on][data-theme=dark] .pdf-highlights {mix-blend-mode: normal; opacity: .34}
+:is(.rich-content, .detail-body.rich-content) {line-height: 1.7}
+:is(.quick b, .pending button, #reminderInput, #reminderList label) {line-height: 1.55}
+
+/* Paged results */
+.library-pager {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line);
+  color: var(--text-soft); font-size: var(--type-label);
+}
+.library-pager[hidden] {display: none}
+.library-pager button {padding: 5px 10px}
+.library-pager button:disabled {opacity: .45}
+.library-pager-info {font-variant-numeric: tabular-nums}
+.library-pager-jump {display: inline-flex; align-items: center; gap: 5px}
+.library-pager-jump input {width: 58px; padding: 4px 6px; text-align: center}
+
+/* Record layout */
+main[data-view="journal"] #records {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+main[data-view="journal"] #records .card {min-width:0;margin:0;padding:20px;display:flex;flex-direction:column}
+main[data-view="journal"] #records .card h3 {font-size:18px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+main[data-view="journal"] #records .card-meta {flex-wrap:wrap;gap:6px}
+main[data-view="journal"] #records .card-date {margin-left:0}
+main[data-view="journal"] #records .card-excerpt {display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+main[data-view="journal"] #records .card-bottom {margin-top:auto;gap:8px;flex-wrap:wrap}
+main[data-view="journal"] #records .tags {flex-wrap:wrap;min-width:0}
+main[data-view="journal"] #records .tag {max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+main[data-view="journal"] #records .empty {grid-column:1/-1}
+@media(max-width:1400px){main[data-view="journal"] #records{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1050px){main[data-view="journal"] #records{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){main[data-view="journal"] #records{grid-template-columns:1fr}}
+#resultCount {align-self: center; white-space: nowrap; font-variant-numeric: tabular-nums}
+
+/* 9 · toast actions (撤销) and the recycle bin rows */
+.toast {display: flex; align-items: center; gap: 10px}
+.toast button {
+  margin-inline-start: auto; padding: 2px 10px; border: 1px solid currentColor;
+  border-radius: var(--radius-control); background: transparent; color: inherit;
+  font-size: var(--type-caption); cursor: pointer; white-space: nowrap;
+}
+.toast button:hover {background: color-mix(in srgb, currentColor 16%, transparent)}
+#trashList .manager-row > span {min-width: 0}
+#trashList .manager-row small {display: block}
+
+/* 10 · full-text workspace search and find-in-reader */
+#openPdfSearch {white-space: nowrap}
+#pdfSearchDialog {width: min(860px, 94vw)}
+#pdfSearchResults {max-height: 60vh; overflow: auto; display: grid; gap: 16px; margin-top: 8px}
+.pdf-search-doc {border: 1px solid var(--line); border-radius: var(--radius-card); padding: 12px 14px; background: var(--surface)}
+#pdfSearchDialog .row {flex-wrap: wrap}
+.workspace-search-result {display: grid; gap: 5px; width: 100%; text-align: left; color: var(--ink); cursor: pointer}
+.workspace-search-result:hover {background: var(--surface-hover)}
+.workspace-search-result strong {font-size: var(--type-control); overflow-wrap: anywhere}
+.workspace-search-result span, .workspace-search-result small {color: var(--text-soft); font-size: var(--type-label); overflow-wrap: anywhere}
+.pdf-find {margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px}
+.pdf-find h3 {margin: 0 0 8px}
+.pdf-find-row {display: flex; gap: 6px; align-items: center; margin-bottom: 6px}
+.pdf-find-row input {width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--field-border); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font-size: var(--type-label)}
+.pdf-find-row .tiny {white-space: nowrap; color: var(--muted)}
+#pdfFindResults {display: grid; gap: 2px; max-height: 30vh; overflow: auto}
+#pdfFindResults button {display: block; text-align: left; padding: 5px 6px; border: 0; background: transparent; border-radius: var(--radius-control); color: var(--text-soft); font-size: var(--type-caption); overflow: hidden; cursor: pointer}
+#pdfFindResults button:hover {background: var(--surface-hover)}
+#pdfFindResults strong {color: var(--accent); margin-inline-end: 6px}
+#pdfFindResults span {overflow-wrap: anywhere}
+
+/* 11 · reader side panel: segmented tabs, headed sections, sticky ask box */
+.pdf-side {display: flex; flex-direction: column; overflow: hidden; padding: 0}
+.reader-panel-tabs {flex: none; display: flex; gap: 2px; padding: 8px 10px 0; border-bottom: 1px solid var(--line)}
+.reader-panel-tabs button {
+  flex: 1; padding: 9px 4px; border: 0; border-bottom: 2px solid transparent;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  background: transparent; color: var(--muted); font-size: var(--type-label); cursor: pointer;
+}
+.reader-panel-tabs button:hover {background: var(--surface-hover)}
+.reader-panel-tabs button.active {color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; background: transparent}
+.pdf-side [data-pdf-panel] {flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden}
+.pdf-side [data-pdf-panel][hidden] {display: none}
+.pdf-panel-head {flex: none; display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 10px; border-bottom: 1px solid var(--line)}
+.pdf-panel-head h3 {margin: 0; font-size: var(--type-control)}
+.pdf-panel-head .pdf-panel-help {margin: 0; color: var(--muted); font-size: var(--type-caption)}
+.pdf-panel-scroll {flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: grid; gap: 10px; align-content: start}
+.pdf-field-card {border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px; display: grid; gap: 8px; background: var(--surface-soft)}
+.pdf-field-card label {display: grid; gap: 6px}
+.pdf-field-card textarea {min-height: 96px; resize: vertical}
+.pdf-field-card button {justify-self: start}
+.pdf-privacy-note {color: var(--muted)}
+.pdf-panel-foot {flex: none; border-top: 1px solid var(--line); padding: 10px 14px; display: grid; gap: 8px; background: var(--surface-soft)}
+.pdf-panel-foot textarea {min-height: 64px; resize: vertical}
+.pdf-ai-settings {display: grid; gap: 8px; margin-top: 8px}
+.pdf-ai-settings label {display: grid; gap: 6px}
+.pdf-ai-context {display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-card)}
+.reader-ai-messages {display: grid; gap: 10px}
+.reader-ai-answer {border: 1px solid var(--line); border-inline-start: 3px solid var(--accent); border-radius: var(--radius-control); padding: 10px; display: grid; gap: 8px}
+.reader-ai-answer strong {font-size: var(--type-label)}
+.reader-ai-answer .pdf-note-link {font-size: var(--type-caption)}
+#readerAiContextPreview {white-space: pre-wrap; background: var(--surface-soft); border: 1px solid var(--line); border-radius: var(--radius-control); padding: 10px; font-size: var(--type-caption); max-height: 180px; overflow: auto}
+.pdf-outline button.active {background: color-mix(in srgb, var(--accent) 11%, var(--surface)); color: var(--accent)}
+
+/* 12 · current account badge pinned to the bottom of the icon rail */
+#workspaceRail .rail-spacer {flex: 1 1 auto; min-height: 6px}
+#workspaceRail .rail-avatar {
+  flex: none; width: 30px; height: 30px; padding: 0;
+  display: grid; place-items: center; border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent); font-size: 12px; font-weight: 600; line-height: 1;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+}
+#workspaceRail .rail-avatar:is(:hover, :focus-visible) {background: color-mix(in srgb, var(--accent) 24%, var(--surface))}
+
+/* 13 · AI 管理：分区卡片 + 状态徽标 + 权限预设 */
+#aiManager {width: min(840px, 94vw)}
+#aiManager .modalbody {max-height: calc(100dvh - 170px); overflow: auto; display: grid; gap: 14px}
+.bridge-hero {display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 2px 2px 0}
+.bridge-hero .eyebrow {margin: 0 0 4px}
+.bridge-hero h3 {margin: 0 0 6px; font-size: var(--type-section)}
+.bridge-hero .section-note {margin: 0; max-width: 62ch}
+.bridge-status {
+  flex: none; display: inline-flex; align-items: center; gap: 7px; margin: 0;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface-soft); color: var(--text-soft);
+  font-size: var(--type-label); min-height: 0; white-space: nowrap;
+}
+.bridge-status::before {content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none}
+.bridge-status.bridge-error {color: var(--strong); border-color: color-mix(in srgb, var(--strong) 32%, var(--line))}
+.bridge-status.bridge-error::before {background: var(--strong)}
+.bridge-card {border: 1px solid var(--line); border-radius: var(--radius-card); padding: 14px; display: grid; gap: 12px; background: var(--surface)}
+.bridge-card-head {display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap}
+.bridge-card-head h3 {margin: 0; display: flex; align-items: center; gap: 8px; font-size: var(--type-control)}
+.bridge-card-head .section-note {margin: 0; flex: 1 1 220px}
+.bridge-card-actions {display: flex; gap: 8px; flex-wrap: wrap}
+.bridge-step {
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent); font-size: 11px; font-weight: 600;
+}
+.bridge-scopes {display: grid; grid-template-columns: repeat(auto-fit, minmax(212px, 1fr)); gap: 4px 12px}
+.bridge-scopes label {
+  display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px;
+  border-radius: var(--radius-control); font-size: var(--type-label); cursor: pointer;
+}
+.bridge-scopes label:hover {background: var(--surface-soft)}
+.bridge-scopes label span {display: grid; gap: 2px; line-height: 1.35; min-width: 0}
+.bridge-scopes small {color: var(--muted); font-size: var(--type-caption); line-height: 1.35}
+.bridge-options-label {color: var(--muted); font-size: var(--type-label)}
+.bridge-presets {display: flex; align-items: center; gap: 8px; flex-wrap: wrap}
+.bridge-preset-gap {flex: 1 1 24px}
+.bridge-token {
+  border: 1px dashed color-mix(in srgb, var(--accent) 38%, var(--line));
+  border-radius: var(--radius-card); padding: 12px; display: grid; gap: 10px;
+  background: var(--surface-soft);
+}
+.bridge-agent-list:empty::before {
+  content: '还没有助手凭证。填好名称和权限后点「创建助手凭证」。';
+  color: var(--muted); font-size: var(--type-label);
+}
+.bridge-foot {display: flex; justify-content: flex-end}
+.bridge-audit {padding: 0}
+.bridge-audit summary {padding: 12px 14px; cursor: pointer; font-size: var(--type-control); font-weight: 600}
+.bridge-audit pre {margin: 0; padding: 0 14px 14px}
+
+/* 15 · reader AI chat: bubbles, per-answer actions, pinned composer */
+.link-button {border: 0; background: transparent; color: var(--accent); font-size: var(--type-label); cursor: pointer; padding: 2px 6px; border-radius: var(--radius-control)}
+.link-button:hover {background: var(--surface-hover)}
+.pdf-ai-context-row {display: flex; gap: 8px; align-items: center}
+.pdf-ai-context-row select {flex: 1; min-width: 0}
+.pdf-ai-context-actions {display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap}
+.reader-ai-messages {display: grid; gap: 14px; align-content: start}
+.ai-exchange {display: grid; gap: 8px}
+.ai-bubble {border-radius: var(--radius-card); padding: 10px 12px; max-width: 100%}
+.ai-bubble-user {background: color-mix(in srgb, var(--accent) 10%, var(--surface)); justify-self: end; max-width: 92%}
+.ai-quote {margin: 0; font-size: var(--type-label); line-height: 1.5; color: var(--text-soft); white-space: pre-wrap}
+.ai-bubble-assistant {border: 1px solid var(--line); background: var(--surface)}
+.ai-answer-body {font-size: var(--type-label); line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere}
+.ai-answer-body .pdf-note-link {margin-inline: 2px}
+.ai-actions {display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap}
+.ai-action {border: 0; background: transparent; color: var(--muted); font-size: var(--type-caption); padding: 3px 6px; border-radius: var(--radius-control); cursor: pointer}
+.ai-action:hover {background: var(--surface-hover); color: var(--ink)}
+.pdf-ai-send {display: flex; align-items: center; gap: 8px}
+.pdf-ai-send .pdf-panel-help {flex: 1; margin: 0; min-width: 0}
+.pdf-ai-ask textarea {min-height: 62px}
+
+/* 16 · offline reflow typography */
+.pdf-reflow-heading {margin: 18px 0 8px; font-size: 1.05em; line-height: 1.4; color: var(--ink)}
+.pdf-reflow-view h2.pdf-reflow-heading {font-size: 1.22em}
+.pdf-reflow-view .pdf-reflow-pair p:first-child {margin-top: 0}
+
+/* 17 · library folder browsing */
+.library-folders {margin-bottom: 18px}
+.library-folders[hidden] {display: none}
+.library-crumbs {display: flex; align-items: center; gap: 2px; flex-wrap: wrap; margin-bottom: 12px; font-size: var(--type-label); color: var(--muted)}
+.library-crumb {border: 0; background: transparent; color: var(--accent); padding: 3px 6px; border-radius: var(--radius-control); cursor: pointer; font-size: inherit; font-family: inherit}
+.library-crumb:hover {background: var(--surface-hover)}
+.library-crumb.active {color: var(--ink); font-weight: 600}
+.library-crumb-spacer {flex: 1}
+.library-crumb-sep {color: var(--muted); padding: 0 1px}
+.library-folder-action {border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 5px 9px; border-radius: var(--radius-control); cursor: pointer; font: inherit; white-space: nowrap}
+.library-folder-action:hover {background: var(--surface-hover); border-color: var(--accent)}
+.library-folder-grid {display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 10px}
+.library-folder-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-card);
+  background: var(--surface); cursor: pointer; text-align: left; font-family: inherit;
+  transition: border-color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
+}
+.library-folder-card:hover {border-color: color-mix(in srgb, var(--accent) 38%, var(--line)); background: var(--surface-soft)}
+.library-folder-card.loose {border-style: dashed}
+.folder-glyph {color: var(--accent); display: grid; place-items: center; margin-bottom: 4px}
+.folder-glyph svg {width: 20px; height: 20px}
+.folder-name {font-size: var(--type-control); color: var(--ink); font-weight: 600; overflow-wrap: anywhere}
+.library-folder-card small {font-size: var(--type-caption); color: var(--muted)}
+
+/* 18 · reader document tabs (multi-open) */
+.reader-tabs {
+  display: flex; align-items: center; gap: 4px; flex-wrap: nowrap;
+  padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--surface-soft);
+}
+.reader-tabs[hidden] {display: none}
+.reader-tab-scroll {display:flex;gap:4px;min-width:0;overflow-x:auto;scrollbar-width:thin}
+.reader-tab {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; max-width: 230px;
+  padding: 6px 6px 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--text-soft); font-size: var(--type-label); cursor: pointer;
+}
+.reader-tab.active {border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); font-weight: 600}
+.reader-tab-name {overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
+.reader-tab-close {display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: var(--muted); font-size: 12px; line-height: 1}
+.reader-tab-close:hover {background: var(--surface-hover); color: var(--ink)}
+.reader-tab-add {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1px dashed var(--line);
+  background: transparent; color: var(--accent); font-size: 15px; line-height: 1; cursor: pointer;
+}
+.reader-tab-add:hover {background: var(--surface-hover)}
+.reader-tab-list {display: grid; gap: 6px; max-height: 52vh; overflow: auto}
+.reader-tab-row {
+  display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-control);
+  background: var(--surface); text-align: left; font-family: inherit; cursor: pointer;
+}
+.reader-tab-row:hover {background: var(--surface-soft); border-color: color-mix(in srgb, var(--accent) 32%, var(--line))}
+.reader-tab-row span {font-size: var(--type-control)}
+.reader-tab-row small {color: var(--muted); font-size: var(--type-caption); overflow-wrap: anywhere}
+
+/* 19 · folder right-click menu */
+.context-menu {
+  position: fixed; z-index: 120; min-width: 176px; padding: 5px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card);
+  box-shadow: 0 12px 34px #2029322e; display: grid; gap: 1px;
+}
+.context-menu[hidden] {display: none}
+.context-menu button {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 0;
+  border-radius: var(--radius-control); background: transparent; color: var(--ink);
+  font-size: var(--type-label); text-align: left; cursor: pointer; font-family: inherit;
+}
+.context-menu button:hover {background: var(--surface-hover)}
+.context-menu button.context-menu-danger {color: var(--strong)}
+.context-menu button.context-menu-danger:hover {background: color-mix(in srgb, var(--strong) 10%, var(--surface))}
+.context-menu-sep {height: 1px; margin: 4px 6px; background: var(--line)}
+#journalPlans {margin-top:18px;margin-bottom:22px;min-width:0}
+#journalPlans h2 {display:flex;justify-content:space-between;align-items:center;gap:12px}
+#journalPlans .quick {width:100%;text-align:left;min-width:0}
+#journalPlans .quick>span:first-child {min-width:0}
+#journalPlans .quick b {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+#journalPlans.plan-stack-multiple {box-shadow:0 5px 0 -1px var(--surface),0 5px 0 0 var(--line),0 10px 0 -2px var(--surface),0 10px 0 -1px var(--line)}
+.plan-stack-controls {display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px}
+.plan-stack-controls button {min-width:34px;min-height:32px;padding:3px 10px;font-size:22px;line-height:1}
+.plan-stack-slide {animation:plan-stack-in 130ms ease-out}
+@keyframes plan-stack-in {from{opacity:.65;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.plan-stack-slide{animation:none}}
+.compact-dialog {width: min(380px, 92vw)}
+.bridge-queue-summary {display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0}
+.bridge-queue-filters {display:flex;gap:5px;flex-wrap:wrap}
+.bridge-queue-filters button {font-size:var(--type-caption);padding:5px 8px}
+.bridge-queue-filters [aria-pressed=true] {border-color:var(--accent);color:var(--accent)}
+#bridgeTaskList .manager-row b {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#bridgeTaskList .profile-meta {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.category-manager-tabs {display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.category-manager-tabs [aria-selected="true"] {background:var(--surface-hover);border-color:var(--accent);color:var(--accent)}
+.category-sort-row {gap:10px;padding:12px}
+.category-drag-handle {cursor:grab;font-size:24px;touch-action:none;flex:none}
+.category-drag-handle:active {cursor:grabbing}
+.category-fixed-icon {width:28px;text-align:center;color:var(--muted);flex:none}
+#categoryList .category-fixed-icon {flex:0 0 28px}
+#categoryList .category-row-name {text-align:left}
+.category-row-name {flex:1;min-width:0;overflow-wrap:anywhere}
+.category-row-name small {display:block}
+.category-row-actions {display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.category-row-actions button {padding:6px 9px}
+.category-dragging {opacity:.45}
+.category-drop-target {outline:2px solid var(--accent);outline-offset:2px}
+#categoryForm {display:flex;flex-direction:row;gap:10px;margin-top:18px}
+#categoryForm input {min-width:0;flex:1}
+#categoriesDialog [role="tabpanel"][hidden] {display:none}
+@media(max-width:560px){.category-sort-row{flex-wrap:wrap}.category-row-actions{margin-left:34px}.category-manager-tabs button{padding:7px 9px}}
+/* The window header stays above scrolling content, including form-based and dynamic dialogs. */
+dialog .modalhead,dialog .about-donote-head {position:sticky;top:0;z-index:35;background:var(--surface);box-shadow:0 1px 0 var(--line);flex-shrink:0}
+dialog .modalhead {gap:12px;min-width:0}
+dialog .modalhead h2 {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dialog-window-actions {display:flex;align-items:center;gap:4px;flex:none;margin-inline-start:auto;align-self:center}
+.dialog-window-actions .icon-button {display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;min-width:34px;padding:0;flex:none}
+#detail .dialog-window-actions .workspace-minimize-action {margin:0}
+#editor.document-page .workspace-minimize-action {display:none}
+dialog .modalbody {min-width:0;overflow-wrap:anywhere}
+dialog .modalfoot .right {flex-wrap:wrap;min-width:0}
+dialog .field-row {min-width:0}
+dialog :is(.field-row,.bridge-fields) > .field {min-width:0}
+dialog .modalfoot button {white-space:normal}
+#editor:not(.document-page) {max-height:min(92dvh, calc(100dvh - 12px));overflow:hidden}
+#editor:not(.document-page) #noteForm {
+  display:flex;flex-direction:column;max-height:min(calc(92dvh - 2px), calc(100dvh - 14px));
+}
+#editor:not(.document-page) .modalbody {min-height:0;overflow:auto;overscroll-behavior:contain}
+#editor:not(.document-page) .modalfoot {flex:none}
+@media (max-width:850px) {
+  .searchrow {flex-wrap:wrap}
+  .searchrow .searchbox {flex:1 1 220px;min-width:0}
+  .searchrow .searchbox input {min-width:0}
+  dialog .modalhead h2 {white-space:normal;overflow-wrap:anywhere}
+}
+@media (max-width:520px), (max-height:500px) {
+  dialog :is(.modalhead,.modalfoot) {gap:8px;padding:8px 12px}
+  dialog .modalfoot .right {gap:6px}
+  #editor .editor-head-actions {margin-inline:0}
+  #editor.document-page :is(.rich-toolbar,.image-tools) {position:static}
+}
+#reader.reader-presentation[open] {display:flex;flex-direction:column;height:92dvh;max-height:92dvh;overflow:hidden}
+#reader.reader-presentation #readerContent {display:flex;flex-direction:column;flex:1;min-height:0}
+#reader.reader-presentation .reader-statusbar {flex:none;flex-wrap:wrap;gap:8px}
+#reader.reader-presentation .presentation-stage {flex:1;min-height:0;height:auto;overflow:hidden;cursor:pointer}
+#reader.reader-presentation .presentation-stage img {user-select:none;-webkit-user-drag:none}
+#reader.reader-presentation.reader-presentation-expanded {inset:0;width:100%;max-width:100%;height:100dvh;max-height:100dvh;margin:0;border:0;border-radius:0}
+.ppt-picture-viewer {width:min(1200px,96vw);max-height:96dvh}
+.ppt-picture-body {padding:16px;overflow:auto;max-height:calc(96dvh - 82px);background:var(--reader-bg)}
+.ppt-picture-body img {display:block;max-width:100%;height:auto;margin:auto}
+@media(max-width:650px){.ppt-navigation-hint{display:none}#reader.reader-presentation .modalhead{gap:6px;padding:10px}#reader.reader-presentation #readerDownload{font-size:12px;padding:6px}}
+.import-progress {height: 8px; border-radius: 999px; background: var(--surface-soft); border: 1px solid var(--line); overflow: hidden; margin: 10px 0 8px}
+.import-progress i {display: block; height: 100%; background: var(--accent); transition: width 120ms linear}
+
+/* 20 · translation panel: language bar on top, translation + source in one document */
+.pdf-lang-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-card);
+  background: var(--surface-soft);
+}
+.pdf-lang-pair {display: inline-flex; align-items: center; gap: 8px; font-size: var(--type-label); color: var(--muted)}
+.pdf-lang-pair b {color: var(--ink); font-weight: 600}
+.pdf-translate-doc {border: 1px solid var(--line); border-radius: var(--radius-card); overflow: hidden; background: var(--surface)}
+.pdf-translate-block {display: grid; gap: 6px; padding: 12px 14px}
+.pdf-translate-block + .pdf-translate-block {border-top: 1px solid var(--line); background: var(--surface-soft)}
+.pdf-translate-label {font-size: var(--type-caption); color: var(--muted); letter-spacing: .04em}
+.pdf-plain-text {
+  width: 100%; min-height: 86px; max-height: 42vh; resize: vertical; border: 0; padding: 0;
+  background: transparent; color: var(--ink); font-size: var(--type-control); line-height: 1.72;
+}
+.pdf-plain-text:focus {outline: none}
+.pdf-translate-block:focus-within {background: color-mix(in srgb, var(--accent) 4%, var(--surface))}
+
+/* 14 · coordinated motion: dialogs, lists, panels, theme fade */
+@keyframes donote-dialog-in {from {opacity: 0; translate: 0 6px; scale: .995} to {opacity: 1; translate: none; scale: 1}}
+@keyframes donote-fade-in {from {opacity: 0} to {opacity: 1}}
+@keyframes donote-backdrop-in {from {opacity: 0} to {opacity: 1}}
+@keyframes donote-toast-in {from {opacity: 0; translate: 0 10px} to {opacity: 1; translate: none}}
+@keyframes donote-panel-in {from {opacity: 0; translate: 0 4px} to {opacity: 1; translate: none}}
+@media (prefers-reduced-motion: no-preference) {
+  dialog[open] {animation: donote-dialog-in 180ms var(--ease-standard) both}
+  /* Fullscreen readers and the document editor only fade: a transformed dialog
+     would offset text-layer hit testing while the animation runs. */
+  :is(#reader, #editor.document-page)[open] {animation: donote-fade-in 160ms var(--ease-standard) both}
+  dialog[open]::backdrop {animation: donote-backdrop-in 180ms var(--ease-standard) both}
+  .toast {animation: donote-toast-in 180ms var(--ease-standard) both}
+  .pdf-side [data-pdf-panel]:not([hidden]) {animation: donote-panel-in 160ms var(--ease-standard) both}
+  .reader-panel-tabs button {transition: color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard)}
+  .bridge-card, .pdf-field-card, .dashboard-card {transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard)}
+}
+html.theme-fade, html.theme-fade body {transition: background-color 260ms ease, color 260ms ease}
+html.theme-fade :is(.topbar, .box, .card, .library-gallery .card, .dashboard-card, .pdf-side, .pdf-tools, .reader-panel-tabs, dialog, .sidebar) {
+  transition: background-color 260ms ease, color 260ms ease, border-color 260ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog[open], dialog[open]::backdrop, .toast, .pdf-side [data-pdf-panel] {animation: none !important}
+  html.theme-fade * {transition: none !important}
+}
+
+/* Chrome labels stay put while dragging; record text remains selectable. */
+:is(h1,h2,h3,.breadcrumb,.breadcrumb b,.date-block,.date-block strong,.section-heading,.tab,.nav,.side-tags button,.stat,.stat-label,.stat-number,.stat-foot,.eyebrow,.sync,.footer,.card-meta,.kind,.status,.tag,.meeting-badge,.pin){
+  -webkit-user-select:none;user-select:none;
+}
+.card h3,.detail-title,.detail-body,.card-excerpt,.rich-content,.rich-editor,input,textarea{ -webkit-user-select:text;user-select:text }
+:is(.rich-content,.rich-editor,.web-reader-article,.pdf-reflow-view) :is(h1,h2,h3){
+  -webkit-user-select:text;user-select:text;
+}
+main.is-switching :is(#records,.library-controls,.filterrow,.searchrow){content-visibility:auto}
+
+/* Show saved subtitle availability on video covers. */
+.video-subtitle-badge{position:absolute;right:10px;bottom:10px;z-index:1;display:inline-flex;align-items:center;max-width:calc(100% - 20px);border-radius:5px;padding:3px 7px;background:rgba(25,33,39,.78);color:#fff;font-size:10px;line-height:1.4;white-space:nowrap;pointer-events:none}
+
+.video-subtitle-list-badge{display:inline-flex;align-items:center;margin-left:6px;border-radius:5px;padding:2px 6px;background:var(--surface-muted,#eef1f1);color:var(--text-soft,#526060);font-size:10px;line-height:1.4;white-space:nowrap}

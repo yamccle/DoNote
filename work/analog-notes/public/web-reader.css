@@ -1,0 +1,88 @@
+#reader.web-reader{
+ width:min(1220px,calc(100vw - 28px));height:min(880px,calc(100dvh - 28px));
+ max-height:calc(100dvh - 28px);overflow:hidden;background:var(--surface);
+ display:flex;flex-direction:column;
+}
+#reader.web-reader:not([open]){display:none}
+#reader.web-reader .modalhead{flex:0 0 auto;gap:8px;padding:12px 16px}
+#reader.web-reader #readerTitle{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#reader.web-reader #readerContent{display:flex;flex:1 1 auto;min-height:0;overflow:hidden}
+#reader.web-reader [hidden]{display:none!important}
+.web-reader-shell{
+ --web-page:#f2f2ef;--web-sheet:#fff;--web-ink:#242322;--web-muted:#64615a;--web-rule:#dddcd6;
+ --web-reader-size:18px;--web-reader-width:66ch;
+ display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0;
+ color:var(--ink);background:var(--surface);
+}
+:root[data-theme=dark] .web-reader-shell[data-reading-theme=system],.web-reader-shell[data-reading-theme=dark]{
+ --web-page:#141414;--web-sheet:#1d1d1d;--web-ink:#edeae2;--web-muted:#a9a59b;--web-rule:#3d3b37;
+}
+.web-reader-shell[data-reading-theme=paper]{
+ --web-page:#eee7d9;--web-sheet:#fbf4e4;--web-ink:#332d21;--web-muted:#716753;--web-rule:#ded3bc;
+}
+.web-reader-shell[data-width=compact]{--web-reader-width:53ch}
+.web-reader-shell[data-width=wide]{--web-reader-width:82ch}
+.web-reader-toolbar,.web-reader-modes,.web-reader-actions,.web-reader-note-actions{
+ display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+}
+.web-reader-toolbar{justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line)}
+.web-reader-toolbar button,.web-reader-note-actions button{padding:6px 9px;white-space:nowrap}
+.web-reader-modes [aria-pressed=true]{background:var(--surface-hover);color:var(--ink);border-color:var(--field-border);font-weight:600}
+.web-offline-status{color:var(--muted);font-size:var(--type-caption);padding-inline:4px}
+.web-reader-layout{
+ display:grid;grid-template-columns:minmax(0,1fr) minmax(225px,280px);
+ flex:1 1 auto;min-height:0;min-width:0;
+}
+.web-reader-layout.web-reader-side-hidden{grid-template-columns:minmax(0,1fr)}
+.web-reader-main,.web-reader-side{min-width:0;min-height:0}
+.web-reader-main{display:flex;flex-direction:column;background:var(--web-page)}
+.web-reader-scroll{overflow:auto;flex:1 1 auto;min-height:0;padding:clamp(8px,2.7vw,32px);color:var(--web-ink)}
+.web-reader-sheet{
+ width:min(100%,calc(var(--web-reader-width) + 2 * clamp(16px,4vw,44px)));min-height:100%;
+ margin-inline:auto;padding:clamp(20px,4vw,44px);font-size:var(--web-reader-size);
+ background:var(--web-sheet);border:1px solid var(--web-rule);border-radius:12px;
+}
+.web-reader-header{margin-bottom:1.7em;padding-bottom:1.1em;border-bottom:1px solid var(--web-rule)}
+.web-reader-header h1{font-size:clamp(1.55em,4vw,2.25em);line-height:1.19;margin:.22em 0 .36em;overflow-wrap:anywhere}
+.web-reader-header p,.web-reader-header small{color:var(--web-muted);margin:0;font-size:.78em;overflow-wrap:anywhere}
+.web-reader-article{font-family:system-ui,"Microsoft YaHei",sans-serif;line-height:1.8;overflow-wrap:anywhere}
+.web-reader-article :is(h1,h2,h3,h4,h5,h6){line-height:1.3;margin:1.25em 0 .5em}
+.web-reader-article :is(p,ul,ol,pre,figure,table,blockquote){margin:.8em 0}
+.web-reader-article :is(ul,ol){padding-inline-start:1.45em}
+.web-reader-article img{max-width:100%;height:auto;display:block;margin:.8em auto;border-radius:5px}
+.web-reader-article figcaption{font-size:.82em;color:var(--web-muted);text-align:center}
+.web-reader-article blockquote{padding-inline-start:.85em;border-inline-start:3px solid var(--web-rule)}
+.web-reader-article pre{padding:.65em;background:var(--web-page);white-space:pre-wrap;overflow:auto;border-radius:6px}
+.web-reader-article table{width:100%;border-collapse:collapse;font-size:.86em}
+.web-reader-article :is(th,td){border:1px solid var(--web-rule);padding:.3em .45em;text-align:start}
+.web-reader-article a{color:inherit;text-underline-offset:.18em}
+::highlight(web-article-mark){background:#f3d373;color:#29251a}
+.web-reader-snapshot{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+.web-reader-snapshot .web-reader-hint{margin:0;padding:9px 13px;border-bottom:1px solid var(--line)}
+.web-reader-snapshot iframe{flex:1 1 auto;min-height:0;width:100%;border:0;background:#fff}
+.web-reader-side{overflow:auto;border-inline-start:1px solid var(--line);background:var(--surface)}
+.web-reader-settings,.web-reader-notes{padding:13px}
+.web-reader-settings{border-bottom:1px solid var(--line)}
+.web-reader-settings h3,.web-reader-notes h3{margin:0 0 8px;font-size:14px;font-weight:600}
+.web-reader-settings label{display:flex;align-items:center;justify-content:space-between;gap:7px;min-height:32px;font-size:12px;color:var(--text-soft)}
+.web-reader-settings output{min-width:32px;text-align:right}
+.web-reader-settings :is(input,select),.web-reader-notes textarea{
+ font:inherit;color:var(--ink);background:var(--surface-soft);border:1px solid var(--field-border);border-radius:6px;
+}
+.web-reader-settings input{min-width:40px;width:100%}
+.web-reader-settings select{padding:4px;min-width:105px}
+.web-reader-hint{font-size:12px;line-height:1.5;color:var(--muted);margin:5px 0 9px}
+.web-reader-notes textarea{box-sizing:border-box;width:100%;font-size:13px;padding:7px;resize:vertical;min-height:56px}
+.web-reader-note-actions{margin:7px 0 12px}
+.web-mark{margin:0 0 8px;padding:8px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-soft)}
+.web-mark-meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted)}
+.web-mark-meta button{padding:1px 0}
+.web-mark-quote,.web-mark-note{display:block;box-sizing:border-box;width:100%;text-align:start;font-size:12px;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap;margin:.4em 0 0}
+.web-mark-quote{padding:0 .5em;border:0;border-inline-start:2px solid #d0a348;background:transparent;color:var(--ink)}
+button.web-mark-quote:hover{text-decoration:underline}
+@media(max-width:740px){
+ .web-reader-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(130px,31%)}
+ .web-reader-layout.web-reader-side-hidden{grid-template-rows:minmax(0,1fr)}
+ .web-reader-side{border-inline-start:0;border-top:1px solid var(--line)}
+ .web-reader-sheet{padding:16px}
+}

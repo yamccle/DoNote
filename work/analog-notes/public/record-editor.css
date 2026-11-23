@@ -1,0 +1,51 @@
+/**
+ * [INPUT]: 读取记录编辑器结构、主题色和窗口尺寸。
+ * [OUTPUT]: 布置主表单、附件、关联资料和可选信息。
+ * [POS]: 仅作用于记录编辑器，保留浮窗和整页两种布局。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+#editor .editor-body {display:grid;align-content:start;gap:14px}
+#editor .editor-body .field {min-width:0;margin:0}
+#editor .editor-record-heading {
+ display:grid;grid-template-columns:minmax(0,1fr) minmax(138px, .38fr);gap:12px
+}
+#editor .editor-record-heading #title {font-size:1.06rem;font-weight:600}
+#editor .editor-body :is(input,select,textarea) {min-width:0}
+#editor .editor-body select {max-width:100%}
+#editor #planFields:not([hidden]) {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+#editor .editor-content > label {margin-block-end:2px}
+#editor:not(.document-page) .editor-content .rich-editor {min-height:124px;height:clamp(136px,30dvh,260px)}
+#editor .editor-toolbar {gap:5px;padding:5px 8px}
+#editor .editor-toolbar #insertInlineImage {border-inline-start:1px solid var(--line);padding-inline-start:10px}
+#editor #editorFormatting {min-width:0}
+#editor #editorFormatting[open] {flex:1 1 100%;border-block-start:1px solid var(--line);padding-block-start:4px}
+#editor #editorFormatting summary {
+ padding:3px 7px;color:var(--text-soft);font-size:var(--type-caption);cursor:pointer;border-radius:var(--radius-control)
+}
+#editor .editor-format-options {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:6px}
+#editor .editor-format-options .rich-colors {flex-wrap:wrap}
+#editor .editor-files {display:grid;gap:6px;min-width:0}
+#editor .editor-file-actions button {padding:5px 9px}
+#editor #draftFiles:empty {display:none}
+#editor .editor-disclosure {border-block-start:1px solid var(--line);min-width:0}
+#editor .editor-disclosure + .editor-disclosure {margin-block-start:-9px}
+#editor .editor-disclosure > summary {
+ padding:8px 5px;cursor:pointer;font-size:var(--type-label);color:var(--ink);border-radius:var(--radius-control)
+}
+#editor :is(.editor-disclosure, #editorFormatting) > summary:is(:hover,:focus-visible) {background:var(--surface-hover)}
+#editor :is(#resourceLinksField,.editor-metadata-grid) {padding:6px 2px 4px}
+#editor .editor-metadata-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#editor #referenceFields {grid-column:1/-1}
+#editor #referenceFields .field + .field {margin-top:10px}
+#editor .editor-pin {display:flex;align-items:center;gap:6px;font-size:var(--type-label);color:var(--text-soft)}
+#editor .editor-resource-count {padding-inline-start:6px;color:var(--muted);font-variant-numeric:tabular-nums}
+#editor .editor-save-state {min-width:0;flex:1 1 140px;overflow-wrap:anywhere}
+#editor .editor-save-state .form-message {margin:0;line-height:1.4}
+#editor .editor-save-state .form-message:empty,#editor .editor-save-state .form-message:not(:empty) + #saveHint {display:none}
+#editor .modalfoot {flex-wrap:wrap}
+#editor .modalfoot .right {margin-inline-start:auto}
+@media(max-width:430px) {
+ #editor .editor-record-heading {grid-template-columns:minmax(0,1fr)}
+ #editor .editor-metadata-grid {grid-template-columns:minmax(0,1fr)}
+ #editor .editor-body {gap:11px}
+}

@@ -1,0 +1,154 @@
+/**
+ * [INPUT]: 读取工作台主题和阅读器控制状态。
+ * [OUTPUT]: 提供工具栏、菜单和按键反馈。
+ * [POS]: 仅装饰 PDF 阅读器的工具区域。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+#reader.reader-enhanced {
+ --pdf-chrome:color-mix(in srgb,var(--paper) 66%,var(--surface));
+ --pdf-canvas:color-mix(in srgb,var(--paper) 74%,var(--reader-bg));
+ --pdf-active:color-mix(in srgb,var(--accent) 9%,var(--surface));
+ --pdf-control-radius:4px;
+}
+#reader.reader-enhanced .reader-chrome {
+ background:var(--pdf-chrome);
+}
+#reader.reader-enhanced .reader-tabs {padding-block:4px}
+#reader.reader-enhanced .reader-tab {
+ padding:4px 5px 4px 9px;border-color:transparent;border-radius:var(--pdf-control-radius);
+ background:transparent;
+}
+#reader.reader-enhanced .reader-tab:hover {background:var(--surface-hover);color:var(--ink)}
+#reader.reader-enhanced .reader-tab.active {
+ border-color:var(--line);background:var(--surface);color:var(--ink);font-weight:600;
+}
+#reader.reader-enhanced .reader-tab-close {border-radius:var(--pdf-control-radius)}
+#reader.reader-enhanced .reader-tab-add {
+ border:0;border-radius:var(--pdf-control-radius);color:var(--text-soft);
+}
+#reader.reader-enhanced .pdf-scroll {background:var(--pdf-canvas)}
+#reader.reader-enhanced .pdf-page {box-shadow:0 0 0 1px var(--line)}
+
+/* Keep actions in groups, with a dedicated field for the current page. */
+#reader.reader-enhanced .pdf-unified-toolbar {
+ display:flex;align-items:center;column-gap:6px;row-gap:3px;flex:none;flex-wrap:wrap;
+ padding:5px 12px;background:var(--surface);border-bottom:1px solid var(--line);
+}
+#reader.reader-enhanced .reader-statusbar,
+#reader.reader-enhanced .pdf-tools,
+#reader.reader-enhanced .pdf-reflow-controls {
+ display:flex;align-items:center;gap:0;min-width:0;max-width:100%;
+ padding:0;border:0;background:transparent;
+}
+#reader.reader-enhanced :is(.reader-statusbar,.pdf-tools,.pdf-reflow-controls) {flex-wrap:wrap}
+#reader.reader-enhanced :is(.reader-statusbar,.pdf-tools,.pdf-reflow-controls)[hidden],
+#reader.reader-enhanced .pdf-reflow-controls button[hidden] {display:none}
+#reader.reader-enhanced .pdf-toolbar-group {
+ display:flex;align-items:center;gap:2px;flex:none;min-width:0;
+ padding:0 7px;
+}
+#reader.reader-enhanced .pdf-toolbar-group + .pdf-toolbar-group {border-inline-start:1px solid var(--line)}
+#reader.reader-enhanced .reader-statusbar > .pdf-toolbar-group:first-child {padding-inline-start:0}
+#reader.reader-enhanced :is(.reader-statusbar,.pdf-tools,.pdf-reflow-controls) .pdf-toolbar-group > button,
+#reader.reader-enhanced .pdf-reflow-controls > button,
+#reader.reader-enhanced #markReadingDone {
+ display:inline-flex;align-items:center;justify-content:center;gap:4px;
+ min-width:32px;min-height:32px;padding:4px 8px;border:1px solid transparent;border-radius:var(--pdf-control-radius);
+ background:transparent;color:var(--text-soft);font:500 var(--type-control)/1.35 var(--font-ui);white-space:nowrap;
+}
+#reader.reader-enhanced :is(.reader-statusbar,.pdf-tools,.pdf-reflow-controls) .pdf-toolbar-group > button:hover,
+#reader.reader-enhanced .pdf-reflow-controls > button:hover,
+#reader.reader-enhanced #markReadingDone:hover {background:var(--surface-hover);color:var(--ink)}
+#reader.reader-enhanced :is(.reader-statusbar,.pdf-tools,.pdf-reflow-controls) button:focus-visible {outline:2px solid var(--accent);outline-offset:1px}
+#reader.reader-enhanced :is(.pdf-toolbar-group > button[aria-expanded=true],.pdf-toolbar-group > button[aria-pressed=true],.pdf-view-menu-toggle[aria-pressed=true],button[popovertarget]:has(+ :popover-open)) {
+ background:var(--pdf-active);color:var(--accent);
+ box-shadow:inset 0 -2px 0 var(--accent);
+}
+#reader.reader-enhanced .pdf-toolbar-group > .pdf-icon-control {width:32px;min-width:32px;padding:0;font-size:17px}
+#reader.reader-enhanced .pdf-toolbar-group > .pdf-chevron {font-size:22px}
+#reader.reader-enhanced .pdf-toolbar-group > button:disabled {opacity:.45}
+#reader.reader-enhanced #pdfPageNumber {
+ width:7ch;min-height:30px;margin:0 2px;padding:3px 4px;text-align:center;
+ border:1px solid var(--field-border);border-radius:var(--pdf-control-radius);background:var(--surface);color:var(--ink);
+ font:500 var(--type-control)/1.4 var(--font-ui);font-variant-numeric:tabular-nums;appearance:textfield;
+}
+#reader.reader-enhanced #pdfPageNumber::-webkit-inner-spin-button {appearance:none}
+#reader.reader-enhanced #pdfPageCount {
+ padding-inline:3px;color:var(--muted);font-size:var(--type-label);font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+#reader.reader-enhanced #pdfZoom {
+ max-width:110px;min-height:30px;padding:3px 4px;border:0;border-radius:var(--pdf-control-radius);
+ background:transparent;color:var(--ink);font:500 var(--type-label)/1.4 var(--font-ui);
+}
+#reader.reader-enhanced #markReadingDone {margin-inline:5px;border-color:var(--line);font-size:var(--type-label)}
+#reader.reader-enhanced .pdf-reflow-controls {column-gap:3px;row-gap:3px}
+#reader.reader-enhanced .pdf-reflow-controls > #pdfViewMenuToggle {border-color:var(--line);color:var(--ink)}
+#reader.reader-enhanced .pdf-reflow-controls > #pdfViewMenuToggle[aria-pressed=true] {color:var(--accent)}
+#reader.reader-enhanced #pdfReflowOriginal {margin-inline-start:3px;color:var(--accent)}
+#reader.reader-enhanced :is(#pdfReflowZoom,.pdf-bilingual-controls > select) {
+ min-height:30px;height:auto;max-width:100%;padding:3px 5px;border:1px solid var(--field-border);
+ border-radius:var(--pdf-control-radius);background:var(--surface);color:var(--ink);
+ font:var(--type-label)/1.4 var(--font-ui);
+}
+#reader.reader-enhanced .pdf-bilingual-controls {flex-wrap:wrap;gap:4px;min-width:0;max-width:100%}
+#reader.reader-enhanced :is(#pdfViewMenu,#pdfReaderMore,#pdfMarkTools,.pdf-selection-menu) {
+ border-radius:6px;
+ box-shadow:0 4px 14px color-mix(in srgb,var(--ink) 14%,transparent);
+ overscroll-behavior:contain;
+}
+:is(#pdfViewMenu,#pdfReaderMore) {
+ position:fixed;inset:auto;margin:0;width:min(270px,calc(100vw - 16px));overflow:auto;
+ padding:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+}
+:is(#pdfViewMenu,#pdfReaderMore):popover-open {display:grid}
+:is(#pdfViewMenu,#pdfReaderMore) button {
+ display:grid;width:100%;gap:3px;padding:9px 10px;text-align:left;border:0;border-radius:var(--pdf-control-radius);
+ background:transparent;color:var(--ink);font:var(--type-control)/1.4 var(--font-ui);
+}
+:is(#pdfViewMenu,#pdfReaderMore) button[hidden] {display:none}
+:is(#pdfViewMenu,#pdfReaderMore) button:is(:hover,:focus-visible) {background:var(--surface-hover)}
+:is(#pdfViewMenu,#pdfReaderMore) button[aria-pressed=true] {background:var(--pdf-active);color:var(--accent)}
+#pdfViewMenu button strong {font-weight:600}
+#pdfViewMenu small {color:var(--muted);font-size:var(--type-caption);font-weight:400}
+#reader.reader-enhanced :is(#pdfViewMenu,#pdfReaderMore,#pdfMarkTools,.pdf-selection-menu) button:focus-visible {
+ outline:2px solid var(--accent);outline-offset:-2px;
+}
+#reader.reader-enhanced .pdf-unified-toolbar button:not(:disabled):active {
+ background:var(--pdf-active);color:var(--accent);
+}
+@keyframes donote-pdf-popup-in {
+ from {opacity:.6;translate:0 var(--pdf-popup-offset,-3px)}
+ to {opacity:1;translate:0 0}
+}
+@media(prefers-reduced-motion:no-preference) {
+ #reader.reader-enhanced :is(.pdf-unified-toolbar button,.reader-tab,.reader-tab-close) {
+  transition:background-color var(--motion-fast) var(--ease-standard),
+   color var(--motion-fast) var(--ease-standard),border-color var(--motion-fast) var(--ease-standard);
+ }
+ #reader.reader-enhanced :is(#pdfViewMenu,#pdfReaderMore,#pdfMarkTools):popover-open,
+ #reader.reader-enhanced .pdf-selection-menu:not([hidden]) {
+  animation:donote-pdf-popup-in var(--motion-fast) var(--ease-standard);
+ }
+ #reader.reader-enhanced [data-placement=above] {--pdf-popup-offset:3px}
+}
+@media(max-width:700px) {
+ #reader.reader-enhanced .pdf-unified-toolbar {gap:4px;padding:5px 8px}
+ #reader.reader-enhanced .pdf-toolbar-group {max-width:100%;flex-wrap:wrap;padding-inline:4px}
+ #reader.reader-enhanced .pdf-toolbar-group + .pdf-toolbar-group {border-inline-start:0}
+ #reader.reader-enhanced :is(.reader-statusbar,.pdf-tools,.pdf-reflow-controls) .pdf-toolbar-group > button,
+ #reader.reader-enhanced .pdf-reflow-controls > button,
+ #reader.reader-enhanced #markReadingDone {padding-inline:7px}
+}
+
+#reader.reader-enhanced #pdfReaderMoreToggle {min-width:32px;padding:0 6px;font-size:20px}
+#reader.reader-enhanced #pdfReaderMore #markReadingDone {display:block;width:100%;height:auto;margin:0;padding:9px 10px;border:0;text-align:left;font:inherit}
+
+/* Reflow keeps the translated text and document structure on a plain sheet. */
+#reader.reader-enhanced .pdf-reflow-view:not([hidden]) {background:var(--pdf-canvas)}
+#reader.reader-enhanced .pdf-reflow-statusbar {background:var(--pdf-chrome)}
+#reader.reader-enhanced .pdf-reflow-document {border-radius:2px}
+#reader.reader-enhanced .pdf-reflow-source.pdf-reflow-heading {font-weight:650;letter-spacing:normal}
+#reader.reader-enhanced .pdf-reflow-view[data-bilingual-view=both] .pdf-reflow-translation {border-inline-start-width:1px}
+@media(max-width:700px) {
+ #reader.reader-enhanced .pdf-reflow-scroll {padding:10px 8px}
+}
