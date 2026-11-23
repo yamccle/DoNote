@@ -15,7 +15,7 @@
 - `pdf-tools.js` 定位阅读器工具菜单，处理工具菜单与侧栏标签的键盘焦点。
 - `pdf-annotations.js` 和 `pdf-reflow.js` 为标注与排版菜单复用阅读器控制。
 - `reader-toolbar.css` 和 `reader-panels.css` 限定工具菜单和抽屉动画。
-- `video-subtitles.js` 同步播放位置和当前字幕，按用户操作定位字幕。
+- `video-subtitles.js` 同步播放位置和当前字幕，按用户操作定位字幕；「识别时同步翻译」开关让识别与离线翻译并行，逐条产出中文字幕。
 - `video-subtitles.css` 提供字幕操作、任务进度和当前字幕的状态样式。
 - `video-player-learning.js` 在学习控制栏保留字幕显示开关。
 

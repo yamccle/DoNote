@@ -107,6 +107,7 @@ function translateVideoSubtitlesFree(cues, {signal, onProgress, onTranslated}) {
    }
    for (const value of data.values) onTranslated(pending[done++].index, value);
    onProgress(done, pending.length);
+   if (data.done === true && done === pending.length) { finish(); }
   }
   host.addEventListener('message', receive);
   signal.addEventListener('abort', abort, {once: true});

@@ -19,6 +19,67 @@ function selectedVideoAsrModel(){
 function videoSubtitleKey(s){return s.profileId+'/'+s.file.id}
 function videoSubtitleNotify(job,changed){for(const view of job.views)view(changed)}
 function videoSubtitleJobStatus(job,text,percent=null,changed){job.status=text;job.percent=percent;videoSubtitleNotify(job,changed)}
+// 识别时同步翻译：识别出一条英文字幕就立即离线翻译一条，边识别边出中文。
+const VIDEO_AUTO_TRANSLATE_KEY='donote-auto-subtitle-translate';
+function videoAutoTranslateEnabled(){try{return localStorage.getItem(VIDEO_AUTO_TRANSLATE_KEY)!=='off'}catch{return true}}
+function videoSyncSuffix(job){
+ const auto=job.auto;
+ if(!auto?.enabled||!auto.done)return '';
+ return ' · 已同步翻译 '+auto.done+' 条'+(auto.failed?'（已中断）':'');
+}
+function settleVideoAutoTranslation(job){
+ const auto=job.auto;if(!auto)return;
+ if(auto.running||auto.queue.length||job.id)return;
+ if(job.kind==='translation'&&job.translationController===auto.controller){
+  job.kind=null;job.translationController=null;
+  if(auto.controller.signal.aborted)videoSubtitleJobStatus(job,'已停止同步翻译。'+(auto.done?' 已同步 '+auto.done+' 条。':''));
+  else if(!auto.failed)videoSubtitleJobStatus(job,job.ownerId?'英文字幕与中文字幕已生成，请核对专业术语及数字。':'英文字幕已生成，本次字幕可导出。',100);
+  videoSubtitleNotify(job);
+ }
+}
+async function drainVideoAutoTranslation(job){
+ const auto=job.auto;
+ if(!auto?.enabled||auto.running||auto.failed||auto.controller.signal.aborted)return;
+ auto.running=true;
+ let lastSave=Date.now();
+ try{
+  while(auto.enabled&&!auto.controller.signal.aborted){
+   if(!auto.queue.length)break;
+   const batch=[],batchIndices=[];
+   for(const index of auto.queue.splice(0,8)){
+    const cue=job.cues[index];
+    if(cue&&cue.en.trim()&&!cue.zh.trim()){batch.push(cue);batchIndices.push(index)}
+   }
+   if(!batch.length)continue;
+   await translateVideoSubtitlesFree(batch,{
+    signal:auto.controller.signal,
+    onProgress:()=>{
+     if(!job.id)videoSubtitleJobStatus(job,'正在同步翻译剩余字幕 '+auto.done+' 条…');
+    },
+    onTranslated(localIndex,value){
+     const index=batchIndices[localIndex],cue=job.cues[index];
+     if(!cue||cue.zh===value)return;
+     cue.zh=value;auto.done++;
+     videoSubtitleJobStatus(job,job.id
+      ?'正在识别，已显示 '+job.recognitionCues+' 条英文字幕'+videoSyncSuffix(job)+'…'
+      :'正在同步翻译剩余字幕 '+auto.done+' 条…',job.percent,[index]);
+     if(job.ownerId&&Date.now()-lastSave>=5000){lastSave=Date.now();videoSubtitleSave(job).catch(()=>{})}
+    }
+   });
+  }
+ }catch(error){
+  if(auto.controller.signal.aborted){/* 取消时由 cancel 分支收尾 */}
+  else{
+   auto.failed=true;
+   videoSubtitleJobStatus(job,'同步翻译中断：'+error.message+(auto.done?' 已同步 '+auto.done+' 条。':''));
+  }
+ }finally{
+  auto.running=false;
+  if(auto.enabled&&!auto.failed&&auto.queue.length&&!auto.controller.signal.aborted){void drainVideoAutoTranslation(job);return}
+  settleVideoAutoTranslation(job);
+  if(auto.done&&job.ownerId&&!auto.failed)videoSubtitleSave(job).catch(()=>{});
+ }
+}
 function videoSubtitleRejectAck(job,error){if(!job.ack)return;clearTimeout(job.ack.timer);const reject=job.ack.reject;job.ack=null;reject(error)}
 function videoSubtitleSend(job,message,seq){return new Promise((resolve,reject)=>{
  if(job.id!==message.id){reject(new Error('识别已取消。'));return}
@@ -80,10 +141,16 @@ function checkedAsrCues(values){
 function appendAsrCues(job,values){
  const cues=checkedAsrCues(values);
  if(!cues.length)return;
+ const startIndex=job.cues.length;
  if(!job.recognitionCues)job.cues=[];
  job.recognitionCues=(job.recognitionCues||0)+cues.length;
  job.cues.push(...cues);
- videoSubtitleJobStatus(job,'正在识别，已显示 '+job.recognitionCues+' 条英文字幕…',job.percent);
+ videoSubtitleJobStatus(job,'正在识别，已显示 '+job.recognitionCues+' 条英文字幕'+videoSyncSuffix(job)+'…',job.percent);
+ // 识别时同步翻译：新识别出的英文字幕立即进入翻译队列。
+ if(job.auto?.enabled&&!job.auto.failed&&!job.auto.controller.signal.aborted){
+  for(let index=startIndex;index<job.cues.length;index++)job.auto.queue.push(index);
+  void drainVideoAutoTranslation(job);
+ }
  if(job.ownerId&&Date.now()-job.lastRecognitionSave>=15000){
   job.lastRecognitionSave=Date.now();
   videoSubtitleSave(job).catch(()=>{});
@@ -92,19 +159,29 @@ function appendAsrCues(job,values){
 async function finishAsrJob(job,error){
  job.id=null;job.sourceBlob=null;
  const count=job.recognitionCues;
+ if(error)job.auto?.controller.abort();
  try{
   if(count&&job.ownerId){
    videoSubtitleJobStatus(job,'正在保存已生成的英文字幕…',job.percent);
    await videoSubtitleSave(job);
   }
+  const auto=job.auto;
+  const autoPending=auto?.enabled&&!auto.failed&&!auto.controller.signal.aborted&&(auto.queue.length||auto.running);
   if(error)videoSubtitleJobStatus(job,error+(count?' 已保留 '+count+' 条英文字幕。':''));
-  else if(count)videoSubtitleJobStatus(job,job.ownerId?'英文字幕已生成，请校对后翻译。':'英文字幕已生成，本次字幕只能导出。',100);
+  else if(autoPending){
+   // 识别结束但翻译还没跟上：转入“翻译中”阶段，让取消按钮与进度继续生效。
+   job.kind='translation';job.translationController=auto.controller;
+   videoSubtitleJobStatus(job,'英文字幕已生成，正在同步翻译剩余字幕…',job.percent);
+  }
+  else if(count)videoSubtitleJobStatus(job,job.ownerId?(auto?.done?'英文字幕与中文字幕已生成，请核对专业术语及数字。':'英文字幕已生成，请校对后翻译。'):'英文字幕已生成，本次字幕只能导出。',100);
   else videoSubtitleJobStatus(job,'没有识别到语音。');
  }catch(failure){
   videoSubtitleJobStatus(job,'字幕未保存：'+failure.message);
  }finally{
-  job.kind=null;
+  if(job.kind==='recognition')job.kind=null;
+  if(job.kind!=='translation')job.translationController=null;
   videoSubtitleNotify(job);
+  settleVideoAutoTranslation(job);
  }
 }
 videoSubtitleHost?.addEventListener('message',event=>{
@@ -128,6 +205,7 @@ function mountVideoSubtitles(session,blob,content){
   <div class="video-subtitles-head">
    <div class="video-subtitles-title"><strong>视频字幕</strong><span class="video-subtitles-caption">本地识别 · 可在设置中选择模型</span></div>
    <div class="video-subtitles-actions">
+    <label class="video-subtitles-auto" title="识别出英文字幕时立即用离线翻译生成中文，边识别边翻译"><input type="checkbox" data-act="auto-translate"> 识别时同步翻译</label>
     <button type="button" data-act="generate">生成英文字幕</button>
     <button type="button" class="primary" data-act="translate-chooser" aria-expanded="false">翻译为中文</button>
     <button type="button" data-act="export">导出 SRT</button>
@@ -174,6 +252,16 @@ function mountVideoSubtitles(session,blob,content){
  const task=root.querySelector('.video-subtitles-task'),playhead=root.querySelector('.video-subtitles-playhead');
  const button=name=>root.querySelector('[data-act="'+name+'"]');
  const locate=button('locate');
+ const autoToggle=button('auto-translate');
+ autoToggle.checked=videoAutoTranslateEnabled();
+ autoToggle.closest('label').hidden=!videoSubtitleHost;
+ autoToggle.addEventListener('change',()=>{
+  try{localStorage.setItem(VIDEO_AUTO_TRANSLATE_KEY,autoToggle.checked?'on':'off')}catch{}
+  if(job.auto){
+   job.auto.enabled=autoToggle.checked&&!!videoSubtitleHost;
+   if(!job.auto.enabled)job.auto.controller.abort();
+  }
+ });
  let lastCues, fields=[], timeline=[], activeRow;
  if(typeof installVideoLearningControls==='function')installVideoLearningControls(root,video,()=>job.cues,signal);
  if(typeof installVideoSubtitleOverlay==='function')installVideoSubtitleOverlay(root,video,()=>job.cues,signal);
@@ -319,18 +407,23 @@ function mountVideoSubtitles(session,blob,content){
  button('generate').onclick=()=>{
   if(!videoSubtitleHost){videoSubtitleJobStatus(job,'请在 DoNote Windows 桌面版使用本地识别。');return}
   if(job.kind||(job.cues.length&&!confirm('新字幕会替换当前字幕，确定重新识别吗？')))return;
+  job.auto?.controller.abort();
+  const autoOn=autoToggle.checked&&!!videoSubtitleHost;
+  job.auto={enabled:autoOn,controller:new AbortController(),queue:[],done:0,failed:false,running:false};
   const id=job.id=crypto.randomUUID();
   job.kind='recognition';job.sourceBlob=blob;job.recognitionCues=0;job.lastRecognitionSave=0;
-  videoSubtitleJobStatus(job,'正在准备当前视频…',0);
+  videoSubtitleJobStatus(job,'正在准备当前视频…'+(autoOn?'（识别时同步翻译）':''),0);
   videoSubtitleStream(job,blob,selectedVideoAsrModel()).catch(error=>{
    if(job.id!==id)return;
+   job.auto?.controller.abort();
    videoSubtitleHost.postMessage({type:'video-transcribe-cancel',id});
    void finishAsrJob(job,error.message);
   });
  };
  button('cancel').onclick=()=>{
-  if(job.translationController){job.translationController.abort();videoSubtitleJobStatus(job,'正在停止翻译…');return}
+  if(job.translationController){job.translationController.abort();if(job.auto)job.auto.enabled=false;videoSubtitleJobStatus(job,'正在停止翻译…');return}
   if(!job.id)return;
+  job.auto?.controller.abort();if(job.auto)job.auto.enabled=false;
   videoSubtitleHost?.postMessage({type:'video-transcribe-cancel',id:job.id});
   videoSubtitleRejectAck(job,new Error('任务已取消。'));
   void finishAsrJob(job,'已停止识别。');

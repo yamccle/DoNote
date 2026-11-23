@@ -66,6 +66,15 @@ async function openWorkspace(browser) {
       if (message === 'startup-ready') {
         queueMicrotask(() => post({ type: 'yams-one-preferences', splashEnabled: false }));
       }
+      // 模拟本机离线字幕翻译：收到 subtitle-local:<id>:<payload> 后立即逐条返回译文。
+      if (typeof message === 'string' && message.startsWith('subtitle-local:')) {
+        const rest = message.slice('subtitle-local:'.length);
+        const separator = rest.indexOf(':');
+        const id = rest.slice(0, separator);
+        const payload = JSON.parse(rest.slice(separator + 1));
+        const values = payload.map(text => '译：' + text);
+        queueMicrotask(() => post({ type: 'subtitle-local-result', id, offset: 0, values, done: true }));
+      }
     };
     window.chrome.webview = webview;
 
@@ -235,6 +244,9 @@ async function testBackgroundSubtitles(page) {
     render();
   }, otherId);
   await send({ type: 'video-transcribe-segments', segments: [{ start: 0, end: 0.2, en: 'Background result' }] });
+  // 边识别边翻译：识别尚未结束时，中文字幕已经逐条生成。
+  await page.waitForFunction(() => [...videoSubtitleJobs.values()].some(job => job.cues[0]?.zh === '译：Background result'));
+  assert.equal(await page.evaluate(() => [...videoSubtitleJobs.values()].some(job => job.id)), true, '识别仍在进行时译文已出现');
   await send({ type: 'video-transcribe-result', count: 1 });
   await page.waitForFunction(() => [...videoSubtitleJobs.values()].every(job => !job.kind));
   await page.reload();
@@ -246,8 +258,8 @@ async function testBackgroundSubtitles(page) {
   }), { ownerId, recordId, fileId });
   assert.equal(state.activeId, otherId);
   assert.equal(state.otherRecords, 0);
-  assert.deepEqual(state.cues, [{ start: 0, end: 0.2, en: 'Background result', zh: '' }]);
-  console.log('PASS background subtitles: range bytes, reopen progress, correct account and IndexedDB persistence');
+  assert.deepEqual(state.cues, [{ start: 0, end: 0.2, en: 'Background result', zh: '译：Background result' }]);
+  console.log('PASS background subtitles: range bytes, reopen progress, correct account, incremental translation and IndexedDB persistence');
 }
 
 const { chromium } = playwright();
