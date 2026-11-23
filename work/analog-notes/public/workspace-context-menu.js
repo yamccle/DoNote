@@ -1,20 +1,30 @@
 /**
- * [INPUT]: 读取工作台和资料的当前状态。
- * [OUTPUT]: 提供当前对象的右键操作。
- * [POS]: 工作台情境菜单，复用记录编辑器提供的新建入口。
+ * [INPUT]: 读取选中记录、当前账户和目标文件夹。
+ * [OUTPUT]: 提供右键操作及带版本校验的记录移动入口。
+ * [POS]: 为情境菜单与资料库多选复用同一个目标选择器。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 'use strict';
-let workspaceMenu=null,workspaceMenuFocus=null,workspaceMenuBusy=false;
+let workspaceMenu=null,workspaceMenuFocus=null,workspaceMenuAnchor=null,workspaceMenuBusy=false;
 function closeWorkspaceMenu(restore=false){
  if(workspaceMenu){workspaceMenu.hidden=true;workspaceMenu.replaceChildren()}
  if(restore&&workspaceMenuFocus?.isConnected)workspaceMenuFocus.focus({preventScroll:true});
- workspaceMenuFocus=null;
+ workspaceMenuFocus=null;workspaceMenuAnchor=null;
 }
-function showWorkspaceMenu(event,items){
- event.preventDefault();hideFolderContextMenu();closeWorkspaceMenu();
+function positionWorkspaceMenu(x,y){
+ const rect=workspaceMenu.getBoundingClientRect();
+ workspaceMenu.style.left=Math.max(8,Math.min(x,innerWidth-rect.width-8))+'px';
+ workspaceMenu.style.top=Math.max(8,Math.min(y,innerHeight-rect.height-8))+'px';
+}
+function positionAnchoredWorkspaceMenu(){
+ const bounds=workspaceMenuAnchor.getBoundingClientRect(),size=workspaceMenu.getBoundingClientRect();
+ positionWorkspaceMenu(bounds.right-size.width,bounds.bottom+size.height+8<=innerHeight?bounds.bottom:bounds.top-size.height);
+}
+function showWorkspaceMenu(event,items,{anchor=null}={}){
+ event.preventDefault();closeWorkspaceMenu();
  if(!workspaceMenu){workspaceMenu=document.createElement('div');workspaceMenu.id='workspaceContextMenu';workspaceMenu.className='context-menu';workspaceMenu.setAttribute('role','menu')}
  const host=event.target.closest('dialog[open]')||document.body;host.append(workspaceMenu);
+ workspaceMenuAnchor=anchor;
  workspaceMenuFocus=event.target.closest('[tabindex],button,input')||document.activeElement;
  const profile=appState.activeId;
  for(const item of items){
@@ -25,9 +35,11 @@ function showWorkspaceMenu(event,items){
   workspaceMenu.append(button);
  }
  workspaceMenu.hidden=false;workspaceMenu.style.maxHeight='calc(100vh - 16px)';workspaceMenu.style.overflowY='auto';
- const rect=workspaceMenu.getBoundingClientRect(),anchor=event.target.getBoundingClientRect();
- const x=event.clientX||anchor.left+12,y=event.clientY||anchor.bottom;
- workspaceMenu.style.left=Math.max(8,Math.min(x,innerWidth-rect.width-8))+'px';workspaceMenu.style.top=Math.max(8,Math.min(y,innerHeight-rect.height-8))+'px';
+ if(anchor)positionAnchoredWorkspaceMenu();
+ else {
+  const bounds=event.target.getBoundingClientRect();
+  positionWorkspaceMenu(event.clientX||bounds.left+12,event.clientY||bounds.bottom);
+ }
  workspaceMenu.querySelector('button')?.focus({preventScroll:true});
 }
 function contextRecordTarget(note){
@@ -52,15 +64,24 @@ async function changeContextRecords(target,change,{logCompletedPlans=false}={}){
  await commitState(next);render();if($('detail').open&&target.versions.has(current))showDetail(current);
  return logs;
 }
-async function moveContextRecords(target){
- const notes=checkedContextRecords(target),scope=folderScope(notes[0].type);
- if(notes.some(n=>folderScope(n.type)!==scope))throw new Error('请选择同一栏目的记录。');
- const dialog=document.createElement('dialog');dialog.className='compact-dialog';dialog.setAttribute('aria-label','移动记录');
- dialog.innerHTML='<div class="modalhead"><h2>移动到文件夹</h2></div><div class="modalbody"><label>目标文件夹<select aria-label="目标文件夹"><option value="">未归档</option>'+recordFolderOptions(scope)+'</select></label><p class="tiny">移动 '+notes.length+' 条记录，保留原文件。</p></div><div class="modalfoot"><button type="button" class="secondary" data-cancel>取消</button><button type="button" class="primary" data-save>移动</button></div>';
- dialog.querySelector('select').value=notes[0].folderId||'';
- dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
- dialog.querySelector('[data-save]').onclick=async e=>{e.target.disabled=true;try{const id=dialog.querySelector('select').value;if(id&&!scopedFolderId(notes[0].type,id))throw new Error('文件夹已变化。');await changeContextRecords(target,n=>{if(id)n.folderId=id;else delete n.folderId});dialog.close();toast('已移动 '+notes.length+' 条记录')}catch(error){toast(error.message)}finally{e.target.disabled=false}};
- dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+function moveContextRecords(target){
+ const notes=checkedContextRecords(target);
+ if(!notes.length)throw new Error('请选择要移动的记录。');
+ const first=notes[0],scope=folderScope(first.type);
+ if(notes.some(note=>folderScope(note.type)!==scope))throw new Error('请选择同一栏目的记录。');
+ const firstFolder=first.folderId||'';
+ const currentFolder=notes.every(note=>(note.folderId||'')===firstFolder)?firstFolder:null;
+ const count=notes.length+(scope==='resource'?' 份资料':' 条记录');
+ const description=notes.length===1?'移动「'+first.title+'」':'移动 '+count;
+ openRecordFolderMove({scope,description,currentFolder,apply:async folderId=>{
+  if(typeof folderId!=='string')throw new Error('请选择目标文件夹。');
+  if(folderId&&!scopedFolderId(scope,folderId))throw new Error('目标文件夹已变化，请重新选择。');
+  await changeContextRecords(target,note=>{
+   if(folderId)note.folderId=folderId;
+   else delete note.folderId;
+  });
+  toast('已移动 '+count);
+ }});
 }
 function recordContextItems(note){
  const target=contextRecordTarget(note),count=target.versions.size,many=count>1,label=many?'所选 '+count+' 条记录':note.title;
@@ -114,6 +135,13 @@ document.addEventListener('keydown',event=>{
  else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();event.stopImmediatePropagation();const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next]?.focus()}
  else if(event.key==='Tab')closeWorkspaceMenu();
 },true);
-window.addEventListener('scroll',event=>{if(!(event.target instanceof Node)||!workspaceMenu?.contains(event.target))closeWorkspaceMenu()},true);
+window.addEventListener('scroll',event=>{
+ if(!workspaceMenu||workspaceMenu.hidden||event.target instanceof Node&&workspaceMenu.contains(event.target))return;
+ if(workspaceMenuAnchor?.isConnected){
+  const bounds=workspaceMenuAnchor.getBoundingClientRect();
+  if(bounds.bottom>0&&bounds.top<innerHeight){positionAnchoredWorkspaceMenu();return}
+ }
+ closeWorkspaceMenu();
+},true);
 window.addEventListener('resize',()=>closeWorkspaceMenu());
 window.addEventListener('blur',()=>closeWorkspaceMenu());

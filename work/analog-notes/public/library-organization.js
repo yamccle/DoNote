@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取资料库选中的记录、阅读清单和归档文件夹。
+ * [OUTPUT]: 提供批量移动、批量整理和阅读清单操作。
+ * [POS]: 批量移动复用记录情境菜单的版本校验和目标选择器。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 const MAX_READING_LISTS=200,MAX_READING_LIST_ITEMS=10000;
@@ -53,7 +59,7 @@ function updateLibraryOrganization(){
  const options='<option value="">所有资料</option>'+readingListOptions();
  if(select.dataset.options!==options){select.innerHTML=options;select.dataset.options=options}
  select.value=list?.id||'';
- $('libraryOrganize').disabled=libraryDeleting||!selectedLibraryIds.size;
+ $('libraryMoveSelected').disabled=$('libraryOrganize').disabled=libraryDeleting||!selectedLibraryIds.size;
 }
 function resetReadingListEditor(){
  editingReadingListId='';$('readingListName').value='';$('readingListSave').textContent='新建清单';$('readingListCancelEdit').hidden=true;
@@ -131,6 +137,13 @@ function openLibraryOrganization(){
  $('libraryOrganizeMessage').textContent='';
  if(!dialog.open)dialog.showModal();
 }
+function moveSelectedLibraryRecords(){
+ if(libraryDeleting||!librarySelectionMode)return;
+ const selected=records.find(note=>selectedLibraryIds.has(note.id));
+ if(!selected)return;
+ try{moveContextRecords(contextRecordTarget(selected))}
+ catch(error){toast(error.message)}
+}
 const organizationTags=value=>[...new Set(value.split(/[,，]/).map(tag=>tag.trim()).filter(Boolean))];
 async function saveLibraryOrganization(event){
  event.preventDefault();
@@ -183,7 +196,7 @@ async function saveLibraryOrganization(event){
 }
 function initializeLibraryOrganization(){
  $('libraryStatus').insertAdjacentHTML('afterend','<select id="readingListFilter" aria-label="按阅读清单筛选"><option value="">所有资料</option></select><button type="button" class="secondary" id="readingListOpen">阅读清单</button>');
- $('libraryDeleteSelected').insertAdjacentHTML('beforebegin','<button type="button" class="secondary" id="libraryOrganize" disabled>批量整理</button>');
+ $('libraryDeleteSelected').insertAdjacentHTML('beforebegin','<button type="button" class="secondary" id="libraryMoveSelected" disabled>移动到…</button><button type="button" class="secondary" id="libraryOrganize" disabled>批量整理</button>');
  document.body.insertAdjacentHTML('beforeend',`
  <dialog id="readingListManager" aria-labelledby="readingListTitle">
   <div class="modalhead"><h2 id="readingListTitle">阅读清单</h2><button type="button" class="icon-button" data-close="readingListManager" aria-label="关闭">✕</button></div>
@@ -214,6 +227,7 @@ function initializeLibraryOrganization(){
  $('readingListForm').onsubmit=saveReadingList;
  $('readingListCancelEdit').onclick=resetReadingListEditor;
  $('readingListRows').onclick=manageReadingListAction;
+ $('libraryMoveSelected').onclick=moveSelectedLibraryRecords;
  $('libraryOrganize').onclick=openLibraryOrganization;
  $('libraryOrganizeForm').onsubmit=saveLibraryOrganization;
 }

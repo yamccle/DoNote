@@ -11,7 +11,14 @@
 - `library.js` 在展开关联资料时生成候选列表。已选择的资料在收起后继续保留。
 - `reliability.js` 暂存记录草稿、计划日期、归档文件夹和附件。
 - `workspace-navigation.js` 同步栏目的选中状态、历史和快捷导航焦点。
-- `workspace-context-menu.js` 将右键新建传给记录编辑器。栏目菜单明确指定类型。
+- `workspace-context-menu.js` 提供工作台菜单和带版本校验的记录移动。
+- `record-folders.js` 验证目录树，提供路径和栏目筛选。
+- `library-folders.js` 显示资料库当前层、路径和每张卡片的菜单入口。
+- `folder-context-menu.js` 复用工作台菜单，将目录操作传给文件夹窗口。
+- `folder-manager.js` 为各栏目提供目录树搜索和目标选择。删除与回收站在同一事务提交。
+- `folder-management.css` 布置目录卡片、路径、搜索和操作窗口。
+- `library-organization.js` 将多选资料交给同一移动窗口，并保留批量标签和阅读清单。
+- `trash.js` 为文件夹和单条记录暂存回收站变化。
 - `workspace-dialogs.js` 按浮窗实例恢复当前草稿，并保留滚动位置。
 - `design-system.css` 提供主题颜色、焦点和通用浮窗动画。
 - `theme.css` 提供页面布局、浮窗遮罩和整页编辑器的主题颜色。

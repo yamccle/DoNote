@@ -1,0 +1,69 @@
+/**
+ * [INPUT]: 读取目录卡片、操作窗口和工作台主题颜色。
+ * [OUTPUT]: 布置路径导航、搜索列表、目录选项和卡片菜单。
+ * [POS]: 供资料库和各记录栏目共用的目录样式。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+.library-folder-toolbar {
+ display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-bottom:12px
+}
+.library-folder-toolbar .library-crumbs {
+ flex:1 1 180px;min-width:0;margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding:4px
+}
+.library-folder-toolbar .library-crumb {
+ flex:none;max-width:min(11rem,65vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.library-folder-tools {display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.library-folder-grid {grid-template-columns:repeat(auto-fill,minmax(min(172px,100%),1fr))}
+.library-folder-item {position:relative;min-width:0}
+.library-folder-item > .library-folder-card {width:100%;height:100%;min-width:0;padding-inline-end:44px}
+.library-folder-more {position:absolute;inset-block-start:6px;inset-inline-end:6px;width:34px;height:34px}
+.library-folder-card small {overflow-wrap:anywhere}
+
+#folderManager {width:min(590px,calc(100% - 28px))}
+#folderActionDialog {width:min(520px,calc(100% - 28px))}
+.folder-manager-tools {
+ display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px
+}
+:is(.folder-manager-tools,#folderDestination) > input {width:100%;min-width:0}
+.folder-manager-rows {margin-block-start:8px}
+.folder-manager-row {
+ display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px;
+ padding-inline-start:min(calc(var(--folder-depth) * 15px),16%);
+ border-block-end:1px solid var(--line)
+}
+.folder-row-open,.folder-destination {
+ display:flex;align-items:center;gap:8px;width:100%;min-height:36px;min-width:0;
+ padding:6px 8px;background:transparent;border:1px solid transparent;border-radius:var(--radius-control);
+ color:var(--ink);font-size:var(--type-control);text-align:start
+}
+:is(.folder-row-open,.folder-destination):hover {background:var(--surface-hover)}
+.folder-row-label {display:grid;gap:1px;min-width:0;overflow-wrap:anywhere}
+.folder-row-label strong {font-weight:600}
+.folder-row-label small {color:var(--muted);font-size:var(--type-caption)}
+#folderManagerMessage {display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#folderManagerMessage:empty,#folderActionMessage:empty {display:none}
+
+#folderActionDialog .modalbody {display:grid;gap:10px;align-content:start}
+#folderActionDialog .field {margin:0}
+#folderActionDialog :is(.section-note,.form-message) {margin:0;overflow-wrap:anywhere}
+.folder-destination-list {
+ margin:8px 0 0;padding:4px;min-inline-size:0;max-height:min(330px,35dvh);overflow-y:auto;
+ border:1px solid var(--line);border-radius:var(--radius-control)
+}
+.folder-destination {padding-inline-start:calc(8px + min(var(--folder-depth) * 14px,16%))}
+.folder-destination[aria-pressed=true] {
+ background:var(--surface-soft);border-color:var(--accent);color:var(--ink)
+}
+#folderRemoveOptions {display:grid;gap:8px}
+#folderRemoveOptions[hidden] {display:none}
+#folderRemoveOptions label {display:flex;align-items:start;gap:6px}
+.folder-action-footer {flex-wrap:wrap;gap:8px}
+.folder-action-footer > :first-child {flex:1 1 135px;min-width:0}
+.folder-action-footer > :first-child:not(:has(> :not([hidden],:empty))) {display:none}
+.folder-action-footer .right {margin-inline-start:auto}
+
+@media(max-width:430px) {
+ .folder-manager-tools {grid-template-columns:minmax(0,1fr)}
+ .folder-manager-tools button {justify-self:end}
+}

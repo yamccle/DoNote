@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收桌面发布包解压后的 workspace 目录。
- * [OUTPUT]: 验证长 PDF、后台字幕、新建记录、草稿与附件保存。
+ * [OUTPUT]: 验证长 PDF、后台字幕、新建记录、草稿、附件与文件夹。
  * [POS]: 发布回归入口。浏览器使用临时账户和本地模拟宿主。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -284,6 +284,176 @@ async function testDraft(page) {
   console.log('PASS draft: reload, saved attachment bytes, and reopening plan dates, tags and resources');
 }
 
+async function testFolderManagement(page) {
+  const ids = {
+    source: 'qa-folder-source', child: 'qa-folder-child',
+    archive: 'qa-folder-archive', destination: 'qa-folder-destination', journal: 'qa-folder-journal'
+  };
+  const labels = {
+    source: '回归来源文件夹', child: '来源子目录', archive: '回归归档目录',
+    destination: '项目归档目标', journal: '日志专用目录', created: '新建资料子目录', renamed: '已整理资料来源'
+  };
+  const bytes = [0x44, 0x6f, 0x00, 0xff];
+  const recordTitle = '文件夹回归附件';
+  const seeded = await page.evaluate(async ({ ids, labels, bytes, recordTitle }) => {
+    const next = structuredClone(appState);
+    const profile = next.profiles.find(entry => entry.id === next.activeId);
+    const folder = (key, parentId = '', scope = 'resource') => ({
+      id: ids[key], name: labels[key], parentId, scope
+    });
+    profile.folders = [...(profile.folders || []), folder('source'), folder('child', ids.source),
+      folder('archive'), folder('destination', ids.archive), folder('journal', '', 'journal')];
+    await commitState(next);
+    const recordId = crypto.randomUUID();
+    const blob = new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' });
+    const file = { id: crypto.randomUUID(), name: 'folder-test.bin', mime: blob.type, size: blob.size, addedAt: new Date().toISOString() };
+    await put({
+      id: recordId, type: 'resource', title: recordTitle, body: '', status: '待读', date: today(),
+      folderId: ids.child, tags: [], attachments: [file]
+    }, [{ key: fileKey(next.activeId, file.id), blob }]);
+    const directIds = [];
+    for (const label of ['文件夹回归直存资料甲', '文件夹回归直存资料乙']) {
+      const id = crypto.randomUUID();
+      await put({ id, type: 'resource', title: label, body: '', status: '待读', date: today(), folderId: ids.source, tags: [], attachments: [] });
+      directIds.push(id);
+    }
+    render();
+    return { recordId, fileId: file.id, directIds };
+  }, { ids, labels, bytes, recordTitle });
+
+  const library = page.locator('#libraryFolders');
+  const manager = page.locator('#folderManager');
+  const dialog = page.locator('#folderActionDialog');
+  const menu = page.locator('#workspaceContextMenu');
+  const submit = dialog.locator('#folderActionSubmit');
+  const name = dialog.locator('#folderActionName');
+  const path = dialog.locator('#folderDestinationPath');
+  const search = dialog.locator('#folderDestinationSearch');
+  const managerSearch = manager.locator('#folderManagerSearch');
+  const folderRow = id => manager.locator(`[data-folder-item="${id}"]`);
+  const target = id => dialog.locator(`[data-folder-destination="${id}"]`);
+  const chooseAction = async (button, label) => {
+    await button.click();
+    await menu.getByRole('menuitem', { name: label, exact: true }).click();
+    await dialog.waitFor();
+  };
+  const viewport = page.viewportSize();
+  await page.setViewportSize({ width: 400, height: 600 });
+  try {
+    await page.locator('[data-rail-view="resource"]').click();
+    await library.locator(`[data-folder-open="${ids.source}"]`).click();
+    await library.locator('[data-folder-create]').click();
+    await dialog.waitFor();
+    assert.match(await dialog.locator('#folderActionLocation').innerText(), new RegExp(labels.source));
+    await name.fill(labels.created);
+    await submit.click();
+    await dialog.waitFor({ state: 'hidden' });
+    const createdId = await page.evaluate(label => recordFolders('resource').find(folder => folder.name === label)?.id, labels.created);
+    assert.ok(createdId, '文件夹名称应保存');
+    await library.locator(`[data-folder-open="${createdId}"]`).waitFor();
+
+    await library.locator('[data-folder-crumb=""]').click();
+    await library.locator(`[data-folder-more="${ids.source}"]`).press('Enter');
+    await menu.getByRole('menuitem', { name: '重命名…', exact: true }).click();
+    await dialog.waitFor();
+    assert.equal(await name.inputValue(), labels.source);
+    await name.fill(labels.archive);
+    await submit.click();
+    await page.waitForFunction(() => /同名|重名/.test(document.getElementById('folderActionMessage').textContent));
+    assert.equal(await dialog.isVisible(), true, '同级重名时应保留表单');
+    assert.equal(await name.inputValue(), labels.archive, '重名后应保留已填写的名称');
+    await name.fill(labels.renamed);
+    await submit.click();
+    await dialog.waitFor({ state: 'hidden' });
+    const sourceCard = library.locator(`[data-folder-open="${ids.source}"]`);
+    assert.match(await sourceCard.innerText(), new RegExp(labels.renamed));
+
+    await library.locator('[data-folder-manage]').click();
+    await managerSearch.fill(labels.renamed);
+    await folderRow(ids.archive).waitFor({ state: 'hidden' });
+    await chooseAction(folderRow(ids.source).locator('[data-folder-more]'), '移动到…');
+    for (const [id, label] of [[ids.source, labels.renamed], [ids.child, labels.child], [ids.journal, labels.journal]]) {
+      await search.fill(label);
+      assert.equal(await target(id).count() > 0 && await target(id).isEnabled(), false, '禁止选择自身、子目录或其他栏目');
+    }
+    await search.fill(labels.destination);
+    await target(ids.destination).click();
+    for (const label of [labels.archive, labels.destination]) assert.match(await path.innerText(), new RegExp(label));
+    await submit.click();
+    await dialog.waitFor({ state: 'hidden' });
+    await page.reload();
+    await page.waitForFunction(() => ready);
+    const stored = await page.evaluate(async ({ ids, createdId, recordId, fileId }) => {
+      const note = records.find(entry => entry.id === recordId);
+      const parents = [ids.source, ids.child, createdId].map(id =>
+        recordFolders('resource').find(folder => folder.id === id)?.parentId);
+      return {
+        parents, title: note?.title, folderId: note?.folderId,
+        bytes: Array.from(new Uint8Array(await (await readBlob(fileId)).arrayBuffer()))
+      };
+    }, { ids, createdId, ...seeded });
+    assert.deepEqual(stored, { parents: [ids.destination, ids.source, ids.source], title: recordTitle, folderId: ids.child, bytes });
+
+    await page.locator('[data-rail-view="journal"]').click();
+    await page.locator('#openFolderManager').click();
+    await folderRow(ids.journal).waitFor();
+    assert.equal(await folderRow(ids.source).count(), 0, '日志栏目应只管理自己的文件夹');
+    await manager.locator('[data-close="folderManager"]').click();
+
+    await page.locator('[data-rail-view="resource"]').click();
+    await library.locator('[data-folder-manage]').click();
+    await managerSearch.fill(labels.renamed);
+    await chooseAction(folderRow(ids.source).locator('[data-folder-more]'), '删除文件夹…');
+    const removeContents = dialog.locator('#folderRemoveContents');
+    assert.equal(await removeContents.isChecked(), false, '删除文件夹默认应保留内容');
+    await submit.click();
+    await dialog.waitFor({ state: 'hidden' });
+    const retained = await page.evaluate(({ ids, createdId, directIds, recordId }) => {
+      const folders = new Map(recordFolders('resource').map(folder => [folder.id, folder.parentId]));
+      return {
+        original: folders.has(ids.source),
+        children: [ids.child, createdId].map(id => folders.get(id)),
+        records: [...directIds, recordId].map(id => records.find(note => note.id === id)?.folderId)
+      };
+    }, { ids, createdId, ...seeded });
+    assert.deepEqual(retained, {
+      original: false, children: [ids.destination, ids.destination],
+      records: [ids.destination, ids.destination, ids.child]
+    });
+
+    await managerSearch.fill(labels.destination);
+    await folderRow(ids.destination).locator('[data-folder-browse]').click();
+    await manager.waitFor({ state: 'hidden' });
+    await page.locator('#librarySelection').click();
+    await page.locator('#librarySelectAll').click();
+    assert.match(await page.locator('#librarySelectedCount').innerText(), /2/);
+    await page.locator('#libraryMoveSelected').click();
+    await dialog.waitFor();
+    await target(ids.child).click();
+    await submit.click();
+    await dialog.waitFor({ state: 'hidden' });
+    assert.deepEqual(await page.evaluate(directIds => directIds.map(id => records.find(note => note.id === id)?.folderId), seeded.directIds),
+      [ids.child, ids.child], '批量移动应归档两个选中的资料');
+
+    await chooseAction(library.locator(`[data-folder-more="${ids.child}"]`), '删除文件夹…');
+    await removeContents.check();
+    await submit.click();
+    await dialog.waitFor({ state: 'hidden' });
+    const trashed = await page.evaluate(async ({ recordId, directIds, fileId }) => {
+      const ids = [recordId, ...directIds];
+      return {
+        live: records.some(note => ids.includes(note.id)),
+        deleted: trashOf(activeProfile()).filter(entry => ids.includes(entry.id)).length,
+        bytes: Array.from(new Uint8Array(await (await readBlob(fileId)).arrayBuffer()))
+      };
+    }, seeded);
+    assert.deepEqual(trashed, { live: false, deleted: 3, bytes });
+  } finally {
+    await page.setViewportSize(viewport);
+  }
+  console.log('PASS folders: nested creation, duplicate names, scoped management, move targets, bulk move, safe deletion, and attachment bytes');
+}
+
 async function testBackgroundSubtitles(page) {
   const { fileId, recordId, ownerId, otherId, prefix } = await page.evaluate(async () => {
     const frame = document.createElement('canvas');
@@ -388,6 +558,7 @@ try {
   await testLongPdf(page, fixture);
   await testRecordEditor(page);
   await testDraft(page);
+  await testFolderManagement(page);
   await testBackgroundSubtitles(page);
   assert.deepEqual(errors, []);
 } finally {

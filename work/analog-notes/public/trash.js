@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取已选记录、回收站和资料存储。
+ * [OUTPUT]: 暂存回收站变化，恢复记录或彻底删除附件。
+ * [POS]: 允许记录操作与文件夹操作在一个事务提交回收站变化。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 // 回收站：删除的记录在这里保留 30 天，附件原样保留；恢复或彻底删除都在这里完成。
 const TRASH_RETENTION_DAYS=30;
@@ -18,8 +24,8 @@ function relativeTrashTime(iso){
  return Math.floor(hours/24)+' 天前';
 }
 // 删除 → 移入回收站。附件与批注留在本机，恢复时原样找回。
-async function removeWorkspaceRecords(targetIds,aiTask){
- const profileId=appState.activeId,next=structuredClone(appState),p=next.profiles.find(p=>p.id===profileId),removed=p.records.filter(note=>targetIds.has(note.id));
+function stageTrashRecords(p,targetIds,aiTask){
+ const removed=p.records.filter(note=>targetIds.has(note.id));
  if(removed.length!==targetIds.size)throw new Error('部分记录已经变化，请刷新后重试。');
  const now=new Date().toISOString();
  p.records=p.records.filter(note=>!targetIds.has(note.id)).map(note=>note.relatedResources?.some(id=>targetIds.has(id))
@@ -30,8 +36,15 @@ async function removeWorkspaceRecords(targetIds,aiTask){
  for(const note of removed)p.trash.push({id:note.id,deletedAt:now,record:note});
  if(p.trash.length>TRASH_CAP)p.trash=p.trash.slice(-TRASH_CAP);
  if(aiTask){p.aiApplied??={};p.aiApplied[aiTask]={recordId:removed[0].id,at:now}}
- await commitState(next);
+}
+function clearTrashRecordCheckpoints(profileId,targetIds){
  for(const id of targetIds)try{localStorage.removeItem(checkpointKey(profileId,id))}catch{}
+}
+async function removeWorkspaceRecords(targetIds,aiTask){
+ const profileId=appState.activeId,next=structuredClone(appState),p=next.profiles.find(profile=>profile.id===profileId);
+ stageTrashRecords(p,targetIds,aiTask);
+ await commitState(next);
+ clearTrashRecordCheckpoints(profileId,targetIds);
 }
 // 恢复：回到原栏目；同编号已被占用时换用新编号。文件夹已删除则回到未归档。
 async function restoreTrashRecords(ids){
