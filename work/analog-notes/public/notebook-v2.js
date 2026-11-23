@@ -291,28 +291,6 @@ async function openAttachment(a){
 }
 $('readerDownload').onclick=()=>{if(readerFile)downloadBlob(readerFile.name,readerFile.blob)};
 $('reader').addEventListener('close',()=>{$('readerContent').replaceChildren();if(readerUrl)URL.revokeObjectURL(readerUrl);readerUrl=null;readerFile=null});
-$('noteForm').onsubmit=async e=>{
- e.preventDefault();if(busy)return;busy=true;$('saveBtn').disabled=true;
- try{
-  syncRichBody();
-  const n={id:editing||crypto.randomUUID(),type:$('type').value,title:$('title').value.trim(),date:$('date').value,status:$('status').value,body:$('body').value,bodyHtml:getRichHtml(),tags:[...new Set($('tagsInput').value.split(/[,，]/).map(t=>t.trim()).filter(Boolean))],reference:$('reference').value,url:$('url').value,pinned:$('pinned').checked,attachments:draftAttachments};
-  if(n.type==='plan'){n.planStart=$('planStart').value;n.planEnd=$('planEnd').value;n.planTrack=$('planTrack').value;n.date=n.planStart;if(!validPlanDates(n.planStart,n.planEnd))throw new Error('请填写有效日期，结束日期须在开始日期当日或之后。')}
-  const folderId=$('recordFolder').value;if(folderId)n.folderId=folderId;
-  n.author=$('author').value.trim();n.relatedResources=[...selectedResourceLinks];n.journalKind=$('journalKind').value||'daily';
-  if(n.type==='issue')n.issueTrack=$('issueTrack').value;
-  const previous=records.find(record=>record.id===editing);
-  if(weeklyJournal(previous||{})||weeklyJournal(n))n.tags=n.tags.filter(tag=>!/^\d{4}-W\d{2}$/.test(tag)&&tag!==WEEKLY_LOGS[previous?.journalKind]?.tag);
-  if(weeklyJournal(n)){
-   const format=WEEKLY_LOGS[n.journalKind],week=getWeekKey(n.date);
-   n.tags=[...new Set([...n.tags,format.tag,week])];
-   if(!n.title||autoWeeklyTitle(n.title))n.title=week+' '+format.label;
-  }
-  validateInlineReferences(n);if(!validate(n))throw new Error('请检查标题、日期、标签或文献链接。');
-  const original=records.find(r=>r.id===editing),deletions=(original?.attachments||[]).filter(a=>!draftAttachments.some(d=>d.id===a.id)).map(a=>fileKey(appState.activeId,a.id));
-  const writes=[...stagedFiles].map(([id,blob])=>({key:fileKey(appState.activeId,id),blob}));
-  await put(n,writes,deletions);await clearSavedDraft();$('editor').close();stagedFiles.clear();render();toast('记录与附件已保存');
- }catch(error){$('formMessage').textContent=error.message}finally{busy=false;$('saveBtn').disabled=false}
-};
 function confirmWorkspaceDeletion(message){
  const detail=$('detail');
  if(detail.open){

@@ -64,7 +64,7 @@ function animateWorkspaceMinimize(dialog){
 async function minimizeWorkspaceDialog(dialog){
  if(!dialog.open||busy||workspaceMinimizeAnimations.has(dialog)||dialog.classList.contains('document-page'))return;
  if(dialog.id==='detail'&&!$('detailDeleteConfirm').hidden)$('detailDeleteCancel').click();
- if(dialog.id==='editor'){queueDraft();saveDraftNow()}
+ if(dialog.id==='editor')void flushEditorDraft();
  if(dialog.id==='reader'){
   dialog.querySelector('audio')?.pause();
   if(readingSession){

@@ -1,14 +1,22 @@
+<#
+[INPUT]: 读取正式源码和桌面运行依赖。
+[OUTPUT]: 构建桌面程序和带文件校验值的发布目录。
+[POS]: 桌面构建入口，由发行脚本从干净的 Git 提交调用。
+[PROTOCOL]: Update this header on change, then check AGENTS.md
+#>
+[CmdletBinding(DefaultParameterSetName='Sdk')]
 param(
-    [Parameter(Mandatory=$true)][string]$WebView2Sdk,
+    [Parameter(Mandatory=$true,ParameterSetName='Sdk')][string]$WebView2Sdk,
+    [Parameter(Mandatory=$true,ParameterSetName='Archive')][string]$RuntimeArchive,
     [Parameter(Mandatory=$true)][string]$Output,
     [switch]$FreshStart,
     [switch]$DataMigration,
-    [string]$ReleaseVersion = '26.1109.0003'
+    [string]$ReleaseVersion = '26.1109.0003',
+    [string]$SourceCommit
 )
 $ErrorActionPreference = 'Stop'
 [void][Version]::Parse($ReleaseVersion)
 $Output = [IO.Path]::GetFullPath($Output)
-$WebView2Sdk = (Resolve-Path $WebView2Sdk).Path
 $project = Join-Path $PSScriptRoot '../analog-notes'
 $assets = Join-Path $Output 'workspace'
 $workspaceAssets = Join-Path $assets 'assets'
@@ -18,6 +26,15 @@ $pythonWorkers = Join-Path $Output 'video-runtime\workers'
 $bridgeWorkers = Join-Path $Output 'ai-bridge\workers'
 $tools = Join-Path $Output 'tools'
 $null = New-Item -ItemType Directory -Force $Output, $assets, $workspaceAssets, $docs, $legal, $pythonWorkers, $bridgeWorkers, $tools
+$node = 'node'
+if ($RuntimeArchive) {
+    $runtimeSha256 = & (Join-Path $PSScriptRoot 'stage-runtime.ps1') -Archive $RuntimeArchive -Output $Output
+    $sdkLib = $Output
+    $node = Join-Path $Output 'ai-bridge/node.exe'
+} else {
+    $WebView2Sdk = (Resolve-Path -LiteralPath $WebView2Sdk).Path
+    $sdkLib = Join-Path $WebView2Sdk 'lib/net462'
+}
 $freshMarker = Join-Path $Output 'fresh-start.marker'
 if ($FreshStart) { [IO.File]::WriteAllText($freshMarker, 'DoNote fresh start') }
 elseif (Test-Path -LiteralPath $freshMarker) { Remove-Item -LiteralPath $freshMarker }
@@ -70,7 +87,6 @@ try {
 }
 
 $csc = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
-$sdkLib = Join-Path $WebView2Sdk 'lib/net462'
 $core = Join-Path $sdkLib 'Microsoft.Web.WebView2.Core.dll'
 $forms = Join-Path $sdkLib 'Microsoft.Web.WebView2.WinForms.dll'
 $captionResources = @(
@@ -83,12 +99,14 @@ if ($LASTEXITCODE -ne 0) { throw 'Desktop compilation failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Updater compilation failed.' }
 Copy-Item -LiteralPath $iconPath -Destination $workspaceAssets
 Remove-Item -LiteralPath $iconPath
-Copy-Item -LiteralPath $core,$forms,(Join-Path $WebView2Sdk 'runtimes/win-x64/native/WebView2Loader.dll') -Destination $Output
-Copy-Item -LiteralPath (Join-Path $WebView2Sdk 'LICENSE.txt'),(Join-Path $WebView2Sdk 'NOTICE.txt') -Destination $legal
+if (!$RuntimeArchive) {
+    Copy-Item -LiteralPath $core,$forms,(Join-Path $WebView2Sdk 'runtimes/win-x64/native/WebView2Loader.dll') -Destination $Output
+    Copy-Item -LiteralPath (Join-Path $WebView2Sdk 'LICENSE.txt'),(Join-Path $WebView2Sdk 'NOTICE.txt') -Destination $legal
+}
 foreach ($file in 'JSZip-LICENSE.md','Marked-LICENSE.md','PDFJS-LICENSE.txt','ppt-preview-LICENSES.txt','Readability-LICENSE.md','pdf-lib-LICENSE.md','sha256-LICENSE.txt','MiniSearch-LICENSE.txt','CitationJS-LICENSES.txt') {
     Copy-Item -LiteralPath (Join-Path $project "public/$file") -Destination $legal
 }
-& node (Join-Path $project 'scripts/build-offline.mjs') (Join-Path $assets 'index.html')
+& $node (Join-Path $project 'scripts/build-desktop-workspace.mjs') $assets
 if ($LASTEXITCODE -ne 0) { throw 'Offline workspace build failed.' }
 $index = Join-Path $assets 'index.html'
 $settings = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'desktop-settings.html')).Replace('{{DONOTE_VERSION}}',$ReleaseVersion)
@@ -99,50 +117,57 @@ $html = $html.Insert($html.LastIndexOf('</body>', [StringComparison]::Ordinal), 
 foreach ($file in 'startup-splash.css','startup-wordmark.js','startup-splash.js','desktop-settings.css','desktop-settings.js','desktop-translation.js','desktop-large-backup.js') {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $assets
 }
-Copy-Item -LiteralPath (Join-Path $project 'public/brand-logo.png') -Destination $assets
-Copy-Item -LiteralPath (Join-Path $project 'public/NotoSansSC.ttf') -Destination $assets
 Copy-Item -LiteralPath (Join-Path $project 'public/NotoSansSC-OFL.txt') -Destination $legal
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'analog-flashcard.png') -Destination $assets
-Copy-Item -LiteralPath (Join-Path $project 'public/ocr') -Destination $assets -Recurse -Force
-Copy-Item -LiteralPath (Join-Path $project 'public/pdfjs') -Destination $assets -Recurse -Force
-Copy-Item -LiteralPath (Join-Path $project 'public/katex') -Destination $assets -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'ai-face.gif') -Destination $workspaceAssets
-$videoRuntime = Join-Path $PSScriptRoot '../video-runtime-build/runtime'
-if (!(Test-Path -LiteralPath (Join-Path $videoRuntime 'python.exe'))) { throw 'Video Python runtime missing.' }
-$videoRuntimeTarget = Join-Path $Output 'video-runtime'
-$null = New-Item -ItemType Directory -Force $videoRuntimeTarget
-Get-ChildItem -LiteralPath $videoRuntime -Force | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination $videoRuntimeTarget -Recurse -Force
+if (!$RuntimeArchive) {
+    $videoRuntime = Join-Path $PSScriptRoot '../video-runtime-build/runtime'
+    if (!(Test-Path -LiteralPath (Join-Path $videoRuntime 'python.exe'))) { throw 'Video Python runtime missing.' }
+    $videoRuntimeTarget = Join-Path $Output 'video-runtime'
+    $null = New-Item -ItemType Directory -Force $videoRuntimeTarget
+    Get-ChildItem -LiteralPath $videoRuntime -Force | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $videoRuntimeTarget -Recurse -Force
+    }
+    $videoDeps = Join-Path $PSScriptRoot '../video-runtime-build/dependencies'
+    if (!(Test-Path -LiteralPath (Join-Path $videoDeps 'faster_whisper'))) { throw 'Offline video recognition dependencies missing.' }
+    Copy-Item -LiteralPath $videoDeps -Destination (Join-Path $Output 'video-runtime/dependencies') -Recurse -Force
+    foreach ($folder in 'translation-en-zh','translation-dependencies') {
+        $source = Join-Path $PSScriptRoot "../video-runtime-build/$folder"
+        Copy-Item -LiteralPath $source -Destination (Join-Path $Output "video-runtime/$folder") -Recurse -Force
+    }
+    $mineruDependencies = Join-Path $PSScriptRoot '../video-runtime-build/mineru-dependencies'
+    if (!(Test-Path -LiteralPath (Join-Path $mineruDependencies 'mineru'))) { throw 'MinerU runtime missing.' }
+    $mineruTarget = Join-Path $Output 'video-runtime\mineru-dependencies'
+    $null = New-Item -ItemType Directory -Force $mineruTarget
+    Get-ChildItem -LiteralPath $mineruDependencies -Force | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $mineruTarget -Recurse -Force
+    }
+    foreach ($folder in 'pdfmathtranslate-dependencies','bbmd') {
+        $source = Join-Path $PSScriptRoot "../video-runtime-build/$folder"
+        if (!(Test-Path -LiteralPath $source)) { throw "Document translation runtime missing: $folder" }
+        Copy-Item -LiteralPath $source -Destination (Join-Path $Output "video-runtime/$folder") -Recurse -Force
+    }
+    $babeldocCache = Join-Path $PSScriptRoot '../video-runtime-build/babeldoc-cache'
+    $fontSource = Join-Path $PSScriptRoot '../video-runtime-build/fonts'
+    if (!(Test-Path -LiteralPath (Join-Path $babeldocCache 'models/doclayout_yolo_docstructbench_imgsz1024.onnx'))) {
+        throw 'PDFMathTranslate layout model missing.'
+    }
+    if (!(Test-Path -LiteralPath (Join-Path $fontSource 'SourceHanSerifCN-Regular.ttf'))) {
+        throw 'PDFMathTranslate Chinese font missing.'
+    }
+    Copy-Item -LiteralPath $babeldocCache -Destination (Join-Path $Output 'video-runtime/babeldoc-cache') -Recurse -Force
+    Copy-Item -LiteralPath $fontSource -Destination (Join-Path $Output 'video-runtime/fonts') -Recurse -Force
+    Copy-Item -LiteralPath (Join-Path $mineruDependencies 'mineru-4.2.1.dist-info/licenses/LICENSE.md') -Destination (Join-Path $legal 'MINERU-LICENSE.md')
 }
-$videoDeps = Join-Path $PSScriptRoot '../video-runtime-build/dependencies'
-if (!(Test-Path -LiteralPath (Join-Path $videoDeps 'faster_whisper'))) { throw 'Offline video recognition dependencies missing.' }
-Copy-Item -LiteralPath $videoDeps -Destination (Join-Path $Output 'video-runtime/dependencies') -Recurse -Force
-foreach ($folder in 'translation-en-zh','translation-dependencies') {
-    $source = Join-Path $PSScriptRoot "../video-runtime-build/$folder"
-    Copy-Item -LiteralPath $source -Destination (Join-Path $Output "video-runtime/$folder") -Recurse -Force
+foreach ($folder in 'pdfmathtranslate-src','bilingual-book-maker-src') {
+    $source = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "../video-runtime-build/$folder")).Path
+    $destination = Join-Path $Output "video-runtime/$folder"
+    foreach ($file in (Get-ChildItem -LiteralPath $source -Recurse -File | Where-Object { $_.Extension -ne '.pyc' })) {
+        $target = Join-Path $destination $file.FullName.Substring($source.Length + 1)
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
+        Copy-Item -LiteralPath $file.FullName -Destination $target
+    }
 }
-$mineruDependencies = Join-Path $PSScriptRoot '../video-runtime-build/mineru-dependencies'
-if (!(Test-Path -LiteralPath (Join-Path $mineruDependencies 'mineru'))) { throw 'MinerU runtime missing.' }
-$mineruTarget = Join-Path $Output 'video-runtime\mineru-dependencies'
-$null = New-Item -ItemType Directory -Force $mineruTarget
-Get-ChildItem -LiteralPath $mineruDependencies -Force | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination $mineruTarget -Recurse -Force
-}
-foreach ($folder in 'pdfmathtranslate-src','pdfmathtranslate-dependencies','bbmd','bilingual-book-maker-src') {
-    $source = Join-Path $PSScriptRoot "../video-runtime-build/$folder"
-    if (!(Test-Path -LiteralPath $source)) { throw "Document translation runtime missing: $folder" }
-    Copy-Item -LiteralPath $source -Destination (Join-Path $Output "video-runtime/$folder") -Recurse -Force
-}
-$babeldocCache = Join-Path $PSScriptRoot '../video-runtime-build/babeldoc-cache'
-$fontSource = Join-Path $PSScriptRoot '../video-runtime-build/fonts'
-if (!(Test-Path -LiteralPath (Join-Path $babeldocCache 'models/doclayout_yolo_docstructbench_imgsz1024.onnx'))) {
-    throw 'PDFMathTranslate layout model missing.'
-}
-if (!(Test-Path -LiteralPath (Join-Path $fontSource 'SourceHanSerifCN-Regular.ttf'))) {
-    throw 'PDFMathTranslate Chinese font missing.'
-}
-Copy-Item -LiteralPath $babeldocCache -Destination (Join-Path $Output 'video-runtime/babeldoc-cache') -Recurse -Force
-Copy-Item -LiteralPath $fontSource -Destination (Join-Path $Output 'video-runtime/fonts') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'web-fetch.mjs') -Destination $bridgeWorkers
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'video-transcribe.py'),(Join-Path $PSScriptRoot 'video-translate.py'),(Join-Path $PSScriptRoot 'local-llm-translate.py'),(Join-Path $PSScriptRoot 'transcript_utils.py'),(Join-Path $PSScriptRoot 'mineru-reflow.py'),(Join-Path $PSScriptRoot 'pdfmathtranslate.py'),(Join-Path $PSScriptRoot 'bilingual-book-worker.py'),(Join-Path $PSScriptRoot 'pdf_gguf_translation.py'),(Join-Path $PSScriptRoot 'offline_en_zh.py') -Destination $pythonWorkers
 $asrModels = Join-Path $Output 'models\asr'
@@ -151,18 +176,35 @@ $null = New-Item -ItemType Directory -Force $asrModels, $translationModels
 [IO.File]::WriteAllText((Join-Path $asrModels '.keep'), '')
 [IO.File]::WriteAllText((Join-Path $translationModels '.keep'), '')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'QWEN3-LICENSE.txt') -Destination $legal
-Copy-Item -LiteralPath (Join-Path $mineruDependencies 'mineru-4.2.1.dist-info\licenses\LICENSE.md') -Destination (Join-Path $legal 'MINERU-LICENSE.md')
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../vendor-pdfmathtranslate-main/PDFMathTranslate-main/LICENSE') -Destination (Join-Path $legal 'PDFMATHTRANSLATE-AGPL-3.0.txt')
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../vendor-bilingual-book-maker/LICENSE') -Destination (Join-Path $legal 'BILINGUAL-BOOK-MAKER-MIT.txt')
-& (Join-Path $PSScriptRoot '../ai-bridge/stage-desktop.ps1') -Output $Output
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../video-runtime-build/pdfmathtranslate-src/LICENSE') -Destination (Join-Path $legal 'PDFMATHTRANSLATE-AGPL-3.0.txt')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../video-runtime-build/bilingual-book-maker-src/LICENSE') -Destination (Join-Path $legal 'BILINGUAL-BOOK-MAKER-MIT.txt')
+& (Join-Path $PSScriptRoot '../ai-bridge/stage-desktop.ps1') -Output $Output -ReuseStagedRuntime:([bool]$RuntimeArchive)
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination $Output
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '开始使用.md'),(Join-Path $PSScriptRoot '视频字幕使用说明.md'),(Join-Path $PSScriptRoot '视频模型下载说明.md'),(Join-Path $PSScriptRoot '本地离线翻译模型说明.md'),(Join-Path $PSScriptRoot '模型目录说明.md'),(Join-Path $PSScriptRoot 'MinerU智能排版说明.md'),(Join-Path $PSScriptRoot '../ai-bridge/AI接入指南.md') -Destination $docs
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../../outputs/使用说明.md') -Destination $docs
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '使用说明.md') -Destination $docs
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '重置为初始状态.cmd') -Destination $tools -ErrorAction SilentlyContinue
 
-$manifestFiles = @(Get-ChildItem -LiteralPath $Output -Recurse -File | Where-Object { $_.FullName -ne (Join-Path $Output 'release-manifest.json') -and !$_.FullName.Substring($Output.Length + 1).StartsWith('Data\', [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object {
-    @{ path = $_.FullName.Substring($Output.Length + 1).Replace('\','/'); size = $_.Length; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
-})
-$manifest = @{ version = $ReleaseVersion; requiresDataBackup = [bool]$DataMigration; files = $manifestFiles } | ConvertTo-Json -Depth 6 -Compress
-[IO.File]::WriteAllText((Join-Path $Output 'release-manifest.json'),$manifest,[Text.Encoding]::UTF8)
+$hasher = [Security.Cryptography.SHA256]::Create()
+try {
+    $manifestFiles = @(foreach ($path in [IO.Directory]::GetFiles($Output, '*', [IO.SearchOption]::AllDirectories) | Sort-Object) {
+        $relative = $path.Substring($Output.Length + 1).Replace('\','/')
+        if ($relative -eq 'release-manifest.json' -or $relative -match '^(Data/|UpdateBackups/|data-location\.txt$)') { continue }
+        $fileStream = [IO.File]::OpenRead($path)
+        try {
+            $hash = [BitConverter]::ToString($hasher.ComputeHash($fileStream)).Replace('-', '').ToLowerInvariant()
+            @{ path = $relative; size = $fileStream.Length; sha256 = $hash }
+        } finally { $fileStream.Dispose() }
+    })
+} finally { $hasher.Dispose() }
+$manifest = [ordered]@{ version = $ReleaseVersion; requiresDataBackup = [bool]$DataMigration; files = $manifestFiles }
+if ($SourceCommit) {
+    $manifest.provenance = [ordered]@{
+        sourceCommit = $SourceCommit
+        runtimeArchiveSha256 = $runtimeSha256
+        buildScript = 'tools/release.ps1'
+        compilerSha256 = (Get-FileHash -LiteralPath $csc -Algorithm SHA256).Hash.ToLowerInvariant()
+        nodeVersion = (& $node --version)
+    }
+}
+[IO.File]::WriteAllText((Join-Path $Output 'release-manifest.json'),($manifest | ConvertTo-Json -Depth 6 -Compress),[Text.Encoding]::UTF8)
 

@@ -22,7 +22,7 @@ foreach($file in $baselineManifest.files){$baselineFiles[$file.path]=$file}
 $changed=@()
 foreach($entry in $targetManifest.files){
     $relative=$entry.path
-    if($relative.StartsWith('Data/',[StringComparison]::OrdinalIgnoreCase)){continue}
+    if($relative -match '^(Data|models)/'){continue}
     $old=$baselineFiles[$relative]
     if(!$old -or [int64]$old.size -ne [int64]$entry.size -or $old.sha256 -ne $entry.sha256){
         $fullName=Join-Path $targetPath $relative.Replace('/',[IO.Path]::DirectorySeparatorChar)
@@ -44,7 +44,9 @@ try{
         Copy-Item -LiteralPath $file.fullName -Destination $copy
     }
     $files=@($changed | ForEach-Object {@{path=$_.path;size=$_.size;sha256=$_.sha256}} | Sort-Object {$_.path})
-    $manifest=@{version=$ReleaseVersion;baseVersion=$BaseVersion;requiresDataBackup=$false;files=$files} | ConvertTo-Json -Depth 6 -Compress
+    $patchManifest=@{version=$ReleaseVersion;baseVersion=$BaseVersion;requiresDataBackup=[bool]$targetManifest.requiresDataBackup;files=$files}
+    if($targetManifest.provenance){$patchManifest.provenance=$targetManifest.provenance}
+    $manifest=$patchManifest | ConvertTo-Json -Depth 6 -Compress
     [IO.File]::WriteAllText((Join-Path $staging 'release-manifest.json'),$manifest,[Text.Encoding]::UTF8)
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -63,5 +65,9 @@ try{
     if($LASTEXITCODE -ne 0){throw 'Patch rejected by desktop installer validator.'}
     [pscustomobject]@{Destination=$destinationPath;BaseVersion=$BaseVersion;Version=$ReleaseVersion;Files=$changed.Count;Size=(Get-Item -LiteralPath $destinationPath).Length}
 }finally{
-    if(Test-Path -LiteralPath $staging){Remove-Item -LiteralPath $staging -Recurse -Force}
+    if((Test-Path -LiteralPath $staging) -and
+        (Split-Path -Parent ([IO.Path]::GetFullPath($staging))) -eq [IO.Path]::GetTempPath().TrimEnd('\') -and
+        (Split-Path -Leaf $staging) -match '^donote-patch-[0-9a-f]{32}$'){
+        Remove-Item -LiteralPath $staging -Recurse -Force
+    }
 }

@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取本地 PDF Blob、离线 PDF.js 和阅读器会话。
+ * [OUTPUT]: 打开 PDF，按需读取大文件的字节范围。
+ * [POS]: 桌面版同源加载 PDF.js 和 worker。便携 HTML 使用内联资源。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 let pdfLibraryPromise = null;
@@ -13,13 +19,19 @@ function addPdfZoomOptions(select, percentages = PDF_ZOOM_PERCENTAGES) {
 async function pdfLibrary() {
   if (!pdfLibraryPromise) {
     pdfLibraryPromise = (async () => {
-      const sourceUrl = URL.createObjectURL(new Blob([PDFJS_SOURCE], { type: 'text/javascript' }));
+      const embedded = typeof PDFJS_SOURCE === 'string' && typeof PDFJS_WORKER_SOURCE === 'string';
+      const assets = new URL('pdfjs/', document.baseURI);
+      const sourceUrl = embedded
+        ? URL.createObjectURL(new Blob([PDFJS_SOURCE], { type: 'text/javascript' }))
+        : new URL('pdf.mjs', assets).href;
       try {
         const library = await import(sourceUrl);
-        library.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([PDFJS_WORKER_SOURCE], { type: 'text/javascript' }));
+        library.GlobalWorkerOptions.workerSrc = embedded
+          ? URL.createObjectURL(new Blob([PDFJS_WORKER_SOURCE], { type: 'text/javascript' }))
+          : new URL('pdf.worker.mjs', assets).href;
         return library;
       } finally {
-        URL.revokeObjectURL(sourceUrl);
+        if (embedded) URL.revokeObjectURL(sourceUrl);
       }
     })().catch(error => {
       pdfLibraryPromise = null;

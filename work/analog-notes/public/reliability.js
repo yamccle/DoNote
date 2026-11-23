@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取编辑器提供的记录字段、附件和当前用户。
+ * [OUTPUT]: 暂存、恢复和清理草稿，显示备份状态。
+ * [POS]: 供记录编辑器调用的草稿存储。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 let draftTimer,draftSnapshot=null,draftQueue=Promise.resolve(),draftGeneration=0,draftDirty=false,draftBaseline='',restoringDraft=false;
 function safeFileName(name){const ext=String(name).match(/\.[A-Za-z0-9]{1,12}$/)?.[0]||'';return safeSegment(ext?String(name).slice(0,-ext.length):name).slice(0,76)+ext}
@@ -44,6 +50,11 @@ function saveDraftNow(){
  }).catch(error=>{if(generation!==draftGeneration)return;draftDirty=true;if(!draftSnapshot)draftSnapshot=snapshot;$('saveHint').textContent='草稿暂存失败，请保存记录或保留页面';toast(storageError(error).message)});
  return draftQueue;
 }
+async function flushEditorDraft(){
+ queueDraft();
+ await saveDraftNow();
+ return !draftDirty;
+}
 async function clearSavedDraft(){
  draftGeneration++;clearTimeout(draftTimer);draftSnapshot=null;draftDirty=false;await draftQueue;
  try{const tx=database.transaction('workspace','readwrite'),done=transactionDone(tx);tx.objectStore('workspace').delete(draftStorageKey(appState.activeId));await done}catch(e){toast('记录已保存；旧草稿清理失败，可忽略旧草稿')}
@@ -77,12 +88,6 @@ async function refreshStorageSummary(){
 }
 function initializeReliability(){
  if(!ready)return;
- const originalOpen=openEditor;openEditor=function(...args){originalOpen(...args);if($('editor').open)beginDraftSession()};
- const originalSync=syncRichBody;syncRichBody=function(){originalSync();queueDraft()};
- $('noteForm').addEventListener('input',queueDraft);$('noteForm').addEventListener('change',queueDraft);
- document.querySelectorAll('[data-close="editor"]').forEach(button=>button.onclick=async()=>{if(busy)return;queueDraft();await saveDraftNow();if(draftDirty){toast('草稿尚未保存，请先保存记录。');return}$('editor').close()});
- // Esc 不再关闭记录编辑器：只安静保存草稿，避免误按丢失编辑状态。
- $('editor').addEventListener('cancel',e=>{e.preventDefault();if(!busy){queueDraft();saveDraftNow()}});
  window.addEventListener('beforeunload',e=>{if(draftDirty){saveDraftNow();e.preventDefault();e.returnValue=''}});
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveDraftNow()});
  $('restoreDraft').onclick=restoreLatestDraft;

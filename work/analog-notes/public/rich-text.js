@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取正文 DOM、选区和格式工具。
+ * [OUTPUT]: 规范正文 HTML，同步纯文本并通知草稿存储。
+ * [POS]: 负责正文的编辑与序列化。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 const RICH_PALETTE=['#202932','#c43c39','#c36a23','#28745b','#2768b3','#7952b3'];
 const richEditor=$('richBody');
@@ -56,7 +62,10 @@ function normalizeRichNote(note){
  const bodyHtml=safeRichHtml(note.bodyHtml);return {...note,bodyHtml,body:richPlainText(bodyHtml)};
 }
 function getRichHtml(){return safeRichHtml(richEditor.innerHTML)}
-function syncRichBody(){$('body').value=richPlainText(getRichHtml())}
+function syncRichBody(){
+ $('body').value=richPlainText(getRichHtml());
+ queueDraft();
+}
 function loadRichBody(note){
  richEditor.innerHTML=note?noteBodyHtml(note):esc($('body').value).replace(/\n/g,'<br>');
  savedBodyRange=null;$('fontSize').value=defaultRichFontSize();$('richBold').setAttribute('aria-pressed','false');$('richItalic').setAttribute('aria-pressed','false');

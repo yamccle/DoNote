@@ -169,7 +169,7 @@ function render(){
  $('records').innerHTML=page.items.length?page.items.map(r=>'<article class="card" role="button" tabindex="0" data-id="'+esc(r.id)+'" aria-label="查看 '+esc(r.title)+'"><div class="card-meta"><span class="kind '+r.type+'">'+svg(r.type==='paper'?'book':r.type==='issue'?'circuit':'pen')+names[r.type]+'</span>'+journalBadge(r)+planBadge(r)+issueTrackBadge(r)+(r.pinned?'<span class="pin">⌑ 已置顶</span>':'')+((r.attachments||[]).length?'<span class="tiny"> · '+r.attachments.length+' 个附件</span>':'')+(r.type==='plan'?'':'<time class="card-date">'+esc(r.date.replaceAll('-','.'))+'</time>')+'</div><h3>'+esc(r.title)+'</h3>'+(r.author?'<p class="tiny" style="margin:0 0 10px">作者 / 主讲人：'+esc(r.author)+'</p>':'')+'<p class="card-excerpt">'+(legacyPptxExcerpt(r)?'':esc(r.body.slice(0,100)+(r.body.length>100?'…':'')))+'</p><div class="card-bottom"><div class="tags">'+r.tags.slice(0,4).map(t=>'<span class="tag">'+esc(t)+'</span>').join('')+'</div><span class="status '+(['已读','已解决','已记录'].includes(r.status)?'done':'')+'" data-status="'+esc(r.status)+'">'+esc(r.status)+(r.readerProgress?' · '+esc(progressLabel(r.readerProgress)):'')+'</span></div></article>').join(''):'<div class="empty"><h3>'+(!ready?'暂时无法读取记录':records.length?'没有匹配结果':'暂无记录')+'</h3>'
   +(!ready?'<p>请重新打开工作台。</p>':records.length?'<p>试试其他关键词，或调整筛选条件。</p>':'')
   +(ready?'<button type="button" class="primary" id="firstNote">'+(view==='resource'?'导入文件':'新建记录')+'</button>':'')+'</div>';
- $('firstNote')?.addEventListener('click',()=>{if(view==='resource'){$('resourceFileInput').click();return}openEditor(view in templates?view:'paper')});$('records').querySelectorAll('.card').forEach(el=>{el.onclick=()=>showDetail(el.dataset.id);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();showDetail(el.dataset.id)}}});
+ $('firstNote')?.addEventListener('click',()=>{if(view==='resource'){$('resourceFileInput').click();return}openNewWorkspaceRecord()});$('records').querySelectorAll('.card').forEach(el=>{el.onclick=()=>showDetail(el.dataset.id);el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();showDetail(el.dataset.id)}}});
  renderPendingIssues();renderLibraryGallery(page.items,visibleList);renderLibraryPager(page.total);window.renderAchievementHall?.();
 }
 const ISSUE_TRACK_LABELS={work:'工作问题',study:'学习问题','':'未分类'};
@@ -199,42 +199,9 @@ function switchView(next,{fromHistory=false}={}){
  if(changed)animateWorkspaceView();
 }
 document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>switchView(b.dataset.nav));document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('[data-tab]').forEach(a=>a.classList.toggle('active',a===b));render()});$('search').oninput=render;$('sort').onchange=render;
-function typeFields(status){const type=$('type').value;$('status').innerHTML=statusOptions[type].map(s=>'<option>'+esc(s)+'</option>').join('');if(status&&statusOptions[type].includes(status))$('status').value=status;$('referenceFields').style.display=['paper','resource'].includes(type)?'block':'none';if(typeof updateLibraryEditorType==='function')updateLibraryEditorType()}
-function openEditor(type='paper',note=null){
- if(!ready){toast('记录库未连接，请先连接或登录。');return}
- discardMinimizedWorkspaceDialog('editor');
- if(!statusOptions[type])type=defaultRecordType();
- editing=note?.id||null;
- $('noteForm').reset();
- for(const id of ['editorMetadata','editorResources','editorFormatting'])$(id).open=false;
- $('type').value=note?.type||type;
- $('type').disabled=!!note?.webArticle;
- typeFields(note?.status);
- setupPlanFields($('type').value,note);
- const scope=folderScope(type);
- setEditorFolder($('type').value,note?note.folderId:scope===folderScope(view)?activeFolderFilter(scope):'');
- $('date').value=note?.date||today();
- $('title').value=note?.title||'';
- $('reference').value=note?.reference||'';
- $('url').value=note?.url||'';
- $('tagsInput').value=note?.tags.join(', ')||topic;
- $('body').value=note?.body??templates[type];
- $('pinned').checked=!!note?.pinned;
- resetAttachments(note);
- loadLibraryEditorFields(note);
- loadRichBody(note);
- $('formMessage').textContent='';
- $('editorTitle').textContent=note?'编辑记录':'新建'+names[type];
- setEditorMode(false);
- $('editor').showModal();
- $('editor').querySelector('.editor-body').scrollTop=0;
- $('title').focus({preventScroll:true});
-}
-$('noteForm').addEventListener('invalid',event=>{
- const details=event.target.closest('details');
- if(details)details.open=true;
-},true);
-$('type').onchange=()=>{typeFields();setupPlanFields($('type').value,null);setEditorFolder($('type').value,$('recordFolder').value);$('editorTitle').textContent=editing?'编辑记录':'新建'+names[$('type').value];if(Object.values(templates).includes($('body').value)||!$('body').value){$('body').value=templates[$('type').value];loadRichBody(null)}};$('newBtn').onclick=()=>openEditor(view in templates?view:'paper');document.querySelectorAll('[data-new]').forEach(b=>b.onclick=()=>openEditor(b.dataset.new));document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(!busy)$(b.dataset.close).close()});$('editor').addEventListener('cancel',e=>{e.preventDefault();if(busy)e.stopPropagation()});
+document.querySelectorAll('[data-close]:not([data-close="editor"])').forEach(button=>{
+ button.onclick=()=>{if(!busy)$(button.dataset.close).close()};
+});
 function showDetail(id){const n=records.find(r=>r.id===id);if(!n)return;discardMinimizedWorkspaceDialog('detail');$('detailDeleteError').textContent='';current=id;$('deleteBtn').textContent=n.type==='resource'?'删除资料':'删除记录';$('detailContent').innerHTML='<div class="card-meta"><span class="kind '+n.type+'">'+esc(names[n.type])+'</span>'+(n.type==='plan'?'':'<span>'+esc(n.date)+'</span>')+'<span class="status" data-status="'+esc(n.status)+'">'+esc(n.status)+'</span>'+journalBadge(n)+planBadge(n)+issueTrackBadge(n)+'</div><h2 class="detail-title" id="detailTitle">'+esc(n.title)+'</h2><div class="tags">'+n.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join('')+'</div>'+(n.aiSource?.agentName?'<p class="detail-ref">AI 助手 · '+esc(n.aiSource.agentName)+'</p>':'')+(n.author?'<p class="detail-ref">作者 / 主讲人：'+esc(n.author)+'</p>':'')+(n.reference?'<p class="detail-ref">'+esc(n.reference)+'</p>':'')+(n.url&&/^https?:\/\//i.test(n.url)?'<a style="display:inline-block;margin-top:15px;font-size:11px" href="'+esc(n.url)+'" target="_blank" rel="noopener noreferrer">打开文献链接 ↗</a>':'')+'<div class="detail-body rich-content">'+noteBodyHtml(n)+'</div>';$('pinBtn').textContent=n.pinned?'取消置顶':'置顶收藏';renderDetailAttachments(n);renderResourceLinks(n);renderLiteratureDetails(n);renderPdfSourceLinks(n);const body=$('detailContent').querySelector('.detail-body');hideLegacyPptxExcerpt(n,body,appState.activeId).then(()=>{if(body.isConnected)hydrateDocumentImages(body,n,false)});if(!$('detail').open)$('detail').showModal();refreshWorkspaceLauncher()}
 $('editBtn').onclick=()=>{const n=records.find(r=>r.id===current);$('detail').close();openEditor(n.type,n)};$('pinBtn').onclick=async()=>{const n=records.find(r=>r.id===current);$('pinBtn').disabled=true;try{await put({...n,pinned:!n.pinned});render();showDetail(n.id)}catch(e){toast(e.message)}finally{$('pinBtn').disabled=false}};
 $('backupBtn').onclick=()=>$('backup').showModal();function download(name,text,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
@@ -374,7 +341,7 @@ $('backupBtn').onclick=()=>$('backup').showModal();function download(name,text,t
 <script src="reader-ai.js"></script><script src="video-translation.js"></script><script src="mineru-reflow.js"></script><script src="pdf-preview-cache.js"></script><script src="pdf-page-comparison.js"></script><script src="pdf-reflow.js"></script>
 <script src="import-documents.js"></script>
 <script src="citation-engine.js"></script><script src="citation-tools.js"></script>
-<script src="library-gallery.js"></script><script src="literature-tools.js"></script><script src="library-organization.js"></script><script src="readability.js"></script><script src="web-capture.js"></script><script src="web-reader.js"></script><script src="web-library.js"></script><script src="sha256.min.js"></script><script src="reliability.js"></script><script src="large-backup.js"></script>
+<script src="library-gallery.js"></script><script src="literature-tools.js"></script><script src="library-organization.js"></script><script src="readability.js"></script><script src="web-capture.js"></script><script src="web-reader.js"></script><script src="web-library.js"></script><script src="sha256.min.js"></script><script src="reliability.js"></script><script src="record-editor.js"></script><script src="large-backup.js"></script>
 <script src="reminders.js"></script><script src="dashboard-widgets.js"></script><script src="record-folders.js"></script><script src="plans.js"></script><script src="ai-subtitles.js"></script><script src="ai-management.js"></script><script src="notebook-v2.js"></script><script src="trash.js"></script><script src="pdf-search.js"></script><script src="pdf-research.js"></script>
 <script src="library-folders.js"></script><script src="reader-tabs.js"></script><script src="folder-context-menu.js"></script><script src="workspace-context-menu.js"></script>
 <script src="minisearch.min.js"></script><script src="workspace-search.js"></script>

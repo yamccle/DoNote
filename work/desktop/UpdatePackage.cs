@@ -27,6 +27,10 @@ internal static class UpdatePackage
         var parts = value.Split('/');
         if (parts.Any(p => p == "" || p == "." || p == ".." || p.EndsWith(" ") || p.EndsWith(".") || p.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || IsReservedName(p))) throw new InvalidDataException("更新包包含无效路径。");
         if (parts[0].Equals("Data", StringComparison.OrdinalIgnoreCase) || parts[0].Equals("UpdateBackups", StringComparison.OrdinalIgnoreCase) || value.Equals("data-location.txt", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("更新包不能包含用户资料。");
+        if (parts[0].Equals("models", StringComparison.OrdinalIgnoreCase) &&
+            !value.Equals("models/asr/.keep", StringComparison.OrdinalIgnoreCase) &&
+            !value.Equals("models/translation/.keep", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("应用更新包不能安装或覆盖模型文件。");
         return Path.Combine(parts);
     }
     private static bool IsReservedName(string part)

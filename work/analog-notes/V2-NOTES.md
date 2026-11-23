@@ -8,7 +8,8 @@ The current UI is an offline-first notebook. The native Sites creation request i
 - `public/notebook-v2.js`: IndexedDB transactions, per-user workspaces, topic management, attachments, backup/import and file-system export.
 - `public/rich-text.js`: per-character size, weight, italics and six palette colors; formatting-only HTML sanitization, editor selection preservation and plain-text indexing.
 - `public/jszip.min.js`: bundled JSZip, with `public/JSZip-LICENSE.md`.
-- `scripts/build-offline.mjs`: embeds both browser scripts into a standalone HTML file. Pass the destination HTML path as its sole argument.
+- `scripts/build-offline.mjs`: inlines styles and application scripts for the standalone HTML entry point. Pass the destination HTML path as its sole argument.
+- `scripts/build-desktop-workspace.mjs`: writes the WebView2 workspace to the destination directory. Browser scripts, styles, the PDF.js worker and presentation engine are local files. Both entry points preserve the same record format.
 
 The page uses local storage on both file and HTTP origins. The previous authenticated D1 API remains in source for future server integration, but the current UI does not call it. Do not claim cloud sync, password authentication, or access isolation for local profiles. Native Sites access would still gate visits if the project is eventually published.
 
