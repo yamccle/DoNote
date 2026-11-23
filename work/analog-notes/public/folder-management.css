@@ -25,7 +25,10 @@
 .folder-manager-tools {
  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px
 }
-:is(.folder-manager-tools,#folderDestination) > input {width:100%;min-width:0}
+:is(.folder-manager-tools,#folderDestination) > input {
+ width:100%;min-width:0;padding:8px 10px;border:1px solid var(--field-border);
+ border-radius:var(--radius-control);background:var(--surface);color:var(--ink)
+}
 .folder-manager-rows {margin-block-start:8px}
 .folder-manager-row {
  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px;
@@ -47,6 +50,7 @@
 #folderActionDialog .modalbody {display:grid;gap:10px;align-content:start}
 #folderActionDialog .field {margin:0}
 #folderActionDialog :is(.section-note,.form-message) {margin:0;overflow-wrap:anywhere}
+#folderDestinationPath,#folderActionLocation {max-height:5em;overflow:auto;scrollbar-width:thin}
 .folder-destination-list {
  margin:8px 0 0;padding:4px;min-inline-size:0;max-height:min(330px,35dvh);overflow-y:auto;
  border:1px solid var(--line);border-radius:var(--radius-control)
@@ -66,4 +70,5 @@
 @media(max-width:430px) {
  .folder-manager-tools {grid-template-columns:minmax(0,1fr)}
  .folder-manager-tools button {justify-self:end}
+ .folder-action-footer > :first-child {flex-basis:100%}
 }

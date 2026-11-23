@@ -287,11 +287,13 @@ async function testDraft(page) {
 async function testFolderManagement(page) {
   const ids = {
     source: 'qa-folder-source', child: 'qa-folder-child',
-    archive: 'qa-folder-archive', destination: 'qa-folder-destination', journal: 'qa-folder-journal'
+    archive: 'qa-folder-archive', destination: 'qa-folder-destination', journal: 'qa-folder-journal',
+    deep: 'qa-folder-deep'
   };
   const labels = {
     source: '回归来源文件夹', child: '来源子目录', archive: '回归归档目录',
-    destination: '项目归档目标', journal: '日志专用目录', created: '新建资料子目录', renamed: '已整理资料来源'
+    destination: '项目归档目标', journal: '日志专用目录', created: '新建资料子目录', renamed: '已整理资料来源',
+    deep: '深层路径末端'
   };
   const bytes = [0x44, 0x6f, 0x00, 0xff];
   const recordTitle = '文件夹回归附件';
@@ -303,6 +305,13 @@ async function testFolderManagement(page) {
     });
     profile.folders = [...(profile.folders || []), folder('source'), folder('child', ids.source),
       folder('archive'), folder('destination', ids.archive), folder('journal', '', 'journal')];
+    let parentId = ids.archive;
+    for (let depth = 1; depth <= 9; depth++) {
+      const id = depth === 9 ? ids.deep : ids.deep + '-' + depth;
+      const name = depth === 9 ? labels.deep : ('用于发布验证的长文件夹名称' + depth).repeat(4);
+      profile.folders.push({ id, scope: 'resource', parentId, name });
+      parentId = id;
+    }
     await commitState(next);
     const recordId = crypto.randomUUID();
     const blob = new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' });
@@ -376,9 +385,24 @@ async function testFolderManagement(page) {
       await search.fill(label);
       assert.equal(await target(id).count() > 0 && await target(id).isEnabled(), false, '禁止选择自身、子目录或其他栏目');
     }
+    await search.fill(labels.deep);
+    await target(ids.deep).click();
+    assert.match(await path.innerText(), new RegExp(labels.deep));
+    assert.equal(await submit.evaluate(button => {
+      const box = button.getBoundingClientRect();
+      const bounds = button.closest('dialog').getBoundingClientRect();
+      return box.bottom <= bounds.bottom && box.bottom <= innerHeight;
+    }), true, '超长目标路径不能把移动按钮推出窗口');
     await search.fill(labels.destination);
     await target(ids.destination).click();
     for (const label of [labels.archive, labels.destination]) assert.match(await path.innerText(), new RegExp(label));
+    await submit.click();
+    await dialog.waitFor({ state: 'hidden' });
+    await manager.getByRole('button', { name: '撤销', exact: true }).click();
+    await page.waitForFunction(id => recordFolders('resource').find(folder => folder.id === id)?.parentId === '', ids.source);
+    await chooseAction(folderRow(ids.source).locator('[data-folder-more]'), '移动到…');
+    await search.fill(labels.destination);
+    await target(ids.destination).click();
     await submit.click();
     await dialog.waitFor({ state: 'hidden' });
     await page.reload();

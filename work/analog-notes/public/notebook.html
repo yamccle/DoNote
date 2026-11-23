@@ -36,7 +36,7 @@
  <form id="folderActionForm">
   <div class="modalhead"><h2 id="folderActionTitle"></h2><button type="button" class="icon-button" data-close="folderActionDialog" aria-label="关闭">✕</button></div>
   <div class="modalbody">
-   <p id="folderActionLocation" class="section-note"></p>
+   <p id="folderActionLocation" class="section-note" tabindex="0"></p>
    <div class="field" id="folderActionNameField"><label for="folderActionName">文件夹名称</label><input id="folderActionName" maxlength="60" autocomplete="off"></div>
    <div id="folderDestination" hidden>
     <input type="search" id="folderDestinationSearch" aria-label="搜索目标文件夹" placeholder="搜索目标文件夹">
@@ -48,7 +48,7 @@
    </div>
   </div>
   <div class="modalfoot folder-action-footer">
-   <div><p id="folderDestinationPath" class="section-note" role="status" hidden></p><p id="folderActionMessage" class="form-message" role="alert"></p></div>
+   <div><p id="folderDestinationPath" class="section-note" role="status" tabindex="0" hidden></p><p id="folderActionMessage" class="form-message" role="alert"></p></div>
    <div class="right"><button type="button" class="secondary" data-close="folderActionDialog">取消</button><button type="submit" class="primary" id="folderActionSubmit"></button></div>
   </div>
  </form>
