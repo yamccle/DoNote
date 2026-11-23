@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收桌面发布包解压后的 workspace 目录。
- * [OUTPUT]: 验证长 PDF、后台字幕、草稿恢复和附件保存。
+ * [OUTPUT]: 验证长 PDF、后台字幕、新建记录、草稿与附件保存。
  * [POS]: 发布回归入口。浏览器使用临时账户和本地模拟宿主。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -144,15 +144,110 @@ async function closeReader(page) {
   await page.waitForFunction(() => !document.getElementById('reader').open && !readingSession);
 }
 
+async function testRecordEditor(page) {
+  const viewport = page.viewportSize();
+  const picker = page.locator('#recordTypePicker');
+  const editor = page.locator('#editor');
+  const type = page.locator('#type');
+  const title = page.locator('#title');
+  const recordTitle = '发布验证：从总览新建计划';
+  // Windows 标题栏通过同一个网页按钮发出新建操作。
+  const clickNew = () => page.evaluate(() => document.getElementById('newBtn').click());
+  await page.setViewportSize({ width: 400, height: 600 });
+  try {
+    await page.locator('[data-rail-view="journal"]').click();
+    await clickNew();
+    await editor.waitFor();
+    assert.equal(await type.inputValue(), 'journal');
+    assert.equal(await picker.isVisible(), false);
+    await editor.getByRole('button', { name: '关闭', exact: true }).click();
+    await editor.waitFor({ state: 'hidden' });
+
+    await page.locator('[data-rail-view="all"]').click();
+    await clickNew();
+    await picker.waitFor();
+    assert.equal(await editor.isVisible(), false);
+    await page.keyboard.press('Escape');
+    await picker.waitFor({ state: 'hidden' });
+
+    await page.keyboard.press('Control+n');
+    await picker.locator('button[data-record-type="plan"]').click();
+    await editor.waitFor();
+    assert.equal(await picker.isVisible(), false);
+    assert.equal(await type.inputValue(), 'plan');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'title');
+    assert.equal(await page.locator('#editorMetadata').getAttribute('open'), null);
+    assert.equal(await page.locator('#editorResources').getAttribute('open'), null);
+    assert.equal(await page.locator('#addAttachments').evaluate(button => {
+      const { left, right, top, bottom } = button.getBoundingClientRect();
+      const scrollArea = document.querySelector('#editor .editor-body').getBoundingClientRect();
+      return left >= 0 && right <= innerWidth && top >= scrollArea.top && bottom <= scrollArea.bottom;
+    }), true, '窄窗口初次打开时应显示添加附件按钮');
+    assert.equal(await page.locator('#saveBtn').evaluate(button => {
+      const { left, right, top, bottom } = button.getBoundingClientRect();
+      return left >= 0 && right <= innerWidth && top >= 0 && bottom <= innerHeight;
+    }), true, '窄窗口初次打开时应显示保存按钮');
+
+    await page.evaluate(() => window.DoNoteAppearance.applyTheme('dark'));
+    const pageMode = page.locator('#editorModeBtn');
+    await pageMode.click();
+    const editorSurfaces = await editor.evaluate(dialog =>
+      [...dialog.querySelectorAll('.modalhead,.modalbody,.modalfoot')].map(node => getComputedStyle(node).backgroundColor));
+    assert.notEqual(editorSurfaces[1], 'rgb(255, 255, 255)');
+    assert.deepEqual(editorSurfaces, Array(3).fill(editorSurfaces[1]), '整页编辑器的页眉和页脚应跟随夜间主题');
+    await pageMode.click();
+    await page.evaluate(() => window.DoNoteAppearance.applyTheme('system'));
+
+    await title.fill(recordTitle);
+    const start = page.locator('#planStart');
+    const end = page.locator('#planEnd');
+    await start.fill('2026-11-23');
+    await end.fill('2026-12-02');
+    await editor.getByRole('button', { name: '收起浮窗' }).click();
+    await editor.waitFor({ state: 'hidden' });
+    await clickNew();
+    await editor.waitFor();
+    assert.equal(await picker.isVisible(), false);
+    assert.equal(await title.inputValue(), recordTitle);
+
+    await type.selectOption('paper');
+    await page.locator('#editorMetadata > summary').click();
+    await page.locator('#url').fill('invalid-url');
+    await page.locator('#tagsInput').fill('发布回归');
+    await type.selectOption('plan');
+    assert.equal(await start.inputValue(), '2026-11-23');
+    assert.equal(await end.inputValue(), '2026-12-02');
+    await page.locator('#saveBtn').click();
+    await editor.waitFor({ state: 'hidden' });
+    const saved = await page.evaluate(name => {
+      const note = records.find(record => record.title === name);
+      return note && { type: note.type, planEnd: note.planEnd, tags: note.tags, url: note.url || '' };
+    }, recordTitle);
+    assert.deepEqual(saved, { type: 'plan', planEnd: '2026-12-02', tags: ['发布回归'], url: '' });
+  } finally {
+    await page.setViewportSize(viewport);
+  }
+  console.log('PASS record editor: scoped entry, overview picker, narrow window, resume and type switching');
+}
+
 async function testDraft(page) {
   const title = '发布验证：带附件的计划';
   const body = '草稿重新打开后应保留正文和原始附件。';
   const bytes = Buffer.from([0x44, 0x6f, 0x4e, 0x6f, 0x74, 0x65, 0x00, 0xff]);
-  await page.evaluate(() => openEditor('plan'));
+  const resourceId = await page.evaluate(async () => {
+    const id = crypto.randomUUID();
+    await put({ id, type: 'resource', title: '发布验证：关联资料', date: today(), status: '待读', tags: [], body: '', attachments: [] });
+    openEditor('plan');
+    return id;
+  });
   await page.locator('#title').fill(title);
   await page.locator('#richBody').fill(body);
   await page.locator('#planStart').fill('2026-11-23');
   await page.locator('#planEnd').fill('2026-12-02');
+  await page.locator('#editorResources > summary').click();
+  await page.locator(`[data-link-resource="${resourceId}"]`).check();
+  await page.locator('#editorMetadata > summary').click();
+  await page.locator('#tagsInput').fill('附件回归');
   await page.locator('#attachmentInput').setInputFiles({ name: 'qa-draft.bin', mimeType: 'application/octet-stream', buffer: bytes });
   await page.waitForFunction(() => document.querySelector('#saveHint')?.textContent.includes('草稿已暂存'));
   await page.reload();
@@ -170,13 +265,23 @@ async function testDraft(page) {
   assert.match(await page.locator('#draftFiles').innerText(), /qa-draft\.bin/);
   await page.locator('#saveBtn').click();
   await editor.waitFor({ state: 'hidden' });
-  const saved = await page.evaluate(async name => {
+  const savedBytes = await page.evaluate(async name => {
     const note = records.find(entry => entry.title === name);
-    return { planEnd: note.planEnd, bytes: Array.from(new Uint8Array(await (await readBlob(note.attachments[0].id)).arrayBuffer())) };
+    return Array.from(new Uint8Array(await (await readBlob(note.attachments[0].id)).arrayBuffer()));
   }, title);
-  assert.equal(saved.planEnd, '2026-12-02');
-  assert.deepEqual(saved.bytes, Array.from(bytes));
-  console.log('PASS draft: reload, plan dates, and saved attachment bytes');
+  assert.deepEqual(savedBytes, Array.from(bytes));
+  await page.locator('#records .card').filter({ hasText: title }).click();
+  await page.locator('#editBtn').click();
+  await editor.waitFor();
+  assert.equal(await page.locator('#planEnd').inputValue(), '2026-12-02');
+  assert.equal(await page.locator('#tagsInput').inputValue(), '附件回归');
+  await page.locator('#editorResources > summary').click();
+  const linkedResource = page.locator(`[data-link-resource="${resourceId}"]`);
+  await linkedResource.waitFor();
+  assert.equal(await linkedResource.isChecked(), true);
+  await editor.getByRole('button', { name: '关闭', exact: true }).click();
+  await editor.waitFor({ state: 'hidden' });
+  console.log('PASS draft: reload, saved attachment bytes, and reopening plan dates, tags and resources');
 }
 
 async function testBackgroundSubtitles(page) {
@@ -281,6 +386,7 @@ try {
   browser = await chromium.launch({ headless: true, ...(browserPath ? { executablePath: browserPath } : channel ? { channel } : {}) });
   const { page, errors } = await openWorkspace(browser);
   await testLongPdf(page, fixture);
+  await testRecordEditor(page);
   await testDraft(page);
   await testBackgroundSubtitles(page);
   assert.deepEqual(errors, []);

@@ -93,18 +93,23 @@ async function minimizeWorkspaceDialog(dialog){
  refreshWorkspaceLauncher();resumeWorkspaceButton.focus({preventScroll:true});
 }
 
-resumeWorkspaceButton.onclick=()=>{
- const entry=[...minimizedWorkspaceDialogs.entries()].at(-1);
- if(!entry)return;
- const [dialog,state]=entry;
+function resumeWorkspaceDialog(dialog){
+ const state=minimizedWorkspaceDialogs.get(dialog);
+ if(!state)return false;
  const missingRecord=state.recordId&&!records.some(note=>note.id===state.recordId);
  const missingFile=state.fileId&&!stagedFiles.has(state.fileId)&&!records.some(note=>note.attachments?.some(file=>file.id===state.fileId));
  if(state.profileId!==appState.activeId||missingRecord||missingFile){
-  discardMinimizedWorkspaceDialog(dialog.id);toast('这份资料或记录已不可用。');return;
+  discardMinimizedWorkspaceDialog(dialog.id);toast('这份资料或记录已不可用。');return false;
  }
  minimizedWorkspaceDialogs.delete(dialog);dialog.showModal();refreshWorkspaceLauncher();
  const restoreScroll=()=>{if(dialog.open)for(const [node,top,left] of state.scrolls)node.scrollTo(left,top)};
  restoreScroll();requestAnimationFrame(restoreScroll);
+ return true;
+}
+
+resumeWorkspaceButton.onclick=()=>{
+ const dialog=[...minimizedWorkspaceDialogs.keys()].at(-1);
+ if(dialog)resumeWorkspaceDialog(dialog);
 };
 
 function fixWorkspaceDialogHeaders(){

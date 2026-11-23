@@ -1,9 +1,17 @@
 /**
- * [INPUT]: 读取记录编辑器结构、主题色和窗口尺寸。
- * [OUTPUT]: 布置主表单、附件、关联资料和可选信息。
- * [POS]: 仅作用于记录编辑器，保留浮窗和整页两种布局。
+ * [INPUT]: 读取新建记录界面、主题色和窗口尺寸。
+ * [OUTPUT]: 布置类型选择、正文、附件和可选信息。
+ * [POS]: 在浮窗和整页模式下为记录表单提供布局。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
+#recordTypePicker {width:min(484px,calc(100% - 28px))}
+#recordTypeChoices {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#recordTypeChoices button {
+ display:flex;align-items:center;gap:8px;min-height:42px;
+ text-align:start;white-space:normal;overflow-wrap:anywhere
+}
+#recordTypeChoices button span {display:inline-flex;flex:none;color:var(--accent)}
+#recordTypeChoices button svg {width:18px;height:18px}
 #editor .editor-body {display:grid;align-content:start;gap:14px}
 #editor .editor-body .field {min-width:0;margin:0}
 #editor .editor-record-heading {
@@ -24,15 +32,23 @@
 }
 #editor .editor-format-options {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:6px}
 #editor .editor-format-options .rich-colors {flex-wrap:wrap}
-#editor .editor-files {display:grid;gap:6px;min-width:0}
-#editor .editor-file-actions button {padding:5px 9px}
+#editor .editor-files {
+ display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:6px 10px;
+ min-width:0;padding-block:4px;border-block:1px solid var(--line)
+}
+#editor .editor-files #addAttachments {min-height:34px;padding:4px 9px}
+#editor #editorResources {min-width:0}
+#editor #editorResources summary {
+ width:fit-content;max-width:100%;padding:6px 8px;cursor:pointer;color:var(--ink);
+ font-size:var(--type-label);border-radius:var(--radius-control)
+}
+#editor #draftFiles {grid-column:1/-1}
 #editor #draftFiles:empty {display:none}
 #editor .editor-disclosure {border-block-start:1px solid var(--line);min-width:0}
-#editor .editor-disclosure + .editor-disclosure {margin-block-start:-9px}
 #editor .editor-disclosure > summary {
  padding:8px 5px;cursor:pointer;font-size:var(--type-label);color:var(--ink);border-radius:var(--radius-control)
 }
-#editor :is(.editor-disclosure, #editorFormatting) > summary:is(:hover,:focus-visible) {background:var(--surface-hover)}
+#editor :is(.editor-disclosure,#editorFormatting,#editorResources) > summary:is(:hover,:focus-visible) {background:var(--surface-hover)}
 #editor :is(#resourceLinksField,.editor-metadata-grid) {padding:6px 2px 4px}
 #editor .editor-metadata-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 #editor #referenceFields {grid-column:1/-1}
@@ -45,7 +61,9 @@
 #editor .modalfoot {flex-wrap:wrap}
 #editor .modalfoot .right {margin-inline-start:auto}
 @media(max-width:430px) {
+ #recordTypeChoices {grid-template-columns:minmax(0,1fr)}
  #editor .editor-record-heading {grid-template-columns:minmax(0,1fr)}
  #editor .editor-metadata-grid {grid-template-columns:minmax(0,1fr)}
  #editor .editor-body {gap:11px}
+ #editor #editorResources[open] {grid-column:1/-1}
 }

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 读取工作台和资料的当前状态。
  * [OUTPUT]: 提供当前对象的右键操作。
- * [POS]: 工作台情境菜单，复用栏目导航提供的新建入口。
+ * [POS]: 工作台情境菜单，复用记录编辑器提供的新建入口。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 'use strict';
@@ -99,7 +99,7 @@ document.addEventListener('contextmenu',event=>{
  // Reader selections have their own translation/annotation menu. Blank reader areas should not show browser printing tools.
  if(el.closest('#reader')){event.preventDefault();closeWorkspaceMenu();return}
  const nav=el.closest('[data-nav]');
- if(nav){const type=nav.dataset.nav;showWorkspaceMenu(event,[{label:'打开'+(names[type]||'栏目'),run:()=>nav.click()},...(type in templates?[{label:'在此栏目新建记录',run:()=>openEditor(type)}]:[])]);return}
+ if(nav){const type=nav.dataset.nav;showWorkspaceMenu(event,[{label:'打开'+(names[type]||'栏目'),run:()=>nav.click()},...(Object.hasOwn(templates,type)?[{label:'在此栏目新建记录',run:()=>openNewWorkspaceRecord(type)}]:[])]);return}
  if(el.closest('.dashboard-card,#remindersWidget,#quickStartWidget')){showWorkspaceMenu(event,[{label:'自定义总览组件…',run:()=>$('dashboardCustomize').click()}]);return}
  const link=el.closest('a[href]');
  if(link){showWorkspaceMenu(event,[{label:'打开链接',run:()=>link.click()},{label:'复制链接',run:()=>navigator.clipboard.writeText(link.href)}]);return}

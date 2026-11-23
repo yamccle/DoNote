@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取当前工作台的栏目配置和记录。
+ * [OUTPUT]: 同步栏目、记录类型和周报入口。
+ * [POS]: 为导航和编辑器提供当前工作台可用的记录类型。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 const WORK_LOG_TEMPLATE='今天的工作\n\n进展与结果\n\n问题与待跟进\n\n下一步\n';
 const BASE_CATEGORY_DATA=[{id:'paper',name:'文献阅读',icon:'book',template:templates.paper,statuses:['待读','在读','已读']},{id:'issue',name:'设计问题',icon:'circuit',template:templates.issue,statuses:['待排查','进行中','已解决']},{id:'journal',name:'工作日志',icon:'pen',template:WORK_LOG_TEMPLATE,statuses:['已记录','进行中']},{id:'study',name:'学习日志',icon:'book',template:'学习主题\n\n资料与练习\n\n理解与疑问\n\n下一步学习计划\n',statuses:['已记录','进行中']}];
@@ -32,6 +38,7 @@ function upgradeJournalCategories(profile){
 function categoryList(){return activeProfile()?.categories||categoryDefaults()}
 function defaultRecordType(){return categoryList()[0]?.id||'paper'}
 function activeCategory(id){return categoryList().find(c=>c.id===id)}
+const recordTypeName=type=>type==='resource'?'资料条目':names[type];
 function validCategories(cats){return Array.isArray(cats)&&cats.length>0&&cats.length<=30&&new Set(cats.map(c=>c.id)).size===cats.length&&cats.every(c=>c&&/^(paper|issue|journal|study|plan|custom-[a-zA-Z0-9-]{1,64})$/.test(c.id)&&typeof c.name==='string'&&c.name.trim()&&c.name.length<=30&&typeof c.template==='string'&&c.template.length<=150000&&Array.isArray(c.statuses)&&c.statuses.length>0&&c.statuses.length<=20&&c.statuses.every(s=>typeof s==='string'&&s.length>0&&s.length<=30)&&['book','circuit','pen'].includes(c.icon))}
 function syncCategoryConfig(){
  if(!appState)return;for(const p of appState.profiles){if(!p.categories)p.categories=categoryDefaults();if(!p.reading)p.reading={};if(!p.navLabels)p.navLabels={workspace:"工作台",overview:"总览",library:"文献与媒体库",pinned:"置顶收藏"}}
@@ -97,16 +104,10 @@ function renderCategoryNavigation(){
  ];
  renderWorkspaceRail(railItems);
  $('tabs').innerHTML='<button class="tab '+(tab==='all'?'active':'')+'" data-tab="all">全部记录</button>'+cats.filter(c=>c.id!=='paper').map(c=>'<button class="tab '+(tab===c.id?'active':'')+'" data-tab="'+c.id+'">'+esc(c.name)+'</button>').join('')+'<button class="tab '+(tab==='resource'?'active':'')+'" data-tab="resource">'+esc(names.resource)+'</button>'+(view==='pinned'&&records.some(n=>n.flashcardKind)?'<button id="achievementTab" class="tab '+(tab==='achievements'?'active':'')+'" data-tab="achievements">成就殿宇</button>':'');
- const type=$('type').value;$('type').innerHTML=[...cats,{id:'resource',name:names.resource}].map(c=>'<option value="'+c.id+'">'+esc(names[c.id]||c.name)+'</option>').join('');$('type').value=statusOptions[type]?type:defaultRecordType();
- const quick=$('quickStartWidget');
- if(quick){
-  const shortcut=(icon,label,action)=>'<button type="button" class="quick" '+action+'><span class="quickicon" aria-hidden="true">'+svg(icon)+'</span><b>'+esc(label)+'</b><span class="arrow" aria-hidden="true">›</span></button>';
-  quick.innerHTML='<h2>新建记录</h2>'+cats.slice(0,4).map(c=>shortcut(categoryIcon(c),names[c.id]||c.name,'data-new="'+esc(c.id)+'"')).join('')
-   +(activeCategory('journal')?shortcut('calendar','本周周报','data-work-weekly'):'')
-   +(activeCategory('study')?shortcut('calendar','本周学习周志','data-study-weekly'):'');
- }
+ const type=$('type').value;
+ $('type').replaceChildren(...[...cats.map(c=>c.id),'resource'].map(id=>new Option(recordTypeName(id),id)));
+ $('type').value=statusOptions[type]?type:defaultRecordType();
  $('tabs').onclick=e=>{const b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;render()}};
- if(quick)quick.onclick=e=>{const b=e.target.closest('[data-new]');if(b)openEditor(b.dataset.new);if(e.target.closest('[data-weekly]'))openWeeklyMeeting();if(e.target.closest('[data-work-weekly]'))openWorkWeek();if(e.target.closest('[data-study-weekly]'))openStudyWeek()};
  if(typeof renderLibraryControls==='function')renderLibraryControls();
 }
 let categoryEditing=null;

@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取计划日期、周期和当前栏目。
+ * [OUTPUT]: 初始化计划字段，计算结束日期，显示计划和归档入口。
+ * [POS]: 为记录编辑器和栏目列表提供计划相关行为。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 function validPlanTrack(value){return value===undefined||['','journal','study'].includes(value)}
@@ -13,11 +19,12 @@ function planEndFor(start,preset){
  }
  return date.toISOString().slice(0,10);
 }
-function setupPlanFields(type,note){
+function setupPlanFields(type,note,{keepValues=false}={}){
  $('planFields').hidden=type!=='plan';
+ $('planStart').disabled=$('planEnd').disabled=type!=='plan';
  for(const field of $('editorMetadata').querySelectorAll('[data-plan-option]'))field.hidden=type!=='plan';
  $('recordDateField').hidden=type==='plan';$('date').disabled=type==='plan';
- if(type!=='plan')return;
+ if(type!=='plan'||keepValues)return;
  $('planTrack').value=note?.planTrack||(['journal','study'].includes(view)?view:'');
  $('planPeriod').value=note?'custom':'week';
  $('planStart').value=note?.planStart||today();

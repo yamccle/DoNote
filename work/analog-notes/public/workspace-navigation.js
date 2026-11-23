@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 读取当前栏目、账户、导航历史和输入方式。
- * [OUTPUT]: 更新快捷导航，处理栏目的切换、键盘焦点和新建记录入口。
+ * [OUTPUT]: 更新快捷导航，处理栏目的切换和工作台快捷键。
  * [POS]: 工作台导航层，切换记录视图后提供短暂反馈。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -149,12 +149,6 @@ function publishDesktopChrome(){
  web.postMessage('chrome:'+document.documentElement.dataset.theme+':'+encodeURIComponent($('crumb').textContent)+(hex?':'+hex:''));
 }
 new MutationObserver(publishDesktopChrome).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
-
-function openNewWorkspaceRecord(){
- const section=activeCategory(view)||view==='resource'?view:tab;
- const type=section==='resource'&&activeCategory('paper')?'paper':section;
- openEditor(Object.hasOwn(templates,type)?type:defaultRecordType());
-}
 
 // Keyboard entry points: Ctrl/Cmd+F jumps to search, Ctrl/Cmd+N starts a record,
 // and "/" focuses search when the user is not typing somewhere else.

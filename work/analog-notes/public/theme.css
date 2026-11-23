@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取工作台主题和浮窗结构。
+ * [OUTPUT]: 定义主题颜色并应用到工作台和阅读界面。
+ * [POS]: 与阅读器和编辑器样式共享界面颜色。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 :root {
  --paper:#f7f7f3; --surface:#fdfdfa; --surface-soft:#efefea; --surface-hover:#e8ebe4;
  --ink:#252a25; --text-soft:#485048; --muted:#606b61; --line:#d9ded5; --field-border:#bdc6bb;
@@ -65,7 +71,7 @@
 .inline-media.selected {outline-color:var(--muted)}
 .image-resize {background:var(--strong)}
 #editor.document-page,#imagePreview {background:var(--paper)}
-#editor.document-page .modalbody {background:var(--surface);border-color:var(--line)}
+#editor.document-page :is(.modalhead,.modalbody,.modalfoot) {background:var(--surface);border-color:var(--line)}
 .library-cover {background:var(--cover)}
 .library-cover img {box-shadow:none}
 .cover-progress {background:var(--field-border)}
