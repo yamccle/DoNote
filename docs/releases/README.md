@@ -10,16 +10,16 @@ r122 完整包的版本清单为 `26.1121.0068`。其文件名和 SHA-256 位于
 
 使用 Windows x64、PowerShell 7、Git、Windows .NET Framework 编译器和 Edge。工作台检查需要 Playwright。可通过 `DONOTE_PLAYWRIGHT_MODULE` 指向 Playwright 模块。
 
-从仓库根目录执行以下命令。`-RuntimeArchive` 始终指向已锁定的运行依赖包（r122），`-PreviousReleaseZip` 指向上一版完整包（当前为 r125）。
+从仓库根目录执行以下命令。`-RuntimeArchive` 始终指向已锁定的运行依赖包（r122），`-PreviousReleaseZip` 指向上一版完整包（当前为 r126）。
 
 ```powershell
 $runtime = '.\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'
-$previous = '.\outputs\r125\DoNote-Windows-x64-r125.zip'
-pwsh -File tools/release.ps1 -Revision r126 -Version 26.1126.0072 `
+$previous = '.\outputs\r126\DoNote-Windows-x64-r126.zip'
+pwsh -File tools/release.ps1 -Revision r127 -Version 26.1127.0073 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory outputs
 ```
 
-脚本读取干净的 Git 提交，并导出独立源码目录。它先运行工作台和实际升级回退检查，再校验 ZIP。通过后，三个文件一起进入 `outputs/r126/`。下次发布使用新的修订号和版本号，并把 `-PreviousReleaseZip` 指向上一版完整包。运行依赖仍使用同一个已锁定的 r122 完整包。构建发生故障时，可用 `-KeepStage` 保留临时构建目录。
+脚本读取干净的 Git 提交，并导出独立源码目录。它先运行工作台和实际升级回退检查，再校验 ZIP。通过后，三个文件一起进入 `outputs/r127/`。下次发布使用新的修订号和版本号，并把 `-PreviousReleaseZip` 指向上一版完整包。运行依赖仍使用同一个已锁定的 r122 完整包。构建发生故障时，可用 `-KeepStage` 保留临时构建目录。
 
 增量包、完整包和发布记录都包含源码提交和运行依赖校验值。发布记录也包含上一版完整包和两个新 ZIP 的 SHA-256。保持检查通过的提交与发行标签对应。Windows 编译器版本和 ZIP 时间戳会影响整个包的字节值，重建以相同源码和依赖为准。
 
@@ -27,9 +27,18 @@ pwsh -File tools/release.ps1 -Revision r126 -Version 26.1126.0072 `
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |
 | --- | --- | --- | --- | --- |
+| r126 | 26.1126.0072 | tag `r126` → `feb837d` | 2026-11-23 | 修复同步翻译漏掉重新识别后的第一批字幕；基于 r125（26.1125.0071） |
 | r125 | 26.1125.0071 | tag `r125` → `e02edda` | 2026-11-23 | 字幕识别时逐条同步翻译（边识别边翻译）；基于 r124（26.1124.0070） |
 | r124 | 26.1124.0070 | tag `r124` → `0d35f83` | 2026-11-23 | 按新发布流程重建；基于 r123（26.1123.0069） |
 | r123 | 26.1123.0069 | tag `r123` → `3eba4d6` | 2026-11-23 | 交互优化与工程化整理；基于 r122（26.1121.0068） |
+
+### r126
+
+- 完整包 `outputs/r126/DoNote-Windows-x64-r126.zip`
+  `7f9fb8c3beb872eaf8c28ff1ae45f7358d34b1825b65071c664cf1a04cf25f46`
+- 增量包 `outputs/r126/DoNote-Update-26.1125.0071-to-r126.zip`
+  `f36d17ba60c46c1bfc2518a1497369621ecfe8da5fc1adbc450176d04ff96761`
+- 发布记录 `outputs/r126/DoNote-r126-release.json`，检查项：`workspace`、`upgrade-and-rollback`、`package-checksums`。
 
 ### r125
 
