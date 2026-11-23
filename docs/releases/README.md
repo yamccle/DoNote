@@ -10,16 +10,16 @@ r122 完整包的版本清单为 `26.1121.0068`。其文件名和 SHA-256 位于
 
 使用 Windows x64、PowerShell 7、Git、Windows .NET Framework 编译器和 Edge。工作台检查需要 Playwright。可通过 `DONOTE_PLAYWRIGHT_MODULE` 指向 Playwright 模块。
 
-从仓库根目录执行以下命令。`-RuntimeArchive` 始终指向已锁定的运行依赖包（r122），`-PreviousReleaseZip` 指向上一版完整包（当前为 r123）。
+从仓库根目录执行以下命令。`-RuntimeArchive` 始终指向已锁定的运行依赖包（r122），`-PreviousReleaseZip` 指向上一版完整包（当前为 r124）。
 
 ```powershell
 $runtime = '.\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'
-$previous = '.\outputs\r123\DoNote-Windows-x64-r123.zip'
-pwsh -File tools/release.ps1 -Revision r124 -Version 26.1124.0070 `
+$previous = '.\outputs\r124\DoNote-Windows-x64-r124.zip'
+pwsh -File tools/release.ps1 -Revision r125 -Version 26.1125.0071 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory outputs
 ```
 
-脚本读取干净的 Git 提交，并导出独立源码目录。它先运行工作台和实际升级回退检查，再校验 ZIP。通过后，三个文件一起进入 `outputs/r124/`。下次发布使用新的修订号和版本号，并把 `-PreviousReleaseZip` 指向上一版完整包。运行依赖仍使用同一个已锁定的 r122 完整包。构建发生故障时，可用 `-KeepStage` 保留临时构建目录。
+脚本读取干净的 Git 提交，并导出独立源码目录。它先运行工作台和实际升级回退检查，再校验 ZIP。通过后，三个文件一起进入 `outputs/r125/`。下次发布使用新的修订号和版本号，并把 `-PreviousReleaseZip` 指向上一版完整包。运行依赖仍使用同一个已锁定的 r122 完整包。构建发生故障时，可用 `-KeepStage` 保留临时构建目录。
 
 增量包、完整包和发布记录都包含源码提交和运行依赖校验值。发布记录也包含上一版完整包和两个新 ZIP 的 SHA-256。保持检查通过的提交与发行标签对应。Windows 编译器版本和 ZIP 时间戳会影响整个包的字节值，重建以相同源码和依赖为准。
 
@@ -27,7 +27,18 @@ pwsh -File tools/release.ps1 -Revision r124 -Version 26.1124.0070 `
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |
 | --- | --- | --- | --- | --- |
+| r124 | 26.1124.0070 | tag `r124` → `0d35f83` | 2026-11-23 | 按新发布流程重建；基于 r123（26.1123.0069） |
 | r123 | 26.1123.0069 | tag `r123` → `3eba4d6` | 2026-11-23 | 交互优化与工程化整理；基于 r122（26.1121.0068） |
+
+### r124
+
+- 完整包 `outputs/r124/DoNote-Windows-x64-r124.zip`
+  `123a1356c877c5508a9baeca1bd1f6977ef61f808833d503326dbea88746a6fc`
+- 增量包 `outputs/r124/DoNote-Update-26.1123.0069-to-r124.zip`
+  `2c299c35f519b3b89425bb75850ae71a18c1c288221967fc5aa54af7f7e0a7b1`
+- 发布记录 `outputs/r124/DoNote-r124-release.json`，检查项：`workspace`、`upgrade-and-rollback`、`package-checksums`。
+
+### r123
 
 - 完整包 `outputs/r123/DoNote-Windows-x64-r123.zip`
   `37052fda3571caf5b22ba3a3acf1b98d65134af5108c584ff718128d6d317739`
