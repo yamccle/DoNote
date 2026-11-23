@@ -27,9 +27,10 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 
 ## 当前状态（换手时）
 
-- 分支 `main`。发布使用的源码提交由修订标签定位。
-- 恢复基线 `source-baseline-recovered` 指向 `7913398`。当前发布标签 `r129` 指向 `5507f04`。
+- 分支 `main`，HEAD `6921c63`（r129 发布记录提交）。
+- 恢复基线 `source-baseline-recovered` 指向 `7913398`；发布标签 `r123`…`r129`（`r129` → `5507f04`，即本次发布使用的源码提交）。
 - 最新发布 **r129 / 26.1129.0075**。在 `outputs/r129/` 提供完整包、增量包与 `DoNote-r129-release.json`。
+- GitHub 已启用 Releases：`r127`、`r128`、`r129` 各含完整包 + 增量包 + 发布记录；模型包不进 GitHub。
 - 运行依赖锁定：`docs/releases/runtime-lock.json` 锁定 **r122**（`26.1121.0068`，SHA `6c4da1cf…`），**不要**改成 r123 及以后：发布包不含 `video-runtime/` 构建期资源，改了会构不出来
 - 工作树应为干净；脏树会被 `release.ps1` 直接拒绝
 
@@ -103,7 +104,7 @@ $previous = '.\outputs\r129\DoNote-Windows-x64-r129.zip'                   # 上
 1. 打标签 `git tag -a r130 -m '…（版本）…' <本次构建用的提交>`。目标提交用发布记录里的 `sourceCommit`。
 2. 更新 `docs/releases/runtime-lock.json` 的 `latestRelease`（运行依赖那段保持 r122 不动）
 3. 更新 `docs/releases/README.md` 的发布记录表与下一版命令示例
-4. `git add -A && git commit -m 'Record r129 release'`，确认 `git status` 干净。
+4. `git add -A && git commit -m 'Record r130 release'`，确认 `git status` 干净。
 
 手工复核单个包（可选）：
 
@@ -132,7 +133,7 @@ $previous = '.\outputs\r129\DoNote-Windows-x64-r129.zip'                   # 上
 1. 产品主线：「阅读 → 摘录 → 形成记录 → 找回出处」这条链做稳。
 2. 把发布收尾四步自动化进 `release.ps1`（打 tag、回写 lock 与 README、提交）。
 3. 给本地翻译 GGUF 加内置下载器（设置页下载 + 镜像 + 进度），摆脱"必须装 9 GB 模型包"。
-4. GitHub Releases 发布（待定）：程序包可上（1.07 GB < 2 GB/资产），模型包 9.25 GB 必须放对象存储/网盘；国内下载建议镜像。
+4. GitHub Releases 已启用（r127–r129 已发布，含完整包/增量包/发布记录）。后续每版继续发布；模型包 9.25 GB 必须放对象存储/网盘，国内下载建议镜像。
 5. 继续补齐 `tools/tests/` 覆盖（工作台、升级回退、大 PDF、草稿/字幕）。
 6. 用户明确说过：**不需要**把发布包复制/分卷到 `OUT/`。
 
