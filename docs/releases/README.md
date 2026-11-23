@@ -10,16 +10,16 @@ r122 完整包的版本清单为 `26.1121.0068`。其文件名和 SHA-256 位于
 
 使用 Windows x64、PowerShell 7、Git、Windows .NET Framework 编译器和 Edge。工作台检查需要 Playwright。可通过 `DONOTE_PLAYWRIGHT_MODULE` 指向 Playwright 模块。
 
-从仓库根目录执行以下命令。`-RuntimeArchive` 始终指向已锁定的运行依赖包（r122），`-PreviousReleaseZip` 指向上一版完整包（当前为 r126）。
+从仓库根目录执行以下命令。`-RuntimeArchive` 始终指向已锁定的运行依赖包（r122），`-PreviousReleaseZip` 指向上一版完整包（当前为 r127）。
 
 ```powershell
 $runtime = '.\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'
-$previous = '.\outputs\r126\DoNote-Windows-x64-r126.zip'
-pwsh -File tools/release.ps1 -Revision r127 -Version 26.1127.0073 `
+$previous = '.\outputs\r127\DoNote-Windows-x64-r127.zip'
+pwsh -File tools/release.ps1 -Revision r128 -Version 26.1128.0074 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory outputs
 ```
 
-脚本读取干净的 Git 提交，并导出独立源码目录。它先运行工作台和实际升级回退检查，再校验 ZIP。通过后，三个文件一起进入 `outputs/r127/`。下次发布使用新的修订号和版本号，并把 `-PreviousReleaseZip` 指向上一版完整包。运行依赖仍使用同一个已锁定的 r122 完整包。构建发生故障时，可用 `-KeepStage` 保留临时构建目录。
+脚本读取干净的 Git 提交，并导出独立源码目录。它先运行工作台和实际升级回退检查，再校验 ZIP。通过后，三个文件一起进入 `outputs/r128/`。下次发布使用新的修订号和版本号，并把 `-PreviousReleaseZip` 指向上一版完整包。运行依赖仍使用同一个已锁定的 r122 完整包。构建发生故障时，可用 `-KeepStage` 保留临时构建目录。
 
 增量包、完整包和发布记录都包含源码提交和运行依赖校验值。发布记录也包含上一版完整包和两个新 ZIP 的 SHA-256。保持检查通过的提交与发行标签对应。Windows 编译器版本和 ZIP 时间戳会影响整个包的字节值，重建以相同源码和依赖为准。
 
@@ -27,10 +27,19 @@ pwsh -File tools/release.ps1 -Revision r127 -Version 26.1127.0073 `
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |
 | --- | --- | --- | --- | --- |
+| r127 | 26.1127.0073 | tag `r127` → `e3165af` | 2026-11-23 | 语音模型默认走 hf-mirror 在线下载；模型安装器加固（占用/权限/半写入）；模型说明按实测校正；基于 r126（26.1126.0072） |
 | r126 | 26.1126.0072 | tag `r126` → `feb837d` | 2026-11-23 | 修复同步翻译漏掉重新识别后的第一批字幕；基于 r125（26.1125.0071） |
 | r125 | 26.1125.0071 | tag `r125` → `e02edda` | 2026-11-23 | 字幕识别时逐条同步翻译（边识别边翻译）；基于 r124（26.1124.0070） |
 | r124 | 26.1124.0070 | tag `r124` → `0d35f83` | 2026-11-23 | 按新发布流程重建；基于 r123（26.1123.0069） |
 | r123 | 26.1123.0069 | tag `r123` → `3eba4d6` | 2026-11-23 | 交互优化与工程化整理；基于 r122（26.1121.0068） |
+
+### r127
+
+- 完整包 `outputs/r127/DoNote-Windows-x64-r127.zip`
+  `9c7e47d8e35766ca33cdbd0c34b4d1de5069d589e09a88b82f34079e919f766f`
+- 增量包 `outputs/r127/DoNote-Update-26.1126.0072-to-r127.zip`
+  `94eefecdd095a0013f7b1a2311d36721ad0170af580a7eed66a31a8b5ec72e9b`
+- 发布记录 `outputs/r127/DoNote-r127-release.json`，检查项：`workspace`、`upgrade-and-rollback`、`package-checksums`。
 
 ### r126
 
@@ -63,6 +72,20 @@ pwsh -File tools/release.ps1 -Revision r127 -Version 26.1127.0073 `
 - 增量包 `outputs/r123/DoNote-Update-26.1121.0068-to-r123.zip`
   `edcabf0bd83496e2c4fe2cb3e76cb12642f5c1063875acac149bc58fe6017089`
 - 发布记录 `outputs/r123/DoNote-r123-release.json`，检查项：`workspace`、`upgrade-and-rollback`、`package-checksums`。
+
+## 模型包
+
+模型与程序分开发布，不放进 Git。当前已验证的模型包：
+
+| 文件 | 大小 | SHA-256 |
+|---|---:|---|
+| `outputs/DoNote-Models-x64-2026-11-23.zip`（修复版安装器） | 9,252,198,099 | `ca4eb5cee6006923ef27a76074f3676116cfa7c40978b180258b90509f847cb6` |
+| `outputs/DoNote-Models-x64-2026-11-14.zip`（原版） | 9,755,837,626 | `0ce9a023a1243fe115638ba0de4522ede603064297b6fd54e81321d705dc72a4` |
+| `outputs/DoNote-Models-Installer-Fix-2026-11-23.zip`（只替换安装器的小修复包） | 3,364 | `f98647c300847bb75c6ce897f1c959cb853abe0d3e44b5066195652c42ab753f` |
+
+模型包内容：4 个 faster-whisper（base、small、large-v3-turbo、large-v3）和 3 个 Qwen3 GGUF（4B-Q4_K_M、1.7B-Q4_K_M、0.6B-Q8_0）。已验证：ZIP 全量 CRC 通过，4 个 `model.bin` 与文档固定版本 SHA-256 一致，GGUF 文件头为 `GGUF`，应用可用 `models/asr/base` 实际完成识别。
+
+没有模型包时，语音识别会在首次使用时从 `hf-mirror.com` 在线下载（`DONOTE_HF_ENDPOINT` 可覆盖，`official` 表示改用 huggingface.co），缓存在 `%USERPROFILE%\.cache\huggingface`；本地翻译 GGUF 需按 `本地离线翻译模型说明.md` 手动下载或安装模型包。
 
 ## 兼容边界
 
