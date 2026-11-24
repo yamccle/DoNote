@@ -31,7 +31,10 @@
 - `design-system.css` 提供主题颜色、焦点和通用浮窗动画。
 - `theme.css` 提供页面布局、浮窗遮罩和整页编辑器的主题颜色。
 - `pdf-tools.js` 定位阅读器工具菜单，处理工具菜单与侧栏标签的键盘焦点。选中文字或框选图表后，可新建研究笔记，或追加到设计问题与仿真记录。
-- `pdf-research-notes.js` 把摘录写进目标记录的 `pdfEvidence`。详情「引用资料」按页码和选区打开原 PDF。
+- `pdf-research-notes.js` 把摘录与原文片段写进目标记录的 `pdfSource` / `pdfEvidence`。详情「引用资料」展示摘录预览并按页码和选区回跳原 PDF。
+- `pdf-backlinks.js` 汇总当前 PDF 被哪些记录引用，在页面右上角显示「被引用 N」角标并在侧栏「引用」页签提供反向打开与选区定位。
+- `pdf-ocr.js` 离线识别扫描页框选区域，将识别文本交给翻译/摘录侧栏并写入 `pdf-search.js` 持久化检索索引。
+- `pdf-translation.js` 衔接选区/识字翻译、保存批注、存为研究笔记与追加到记录；手动校对文字时保留原页面与选区坐标。
 - `pdf-annotations.js` 和 `pdf-reflow.js` 为标注与排版菜单复用阅读器控制。
 - `reader-toolbar.css` 和 `reader-panels.css` 限定工具菜单和抽屉动画。
 - `web-reader.js` 阅读已保存网页。选中正文或已有标注可保存为研究笔记，笔记经 `webSource` 打开原文并定位摘录。

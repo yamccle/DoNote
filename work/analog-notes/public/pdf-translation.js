@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取 PDF 选区、框选识字结果、术语表与桌面翻译桥。
+ * [OUTPUT]: 提供文本规范化、整页/按段翻译桥及翻译与摘录侧栏 installPdfTranslationPanel。
+ * [POS]: 连接阅读器选区/识字与离线/在线翻译、批注保存、研究笔记保存及记录追加。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 function wellFormedText(value){
@@ -457,7 +463,8 @@ function installPdfTranslationPanel(session, panel, showPanel) {
   cancelQueued();
   session.translationController?.abort();
   session.translationKey = null;
-  session.translationSelection = null;
+  const trimmed = input.value.trim();
+  session.translationSelection = trimmed && session.translationSelection ? { ...session.translationSelection, quote: trimmed } : null;
   result.value = '';
   status.textContent = '原文已修改，可点击「本地翻译」或「在线翻译」。';
  };
@@ -521,6 +528,26 @@ function installPdfTranslationPanel(session, panel, showPanel) {
    rects: picked?.rects ?? []
   });
   if (mark) status.textContent = '译文已保存，可在「批注」查看。';
+ };
+ function currentExcerptPicked() {
+  const quote = input.value.trim();
+  if (!quote) { toast('请先选中文字或框选识字。'); return null; }
+  const base = session.translationSelection || session.picked;
+  const page = base?.page ?? session.page;
+  return { page, rects: base?.page === page ? (base?.rects ?? []) : [], quote };
+ }
+ panel.querySelector('#savePdfSelectionNote').onclick = async () => {
+  const picked = currentExcerptPicked();
+  if (!picked) return;
+  try { await savePdfExcerpt(session, picked); } catch (error) { toast(error.message); }
+ };
+ panel.querySelector('#appendPdfSelectionRecord').onclick = async () => {
+  const picked = currentExcerptPicked();
+  if (!picked) return;
+  try {
+   const id = await askPdfExcerptTarget();
+   if (id) await appendPdfExcerpt(session, picked, id);
+  } catch (error) { toast(error.message); }
  };
  refreshTranslateLanguageLabel();
  return {

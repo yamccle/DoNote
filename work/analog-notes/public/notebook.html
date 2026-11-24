@@ -323,6 +323,7 @@ $('backupBtn').onclick=()=>$('backup').showModal();function download(name,text,t
    <div class="reader-panel-tabs" role="tablist" aria-label="阅读侧栏">
     <button type="button" id="showPdfTranslation" data-pdf-panel-tab="translation" aria-controls="pdfTranslationZone" role="tab">翻译</button>
     <button type="button" id="showPdfAnnotations" data-pdf-panel-tab="annotations" aria-controls="pdfAnnotationsZone" role="tab">批注</button>
+    <button type="button" id="showPdfBacklinks" data-pdf-panel-tab="backlinks" aria-controls="pdfBacklinksZone" role="tab">引用</button>
     <button type="button" id="showReaderAi" data-pdf-panel-tab="ai" aria-controls="readerAiPanel" role="tab">AI 问答</button>
    </div>
    <section id="pdfTranslationZone" data-pdf-panel="translation" aria-labelledby="showPdfTranslation" role="tabpanel">
@@ -349,6 +350,8 @@ $('backupBtn').onclick=()=>$('backup').showModal();function download(name,text,t
       <button type="button" id="pdfLocalTranslate">本地翻译</button>
       <button type="button" id="pdfOnlineTranslate">在线翻译</button>
       <button type="button" id="savePdfTranslation">保存为批注</button>
+      <button type="button" id="savePdfSelectionNote">存为研究笔记</button>
+      <button type="button" id="appendPdfSelectionRecord">追加到记录</button>
      </div>
      <button type="button" id="pdfUseSelection" hidden>重新读取所选文字</button>
      <p id="pdfTranslationStatus" class="pdf-panel-help" role="status"></p>
@@ -374,6 +377,10 @@ $('backupBtn').onclick=()=>$('backup').showModal();function download(name,text,t
      </div>
     </div>
    </section>
+   <section id="pdfBacklinksZone" data-pdf-panel="backlinks" aria-labelledby="showPdfBacklinks" role="tabpanel" hidden>
+    <header class="pdf-panel-head"><h3>本文件被引用</h3><span class="tiny" id="pdfBacklinkCount"></span></header>
+    <div class="pdf-panel-scroll"><div id="pdfBacklinkList"></div></div>
+   </section>
   </aside>
  </div>
 </template>
@@ -386,7 +393,7 @@ $('backupBtn').onclick=()=>$('backup').showModal();function download(name,text,t
 <script src="presentation-preview.js"></script>
 <script src="library.js"></script><script src="video-player-learning.js"></script><script src="video-caption-overlay.js"></script><script src="video-translation-chooser.js"></script><script src="video-subtitles.js"></script><script src="video-frame-notes.js"></script><script src="reader-session.js"></script><script src="pdf-viewer.js"></script>
 <script src="import-progress.js"></script><script src="translate-lang.js"></script><script src="pdf-ocr.js"></script>
-<script src="pdf-lib.min.js"></script><script src="pdf-annotation-export.js"></script><script src="pdf-annotations.js"></script><script src="circuit-glossary.js"></script><script src="pdf-translation.js"></script><script src="pdf-research-notes.js"></script><script src="pdf-tools.js"></script>
+<script src="pdf-lib.min.js"></script><script src="pdf-annotation-export.js"></script><script src="pdf-annotations.js"></script><script src="circuit-glossary.js"></script><script src="pdf-translation.js"></script><script src="pdf-research-notes.js"></script><script src="pdf-backlinks.js"></script><script src="pdf-tools.js"></script>
 <script src="reader-ai.js"></script><script src="video-translation.js"></script><script src="mineru-reflow.js"></script><script src="pdf-preview-cache.js"></script><script src="pdf-page-comparison.js"></script><script src="pdf-reflow.js"></script>
 <script src="import-documents.js"></script>
 <script src="citation-engine.js"></script><script src="citation-tools.js"></script>

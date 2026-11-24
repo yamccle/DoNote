@@ -70,7 +70,7 @@ async function deleteTrashPermanently(ids){
  const workspaceKeys=[];
  for(const id of removedFiles){
   workspaceKeys.push(annotationKey(profileId,id),videoFrameNotesKey(profileId,id));
-  workspaceKeys.push(keyPrefixRange(galleryThumbnailPrefix(profileId,id)));
+  workspaceKeys.push(keyPrefixRange(galleryThumbnailPrefix(profileId,id)),keyPrefixRange(pdfIndexPrefix(profileId,id)));
  }
  const readingIds=new Set([...wanted,...removedFiles]);
  for(const id of readingIds)if(p.reading)delete p.reading[id];

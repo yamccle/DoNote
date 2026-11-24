@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取 PDF 页面画布、框选区域与离线 Tesseract worker。
+ * [OUTPUT]: 提供 recognizePdfRegion，将离线识别文本交给翻译/摘录侧栏并写入本机检索索引。
+ * [POS]: 扫描页与缺失文字层页面的离线识字入口，衔接 pdf-translation.js 与 pdf-search.js。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 // Offline OCR for scanned PDFs and pages with an unusable text layer.
 const pdfOcrWorkers = new Map();
 
@@ -50,8 +56,11 @@ async function recognizePdfRegion(session, pageBox, rect, pageNumber) {
   const picked = { page: pageNumber, quote, rects: [rect] };
   session.picked = picked;
   session.translationSelection = picked;
+  if (typeof savePdfOcrPageText === 'function') {
+   void savePdfOcrPageText(session.profileId, session.file.id, session.pdf?.numPages || pageNumber, pageNumber, quote).catch(() => {});
+  }
   await session.receiveOcrText?.(picked);
-  if (status) status.textContent = '已离线识别文字。可直接翻译，也可用「标注工具」添加高亮或批注；复杂公式请核对识别结果。';
+  if (status) status.textContent = '已离线识别文字并加入本机检索。可直接翻译、存为研究笔记或追加到记录；复杂公式请核对识别结果。';
  } catch (error) {
   session.ocrError = String(error?.message || error);
   if (readingSession === session && status) status.textContent = '离线识字失败：' + session.ocrError;

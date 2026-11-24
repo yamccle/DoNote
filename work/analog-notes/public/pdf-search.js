@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取 PDF 文档对象、IndexedDB workspace 分段缓存及框选识字文本。
+ * [OUTPUT]: 提供 buildPdfSearchIndex、readSearchIndex、savePdfOcrPageText、searchPdfIndex 与 installPdfFind。
+ * [POS]: 阅读器内查找、文献指标对比与全库全文检索共用的持久化页面文字索引层。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 // PDF 全文索引与检索：
 //  - 按需为每份 PDF 提取文本（页面定位），索引以 JSON blob 存进本机文件库；
@@ -7,6 +13,7 @@
 const PDF_INDEX_BATCH = 24;
 const SEARCH_BACKGROUND_COUNT = 3;
 const pdfIndexPrefix = (profileId, fileId) => 'pdf-index-v3/' + profileId + '/' + fileId + '/';
+const pdfOcrIndexKey = (profileId, fileId) => pdfIndexPrefix(profileId, fileId) + 'ocr';
 
 function pdfSearchCandidates() {
  return records.filter(note => note.attachments?.some(fileIsPdf));
@@ -14,20 +21,57 @@ function pdfSearchCandidates() {
 
 async function readPdfIndexSegments(fileId, profileId) {
  const tx = database.transaction('workspace');
- return reqResult(tx.objectStore('workspace').getAll(keyPrefixRange(pdfIndexPrefix(profileId, fileId))));
+ const items = await reqResult(tx.objectStore('workspace').getAll(keyPrefixRange(pdfIndexPrefix(profileId, fileId))));
+ return items.filter(item => Number.isInteger(item?.start));
+}
+
+async function readPdfOcrPages(fileId, profileId) {
+ const tx = database.transaction('workspace');
+ const stored = await reqResult(tx.objectStore('workspace').get(pdfOcrIndexKey(profileId, fileId)));
+ return stored && typeof stored === 'object' && stored.pages ? stored : null;
+}
+
+async function savePdfOcrPageText(profileId, fileId, totalPages, pageNumber, quote) {
+ const clean = normalizePdfTranslationText(quote || '').replace(/\s+/g, ' ').trim();
+ if (!clean || !Number.isInteger(pageNumber) || pageNumber < 1) return false;
+ const current = await readPdfOcrPages(fileId, profileId);
+ const pages = { ...(current?.pages || {}) };
+ const existing = String(pages[pageNumber] || '');
+ if (existing.includes(clean)) return true;
+ pages[pageNumber] = (existing ? existing + ' ' + clean : clean).slice(0, 40000);
+ return putWorkspaceForFile(profileId, fileId, pdfOcrIndexKey(profileId, fileId), {
+  totalPages: Math.max(Number(totalPages) || 0, Number(current?.totalPages) || 0, pageNumber),
+  pages
+ });
 }
 
 async function readSearchIndex(fileId, profileId) {
- const segments = (await readPdfIndexSegments(fileId, profileId)).sort((a,b) => a.start-b.start);
- if (!segments.length) return null;
- const totalPages = segments[0].totalPages;
+ const [rawSegments, ocr] = await Promise.all([
+  readPdfIndexSegments(fileId, profileId),
+  readPdfOcrPages(fileId, profileId)
+ ]);
+ const segments = rawSegments.sort((a,b) => a.start-b.start);
+ if (!segments.length && !ocr) return null;
+ const totalPages = segments[0]?.totalPages || ocr.totalPages || 0;
  const index = {totalPages, scannedPages:0, failedPages:[], emptyPages:[], pages:[]};
  for (const segment of segments) {
   if (segment.totalPages !== totalPages || segment.start !== index.scannedPages+1) break;
   index.scannedPages = segment.end;
   index.failedPages.push(...segment.failedPages);
   index.emptyPages.push(...segment.emptyPages);
-  index.pages.push(...segment.pages);
+  index.pages.push(...segment.pages.map(page => ({...page})));
+ }
+ if (ocr?.pages) {
+  const byPage = new Map(index.pages.map(page => [page.n, page]));
+  for (const [key, text] of Object.entries(ocr.pages)) {
+   const n = Number(key);
+   if (!Number.isInteger(n) || n < 1 || typeof text !== 'string' || !text.trim()) continue;
+   const entry = byPage.get(n);
+   if (entry) { if (!entry.text.includes(text)) entry.text = (entry.text + ' ' + text).slice(0, 60000); }
+   else { const created = {n, text}; byPage.set(n, created); index.pages.push(created); }
+  }
+  index.pages.sort((a,b) => a.n-b.n);
+  index.emptyPages = index.emptyPages.filter(n => !byPage.has(n));
  }
  return index;
 }
@@ -126,6 +170,9 @@ function installPdfFind(session,toc){
   indexController.abort();indexPromise=null;index=null;void run(true);
  };
  signal.addEventListener('abort',()=>indexController.abort(),{once:true});
+ document.addEventListener('workspace-search-file-updated',({detail})=>{
+  if(detail?.profileId===session.profileId&&detail?.fileId===session.file.id){index=null;indexPromise=null}
+ },{signal});
  const run=async(retry=false)=>{
   clearTimeout(timer);const current=++token,query=input.value.trim();results.replaceChildren();count.textContent='';
   if(!query){return}

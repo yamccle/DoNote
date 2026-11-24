@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 读取 IndexedDB 中当前工作台的记录和附件。
- * [OUTPUT]: 导出本机备份和可恢复的云端快照。
+ * [OUTPUT]: 提交记录状态并派发 workspace-records-changed，导出本机备份和可恢复的云端快照。
  * [POS]: 工作台数据入口，为桌面备份复用同一清单和附件。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -42,6 +42,7 @@ async function commitState(next,writes=[],deletions=[],workspaceDeletions=[]){
  };
  try{await done}catch(error){if(conflict)throw new Error('另一个窗口已修改资料，请刷新后再操作，避免覆盖记录。');throw storageError(error)}
  appState=next;records=activeProfile().records;
+ document.dispatchEvent(new CustomEvent('workspace-records-changed'));
 }
 async function putWorkspaceForFile(profileId,fileId,key,value){
  const tx=database.transaction(['workspace','files'],'readwrite'),done=transactionDone(tx);

@@ -2,7 +2,7 @@
 
 /**
  * [INPUT]: PDF 阅读会话和阅读器控件。
- * [OUTPUT]: 安装菜单、侧栏键盘导航和批注入口。
+ * [OUTPUT]: 安装菜单、侧栏键盘导航、批注与反向引用入口，暴露 session.showPdfPanel。
  * [POS]: 连接 PDF 阅读器的控件与当前会话。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -352,6 +352,7 @@ async function enhancePdfReader(session, bar, scroller) {
   await syncSidebarWidth(picked);
  }
 
+ session.showPdfPanel = mode => showPanel(mode, false);
  session.editTextMark = async mark => {
   await showPanel('annotations');
   if (!signal.aborted) side.querySelector('[data-annotation-id="' + mark.id + '"] textarea')?.focus();
@@ -428,7 +429,7 @@ async function enhancePdfReader(session, bar, scroller) {
   session.selectingText = false;
  }, {signal});
 
- renderPdfSidebar(session);
+ renderPdfSidebar(session); installPdfBacklinks(session, side);
  void loadPdfOutline(session, outline.querySelector('#pdfOutlineList'));
 }
 

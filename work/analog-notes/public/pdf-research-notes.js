@@ -1,4 +1,12 @@
+/**
+ * [INPUT]: 依赖阅读会话 readingSession、记录库 records/put/validate 与 openAttachment。
+ * [OUTPUT]: 提供 PDF 摘录的出处校验、保存、追加、摘录菜单、选区高亮 flashPdfRects 与详情「引用资料」。
+ * [POS]: 「阅读 → 摘录 → 记录」链的写入端。pdf-backlinks.js 读取这里写入的出处，从 PDF 一侧列出引用。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
+
+const PDF_EXCERPT_QUOTE_LIMIT=2000;
 
 function validPdfNoteSource(source){
  return source===undefined||(
@@ -6,11 +14,30 @@ function validPdfNoteSource(source){
   /^[a-zA-Z0-9-]{1,80}$/.test(source.fileId) &&
   Number.isInteger(source.page) && source.page>0 && source.page<=100000 &&
   typeof source.recordId==='string'&&typeof source.fileId==='string'&&typeof source.fileName==='string' && source.fileName.length<=500 &&
+  (source.quote===undefined||typeof source.quote==='string'&&source.quote.length<=PDF_EXCERPT_QUOTE_LIMIT) &&
   validPdfCoordinates(source.rects,4,500)
  );
 }
 
+// 出处只保留原文片段，正文仍由笔记自身保存。空片段不写字段，旧版本读取时保持兼容。
+function pdfExcerptQuote(picked){
+ const quote=String(picked?.quote||'').trim().slice(0,PDF_EXCERPT_QUOTE_LIMIT);
+ return quote?{quote}:{};
+}
+
+// 阅读器打开时，详情弹窗若已在底层打开需重入顶层，避免被阅读器遮挡。
+function showDetailFromReader(id){
+ if($('reader').open&&$('detail').open)$('detail').close();
+ showDetail(id);
+}
+
 async function openPdfEvidence(file,page,rects=[]){
+ if($('reader').open&&readingSession?.file.id===file.id){
+  if($('detail').open)$('detail').close();
+  await readingSession.showPage(page);
+  flashPdfRects(page,rects);
+  return;
+ }
  if($('reader').open){
   const closed=new Promise(resolve=>$('reader').addEventListener('close',resolve,{once:true}));
   $('reader').close();await closed;
@@ -18,8 +45,13 @@ async function openPdfEvidence(file,page,rects=[]){
  await openAttachment(file);
  if(readingSession?.file.id!==file.id)return;
  await readingSession.showPage(page);
+ flashPdfRects(page,rects);
+}
+
+function flashPdfRects(page,rects=[]){
  const box=$('pdfScroll')?.querySelector('[data-pdf-page="'+page+'"]');
  if(!box||!rects.length)return;
+ box.querySelector('.pdf-note-source-focus')?.remove();
  const layer=document.createElement('div');layer.className='pdf-note-source-focus';
  layer.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:5';
  for(const [x,y,w,h] of rects){
@@ -42,7 +74,7 @@ async function savePdfExcerpt(session,picked){
   body:['出处：'+owner.title+' · '+session.file.name+' · 第 '+picked.page+' 页',picked.quote].filter(Boolean).join('\n\n'),
   tags:['PDF 摘录'],date:today(),status:statusOptions.paper[0],pinned:false,
   relatedResources:owner.type==='resource'?[owner.id]:[],
-  pdfSource:{recordId:owner.id,fileId:session.file.id,fileName:session.file.name,page:picked.page,rects:picked.rects??[]},
+  pdfSource:{recordId:owner.id,fileId:session.file.id,fileName:session.file.name,page:picked.page,rects:picked.rects??[],...pdfExcerptQuote(picked)},
   attachments:[]
  };
  const writes=[];
@@ -54,7 +86,7 @@ async function savePdfExcerpt(session,picked){
  }
  if(profileId!==appState.activeId)throw new Error('工作台已切换。');
  await put(note,writes);
- const notice=()=>showDetail(note.id);
+ const notice=()=>showDetailFromReader(note.id);
  toast('摘录已保存为研究笔记',{label:'打开笔记',run:notice});
 }
 
@@ -91,7 +123,7 @@ function pdfExcerptSource(session,picked){
  const owner=records.find(note=>note.attachments?.some(file=>file.id===session.file.id));
  if(!owner)throw new Error('请先把 PDF 保存到当前工作台。');
  if(!picked?.quote&&!picked?.image&&!picked?.rects?.length)throw new Error('请先选中文字或框选图表。');
- const source={recordId:owner.id,fileId:session.file.id,fileName:session.file.name,page:picked.page,rects:picked.rects??[]};
+ const source={recordId:owner.id,fileId:session.file.id,fileName:session.file.name,page:picked.page,rects:picked.rects??[],...pdfExcerptQuote(picked)};
  if(!validPdfNoteSource(source))throw new Error('无法定位这段摘录。');
  return source;
 }
@@ -139,11 +171,13 @@ async function appendPdfExcerpt(session,picked,targetId){
  if(profileId!==appState.activeId)throw new Error('工作台已切换。');
  if(!validate(next))throw new Error('无法追加到这条记录。');
  await put(next,writes);
- toast('已追加到「'+latest.title+'」',{label:'打开记录',run:()=>showDetail(targetId)});
+ toast('已追加到「'+latest.title+'」',{label:'打开记录',run:()=>showDetailFromReader(targetId)});
 }
 
 function showPdfExcerptMenu(session,picked,clientX,clientY){
- const reader=$('reader'),menu=document.createElement('div');
+ const reader=$('reader'),menu=document.createElement('div'),dismiss=new AbortController(),{signal}=dismiss;
+ const close=()=>{dismiss.abort();menu.remove()};
+ session.controller?.signal.addEventListener('abort',close,{once:true});
  menu.className='pdf-selection-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','图表摘录');
  const actions=[
   ['保存为研究笔记',()=>savePdfExcerpt(session,picked)],
@@ -151,12 +185,14 @@ function showPdfExcerptMenu(session,picked,clientX,clientY){
  ];
  for(const [label,run] of actions){
   const button=document.createElement('button');button.type='button';button.setAttribute('role','menuitem');button.textContent=label;
-  button.onclick=async()=>{menu.remove();try{await run()}catch(error){toast(error.message)}};
+  button.onclick=async()=>{close();try{await run()}catch(error){toast(error.message)}};
   menu.append(button);
  }
  reader.append(menu);menu.hidden=false;
  menu.style.left=Math.max(8,Math.min(clientX||16,innerWidth-menu.offsetWidth-8))+'px';
  menu.style.top=Math.max(8,Math.min(clientY||64,innerHeight-menu.offsetHeight-8))+'px';
+ reader.addEventListener('pointerdown',event=>{if(!menu.contains(event.target))close()},{signal});
+ reader.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();close()}},{signal});
  menu.firstElementChild.focus();
 }
 
@@ -178,6 +214,12 @@ function renderPdfSourceLinks(note){
    try{await openPdfEvidence(file,source.page,source.rects);}catch(error){toast(error.message);}
   };
   body.append(button);
+  if(source!==note.pdfSource&&source.quote){
+   const quote=document.createElement('blockquote');
+   quote.className='pdf-evidence-quote';
+   quote.textContent=source.quote;
+   body.append(quote);
+  }
  }
  if(!sources.length&&note.researchLinks===undefined)return;
  const select=document.createElement('select'),label=document.createElement('label');

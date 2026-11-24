@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 读取本地 PDF Blob、离线 PDF.js 和阅读器会话。
- * [OUTPUT]: 打开 PDF，按需读取大文件的字节范围。
+ * [OUTPUT]: 打开 PDF，按需读取大文件的字节范围，并在页面挂载与关闭时通知叠层与释放资源。
  * [POS]: 桌面版同源加载 PDF.js 和 worker。便携 HTML 使用内联资源。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -339,9 +339,13 @@ function installPdfPageStack(session, toolbar, scroller) {
       await job.text.render();
       if (!isCurrent()) return;
       renderPdfMarks(session, slot, index + 1);
+      document.dispatchEvent(new CustomEvent('pdf-page-rendered', { detail: { session, slot, page: index + 1 } }));
     } catch (error) {
       if (!isCurrent()) return;
-      if (job.painted) renderPdfMarks(session, slot, index + 1);
+      if (job.painted) {
+        renderPdfMarks(session, slot, index + 1);
+        document.dispatchEvent(new CustomEvent('pdf-page-rendered', { detail: { session, slot, page: index + 1 } }));
+      }
       else slot.textContent = '此页显示失败：' + error.message;
     }
   }
@@ -554,7 +558,11 @@ function installPdfPageStack(session, toolbar, scroller) {
 
 function disposeReadingPdf(session) {
   const task = session.loadingTask;
+  const pdf = session.pdf;
   session.loadingTask = null;
+  session.pdf = null;
+  session.sourceBlob = null;
+  void pdf?.cleanup?.().catch(() => {});
   void task?.destroy().catch(() => {});
 }
 

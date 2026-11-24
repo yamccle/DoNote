@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收桌面发布包解压后的 workspace 目录。
- * [OUTPUT]: 验证总览、记录、长 PDF、摘录回跳与云备份消息流程。
+ * [OUTPUT]: 验证总览、记录、长 PDF、双向引用回跳、扫描页离线识字入索引与云备份消息流程。
  * [POS]: 发布回归入口。浏览器使用临时账户和本地模拟宿主。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { FIRST_PAGE_TEXT, LAST_PAGE_TEXT, writeLargePdf } from './large-pdf.mjs';
+import { testAppendPdfExcerpt, testPdfBacklinksAndScannedOcr, testWebExcerpt } from './workspace-excerpts.mjs';
 
 const MIB = 1024 ** 2;
 const PAGE_COUNT = 321;
@@ -716,108 +717,6 @@ async function testBackgroundSubtitles(page) {
   console.log('PASS background subtitles: range bytes, reopen progress, correct account, incremental translation from the first cue and IndexedDB persistence');
 }
 
-async function testWebExcerpt(page) {
-  const quote = '链上要找回的这一句摘录。';
-  await page.evaluate(async quoteText => {
-    const before = '锚点之前。';
-    const after = '锚点之后。';
-    const html = '<p>填充段落。</p>'.repeat(40) + '<p>' + before + quoteText + after + '</p>';
-    const fileId = crypto.randomUUID();
-    const recordId = crypto.randomUUID();
-    const blob = new Blob([html], { type: 'text/html' });
-    const capturedAt = new Date().toISOString();
-    await put({
-      id: recordId, type: 'resource', title: '出处网页', author: '', reference: '', url: '',
-      body: '', date: today(), tags: [], status: '待读', pinned: false,
-      attachments: [{ id: fileId, name: 'article.html', mime: 'text/html', size: blob.size, addedAt: capturedAt, webRole: 'article' }],
-      webArticle: { url: 'https://example.com/source', capturedAt },
-      updatedAt: capturedAt
-    }, [{ key: fileKey(appState.activeId, fileId), blob }]);
-    await saveWebExcerpt({
-      id: recordId, mode: 'article',
-      selection: { quote: quoteText, start: before.length, end: before.length + quoteText.length, before, after }
-    });
-    const note = records.find(item => item.webSource?.recordId === recordId);
-    if (!note || !validate(note)) throw new Error('excerpt note was not saved');
-    if (validate({ ...note, webSource: { recordId, quote: ' ', start: 0, end: 1, before: '', after: '' } })) throw new Error('blank quote passed validate');
-    const edited = { ...note };
-    delete edited.webSource;
-    await put(edited);
-    if (records.find(item => item.id === note.id)?.webSource?.quote !== quoteText) throw new Error('editor save dropped webSource');
-    showDetail(note.id);
-    if (![...document.querySelectorAll('#detailContent button')].some(button => button.textContent === '打开原文摘录')) throw new Error('detail has no source button');
-    await openWebEvidence(note.webSource);
-  }, quote);
-  await page.waitForFunction(quoteText => {
-    const article = document.querySelector('.web-reader-article');
-    const highlight = CSS.highlights?.get('web-article-focus');
-    const range = highlight ? [...highlight][0] : null;
-    return document.getElementById('reader')?.open && article?.textContent.includes(quoteText) && range?.toString() === quoteText;
-  }, quote);
-  console.log('PASS web excerpt: record keeps its source and jumps back to the quote');
-}
-
-async function testAppendPdfExcerpt(page) {
-  const saved = await page.evaluate(async () => {
-    const fileId = crypto.randomUUID();
-    const ownerId = crypto.randomUUID();
-    const issueId = crypto.randomUUID();
-    const dailyId = crypto.randomUUID();
-    const pdf = new Blob(['%PDF-1.1\n%%EOF'], { type: 'application/pdf' });
-    const image = new Blob([Uint8Array.from([137, 80, 78, 71])], { type: 'image/png' });
-    const capturedAt = new Date().toISOString();
-    await put({
-      id: ownerId, type: 'resource', title: 'SAR ADC 论文', author: '', reference: '', url: '',
-      body: '', date: today(), tags: [], status: '待读', pinned: false,
-      attachments: [{ id: fileId, name: 'sar-adc.pdf', mime: 'application/pdf', size: pdf.size, addedAt: capturedAt }]
-    }, [{ key: fileKey(appState.activeId, fileId), blob: pdf }]);
-    const base = { date: today(), pinned: false, attachments: [], author: '', reference: '', url: '' };
-    await put({ ...base, id: issueId, type: 'issue', title: '比较器失调', body: '待查', tags: [], status: '待排查' });
-    await put({ ...base, id: dailyId, type: 'journal', title: '普通日志', body: '今天开会', tags: [], status: '已记录', journalKind: 'daily' });
-    if (pdfExcerptTargets().some(item => item.id === dailyId)) throw new Error('plain journal was offered');
-    if (!pdfExcerptTargets().some(item => item.id === issueId)) throw new Error('issue was hidden');
-    const session = { file: { id: fileId, name: 'sar-adc.pdf' }, profileId: appState.activeId };
-    const picked = { page: 3, rects: [[0.1, 0.2, 0.4, 0.15]], quote: '图 4', image };
-    await appendPdfExcerpt(session, picked, issueId);
-    const issue = records.find(item => item.id === issueId);
-    if (!validate(issue) || issue.pdfEvidence?.[0]?.page !== 3 || issue.pdfEvidence[0].fileId !== fileId) throw new Error('evidence was not stored');
-    if (!issue.attachments.some(file => file.mime === 'image/png')) throw new Error('chart image was not attached');
-    const next = structuredClone(appState);
-    const folderId = folderFromImportPath(next.profiles.find(item => item.id === next.activeId), 'issue', ['设计夹']);
-    await commitState(next);
-    const current = records.find(item => item.id === issueId);
-    const edited = { ...current, folderId };
-    delete edited.pdfEvidence;
-    await put(edited);
-    const moved = records.find(item => item.id === issueId);
-    if (moved.folderId !== folderId || moved.pdfEvidence?.[0]?.fileId !== fileId) throw new Error('folder move dropped evidence');
-    showDetail(issueId);
-    const labeled = [...document.querySelectorAll('#detailContent h3')].some(node => node.textContent === '引用资料');
-    const button = [...document.querySelectorAll('#detailContent button')].some(node => node.textContent === '打开 sar-adc.pdf · 第 3 页');
-    if (!labeled || !button) throw new Error('source link missing');
-    const zip = new JSZip();
-    const owner = structuredClone(records.find(item => item.id === ownerId));
-    const issueCopy = structuredClone(moved);
-    owner.attachments[0].path = 'files/sar-adc.pdf';
-    delete owner.attachments[0].sha256;
-    zip.file(owner.attachments[0].path, pdf);
-    for (const file of issueCopy.attachments || []) {
-      file.path = 'files/' + file.id + '.png';
-      delete file.sha256;
-      zip.file(file.path, image);
-    }
-    const staged = await stageBackupRecords([owner, issueCopy], zip, { records: [] });
-    const newFileId = staged.find(entry => entry.note.id === ownerId).note.attachments[0].id;
-    const evidence = staged.find(entry => entry.note.id === issueId).note.pdfEvidence[0];
-    if (evidence.fileId !== newFileId || evidence.page !== 3 || evidence.rects[0][0] !== 0.1) throw new Error('backup did not keep the source selection');
-    return { issueId, fileId };
-  });
-  await page.reload();
-  await page.waitForFunction(() => typeof ready !== 'undefined' && ready);
-  assert.equal(await page.evaluate(saved => records.find(item => item.id === saved.issueId)?.pdfEvidence?.[0]?.fileId === saved.fileId, saved), true);
-  console.log('PASS pdf excerpt append: evidence survives folder move, reload and backup remap');
-}
-
 async function testCloudBackupUi(page) {
   await page.evaluate(() => {
     qaRelease.cloud = { settings: null, names: [], failUpload: true };
@@ -875,6 +774,7 @@ try {
   await testBackgroundSubtitles(page);
   await testWebExcerpt(page);
   await testAppendPdfExcerpt(page);
+  await testPdfBacklinksAndScannedOcr(page, resumeFixture, closeReader);
   // 网页阅读器的快照 iframe 故意沙箱隔离。浏览器会报告其中没有 Service Worker，这不是页面脚本错误。
   const sandboxedWorker = "Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.";
   assert.deepEqual(errors.filter(message => message !== sandboxedWorker), []);
