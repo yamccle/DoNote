@@ -1,6 +1,6 @@
 <#
 [INPUT]: 读取干净的 Git 提交、锁定的运行依赖包和旧版完整包。
-[OUTPUT]: 生成并验证 Windows 完整包、增量包和发布记录。
+[OUTPUT]: 生成 Windows 完整包、增量包和含云备份回归结果的发布记录。
 [POS]: 正式发布入口。验证在独立目录运行。
 [PROTOCOL]: Update this header on change, then check AGENTS.md
 #>
@@ -64,6 +64,8 @@ try {
     & (Join-Path $desktop 'make-update-patch.ps1') -Baseline $baseline -Target $stage -Destination $patch -BaseVersion $base.version -ReleaseVersion $Version
     & (Join-Path $stage 'ai-bridge/node.exe') (Join-Path $tests 'test-workspace.mjs') (Join-Path $stage 'workspace')
     if ($LASTEXITCODE -ne 0) { throw '工作台回归验证失败。' }
+    & (Join-Path $stage 'ai-bridge/node.exe') (Join-Path $tests 'test-cloud-backup.mjs')
+    if ($LASTEXITCODE -ne 0) { throw '云备份传输回归验证失败。' }
     & (Join-Path $tests 'test-release-update.ps1') -PreviousReleaseZip $previous -UpdateZip $patch
     & (Join-Path $desktop 'package-release.ps1') -Source $stage -Destination $full
 
@@ -75,7 +77,7 @@ try {
         baseVersion = $base.version
         previousArchiveSha256 = (Get-FileHash -LiteralPath $previous).Hash.ToLowerInvariant()
         provenance = $manifest.provenance
-        checks = @('workspace', 'upgrade-and-rollback', 'package-checksums')
+        checks = @('workspace', 'cloud-backup-transport', 'upgrade-and-rollback', 'package-checksums')
         artifacts = @(foreach ($item in $patch,$full) {
             @{ name = [IO.Path]::GetFileName($item); sha256 = (Get-FileHash -LiteralPath $item).Hash.ToLowerInvariant() }
         })

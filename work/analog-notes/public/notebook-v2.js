@@ -1,3 +1,9 @@
+/*
+ * [INPUT]: 读取 IndexedDB 中当前工作台的记录和附件。
+ * [OUTPUT]: 导出本机备份和可恢复的云端快照。
+ * [POS]: 工作台数据入口，为桌面备份复用同一清单和附件。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 // User-owned offline records and attachments are committed together.
 const DEFAULT_TOPICS=['运放','ADC','PLL','LDO','带隙基准','噪声','稳定性'];
@@ -360,7 +366,19 @@ function offlineIndex(backup){
 async function folderContents(includeData=true,options){
  // JSON remains fully self-contained when separated from the exported directory.
  const {backup,files}=await collectBackup(includeData,options);
- return [{path:'backup.json',blob:new Blob([JSON.stringify(backup)],{type:'application/json'})},{path:'离线阅读.html',blob:new Blob([offlineIndex(backup)],{type:'text/html;charset=utf-8'})},...files,...backup.records.map(n=>({path:'笔记/'+safeSegment(names[n.type]||n.type)+'/'+safeSegment(n.title)+'-'+n.id+'.md',blob:new Blob([markdown(n)],{type:'text/markdown;charset=utf-8'})}))];
+ if(options?.restoreOnly){
+  // 云端快照使用短路径。原文件名和类型仍记录在备份清单中。
+  let index=0;
+  for(const note of backup.records)for(const attachment of note.attachments||[]){
+   const path='files/'+(index+1)+'.bin';
+   files[index].path=path;
+   attachment.path=path;
+   index++;
+  }
+ }
+ const manifest={path:'backup.json',blob:new Blob([JSON.stringify(backup)],{type:'application/json'})};
+ if(options?.restoreOnly)return [manifest,...files];
+ return [manifest,{path:'离线阅读.html',blob:new Blob([offlineIndex(backup)],{type:'text/html;charset=utf-8'})},...files,...backup.records.map(n=>({path:'笔记/'+safeSegment(names[n.type]||n.type)+'/'+safeSegment(n.title)+'-'+n.id+'.md',blob:new Blob([markdown(n)],{type:'text/markdown;charset=utf-8'})}))];
 }
 async function withExport(button,action){if(!ensureReady())return;const original=button.textContent;button.disabled=true;button.textContent='正在整理…';$('importMessage').textContent='';try{await action()}catch(e){if(e.name!=='AbortError')$('importMessage').textContent=e.message}finally{button.disabled=false;button.textContent=original}}
 $('exportJson').onclick=()=>withExport($('exportJson'),async()=>{const {backup}=await collectBackup(true);downloadBlob('analog-notes-'+safeSegment(activeProfile().name)+'-'+today()+'.json',new Blob([JSON.stringify(backup)],{type:'application/json'}));toast('完整备份已导出，包含附件')});

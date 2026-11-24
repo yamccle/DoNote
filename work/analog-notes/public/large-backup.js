@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取经用户选择的备份目录。
+ * [OUTPUT]: 按原备份格式恢复记录和附件。
+ * [POS]: 供本地备份与已下载的云端备份共用。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 async function openLargeBackupFile(directory,path){
@@ -14,6 +20,7 @@ async function openLargeBackupFile(directory,path){
 }
 
 const restoreFolderButton=document.createElement('button');
+restoreFolderButton.id='restoreLargeBackupFolder';
 restoreFolderButton.type='button';
 restoreFolderButton.className='secondary';
 restoreFolderButton.textContent='从备份文件夹恢复';

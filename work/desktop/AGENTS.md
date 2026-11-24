@@ -8,6 +8,13 @@
 - `stage-runtime.ps1` 按运行依赖锁定文件核验旧包，只提取发布所需依赖。
 - `make-update-patch.ps1` 比较两个完整清单，生成已验证的增量 ZIP。
 - `UpdatePackage.cs` 校验文件路径、版本及内容。普通应用包拒绝模型文件。
+- `Program.cs` 为已验证来源的工作台消息选择 Windows 宿主服务。
+
+## 云备份
+
+- `LargeBackup.cs` 写入本机备份，并把已完成的快照交给云备份。
+- `CloudBackup.cs` 绑定系统选取的同步目录。保存 Windows 用户加密设置。
+- `CloudBackupTransport.cs` 传输版本化 ZIP 和完成标记。验证下载后解包。
 
 ## 开场动画
 
@@ -22,5 +29,10 @@
 
 - `desktop-settings.js` 将设置浮层挂到当前窗口。子菜单在可见控件之间移动焦点。退出设置时恢复原控件焦点。
 - `desktop-settings.css` 使用工作台主题和动画变量。系统减少动态效果时，设置浮层直接显示。
+
+## 云端备份
+
+- `desktop-large-backup.js` 为本地备份和云端快照暂存复用按块写入。
+- `desktop-cloud-backup.js` 配置备份目标并显示传输进度。下载完成后使用原有文件夹恢复。
 
 [PROTOCOL]: Update this header on change, then check AGENTS.md

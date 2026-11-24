@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收桌面发布包解压后的 workspace 目录。
- * [OUTPUT]: 验证总览、栏目工具栏、长 PDF、记录保存、网页摘录回跳与 PDF 摘录追加。
+ * [OUTPUT]: 验证总览、记录、长 PDF、摘录回跳与云备份消息流程。
  * [POS]: 发布回归入口。浏览器使用临时账户和本地模拟宿主。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -63,6 +63,26 @@ async function openWorkspace(browser) {
     window.qaRelease = { messages: [], post, reads: 0, bytes: 0 };
     webview.postMessage = message => {
       window.qaRelease.messages.push(message);
+      const cloud = window.qaRelease.cloud;
+      if (cloud && message?.type === 'cloud-backup') {
+        let result = {};
+        const { id, action } = message;
+        if (action === 'status') result = { settings: cloud.settings };
+        if (action === 'choose-folder') result = { folder: 'X:/My Drive/DoNote' };
+        if (action === 'configure') cloud.settings = { mode: message.mode, folder: message.folder };
+        if (action === 'list') result = { snapshots: cloud.names.map(name => ({ name })) };
+        if (action === 'upload') {
+          if (cloud.failUpload) result = { error: '测试传输失败' };
+          else cloud.names.push(message.name);
+        }
+        if (action === 'download') result = { path: 'X:/DoNote-Restore/' + message.name };
+        queueMicrotask(() => post({ type: 'cloud-backup-result', id, ...result }));
+        return;
+      }
+      if (cloud && typeof message?.type === 'string' && message.type.startsWith('native-backup-')) {
+        queueMicrotask(() => post({ type: 'native-backup-result', id: message.id }));
+        return;
+      }
       if (message === 'startup-ready') {
         queueMicrotask(() => post({ type: 'yams-one-preferences', splashEnabled: false }));
       }
@@ -798,6 +818,43 @@ async function testAppendPdfExcerpt(page) {
   console.log('PASS pdf excerpt append: evidence survives folder move, reload and backup remap');
 }
 
+async function testCloudBackupUi(page) {
+  await page.evaluate(() => {
+    qaRelease.cloud = { settings: null, names: [], failUpload: true };
+    $('backupBtn').click();
+  });
+  await page.locator('#cloudBackupOpen').click();
+  await page.locator('#cloudBackupChoose').click();
+  await page.locator('#cloudBackupSave').click();
+  await page.waitForFunction(() => !$('cloudBackupRun').disabled);
+  await page.locator('#cloudBackupRun').click();
+  await page.waitForFunction(() =>
+    $('cloudBackupMessage').textContent === '测试传输失败' && !$('cloudBackupRun').disabled);
+  assert.equal(await page.locator('#cloudBackupList').locator('option').count(), 1);
+  const attempted = await page.evaluate(() => {
+    qaRelease.cloud.failUpload = false;
+    return qaRelease.messages.filter(message => typeof message === 'object');
+  });
+  const types = attempted.map(message => message.type === 'cloud-backup' ? message.action : message.type);
+  const manifest = attempted.findLastIndex(message =>
+    message.type === 'native-backup-file-start' && message.path === 'backup.json');
+  const finalFile = types.lastIndexOf('native-backup-file-start');
+  assert.ok(manifest >= 0 && manifest === finalFile, '备份清单应最后写入');
+  assert.ok(types.indexOf('stage') < types.indexOf('native-backup-start'));
+  assert.ok(types.indexOf('native-backup-finish') < types.indexOf('upload'));
+  assert.ok(types.indexOf('upload') < types.indexOf('discard'));
+  await page.locator('#cloudBackupRun').click();
+  await page.waitForFunction(() =>
+    /确认上传完成/.test($('cloudBackupMessage').textContent) && !$('cloudBackupDownload').disabled);
+  await page.locator('#cloudBackupDownload').click();
+  await page.waitForFunction(() => /已下载并通过校验/.test($('cloudBackupMessage').textContent));
+  assert.match(await page.locator('#cloudBackupDownloaded').textContent(), /DoNote-Restore/);
+  await page.locator('#cloudBackupDialog [data-close]').click();
+  await page.locator('#backup [data-close]').first().click();
+  await page.evaluate(() => { delete qaRelease.cloud; });
+  console.log('PASS 云备份界面：目标设置、清单最后写入、上传失败与重试、下载和恢复入口。');
+}
+
 const { chromium } = playwright();
 const browserPath = process.env.DONOTE_BROWSER_EXECUTABLE;
 const channel = process.env.DONOTE_BROWSER_CHANNEL ?? 'msedge';
@@ -810,6 +867,7 @@ try {
   browser = await chromium.launch({ headless: true, ...(browserPath ? { executablePath: browserPath } : channel ? { channel } : {}) });
   const { page, errors } = await openWorkspace(browser);
   await testWorkspaceNavigation(page, resumeFixture);
+  await testCloudBackupUi(page);
   await testLongPdf(page, fixture);
   await testRecordEditor(page);
   await testDraft(page);

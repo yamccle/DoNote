@@ -16,6 +16,8 @@
 - `record-editor.css` 布置类型选择器和记录编辑器。附件与关联资料集中于正文前。
 - `library.js` 在展开关联资料时生成候选列表。已选择的资料在收起后继续保留。
 - `reliability.js` 暂存记录草稿、计划日期、归档文件夹和附件。
+- `notebook-v2.js` 存取工作台记录与附件，并为本机备份和云端快照生成同一恢复清单。
+- `large-backup.js` 读取用户选择的快照目录，并调用统一恢复流程。
 - `workspace-navigation.js` 同步栏目的选中状态、历史和快捷导航焦点。
 - `workspace-context-menu.js` 提供工作台菜单和带版本校验的记录移动。
 - `record-folders.js` 验证目录树，提供路径和栏目筛选。

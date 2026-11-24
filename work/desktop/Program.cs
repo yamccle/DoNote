@@ -1,7 +1,7 @@
 /**
- * [INPUT]: 接收 WebView2 工作台消息和本机资料目录设置。
- * [OUTPUT]: 提供桌面窗口、工作台宿主和本机服务入口。
- * [POS]: 约束开屏动画对原生标题栏的占用时间，并保留窗口退出和资料访问入口。
+ * [INPUT]: 接收 Windows 窗口事件、本机资料目录设置和已验证来源的 WebView2 工作台消息。
+ * [OUTPUT]: 提供桌面窗口、工作台宿主，并将工作台请求交给翻译、云端备份、阅读和 AI 服务宿主。
+ * [POS]: 桌面程序入口，约束开屏动画对原生标题栏的占用时间并负责各原生服务的启停。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 using System;
@@ -76,6 +76,7 @@ internal sealed partial class WorkspaceWindow : Form
             StopLocalLlmTranslation();
             StopBilingualPairProcesses();
             StopNativeBackup(false);
+            StopCloudBackupTransfer();
             StopMinerUReflow();
             StopPdf2zh();
         };
@@ -317,6 +318,7 @@ internal sealed partial class WorkspaceWindow : Form
             if (await HandleVideoTranscribe(web, objectMessage)) return;
             if (await HandleDocumentTranslationMessage(web, objectMessage)) return;
             if (await HandleMinerUReflowMessage(web, objectMessage)) return;
+            if (await HandleCloudBackupMessage(web, objectMessage)) return;
             if (HandleLargeBackupMessage(web, objectMessage)) return;
             if (HandleAiModelMessage(web, args.WebMessageAsJson)) return;
             if (await HandleAiCredentialMessage(web, args.WebMessageAsJson)) return;

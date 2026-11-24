@@ -1,3 +1,9 @@
+/*
+ * [INPUT]: 接收目录授权和已分块的备份附件。
+ * [OUTPUT]: 在本机写入带清单的备份目录，并向云备份移交已完成快照。
+ * [POS]: 本机和云备份共用的原生写入器。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -34,6 +40,11 @@ internal sealed partial class WorkspaceWindow
         Guid requestId;
         if (!request.TryGetValue("id", out value) || !Guid.TryParse(value as string, out requestId)) return true;
         var id = requestId.ToString("D");
+        if (type == "native-backup-choose" && (cloudStage != null || cloudBackupCancellation != null))
+        {
+            PostWorkspaceMessage(web, new { type = "native-backup-result", id, error = "云备份进行中，请等待或取消该任务。" });
+            return true;
+        }
         try
         {
             if (type == "native-storage-space")
@@ -79,12 +90,16 @@ internal sealed partial class WorkspaceWindow
                 var folderName = request.TryGetValue("folderName", out value) ? Convert.ToString(value) : "";
                 if (!System.Text.RegularExpressions.Regex.IsMatch(folderName, @"\A[A-Za-z0-9._\-\u4e00-\u9fff ]{1,120}\z"))
                     throw new InvalidDataException("备份文件夹名称无效。");
+                var cloud = IsCloudBackupRoot(nativeBackupChosenRoot);
+                if (cloud && !CloudBackupTransport.ValidName(folderName))
+                    throw new InvalidDataException("云备份版本名称无效。");
                 var expected = request.TryGetValue("estimatedBytes", out value) ? Convert.ToInt64(value) : 0;
                 if (expected <= 0) throw new InvalidDataException("无法估算备份大小。");
                 var reserve = 512L * 1024 * 1024;
                 var free = AvailableBytes(nativeBackupChosenRoot);
-                if (free >= 0 && free < expected + reserve)
-                    throw new InvalidOperationException("目标磁盘空间不足。预计需要 " + SizeText(expected)
+                var required = checked(expected * (cloud ? 2L : 1L) + reserve);
+                if (free >= 0 && free < required)
+                    throw new InvalidOperationException("目标磁盘空间不足。预计需要 " + SizeText(required)
                         + "，当前可用 " + SizeText(free) + "。");
                 var chosenRoot = nativeBackupChosenRoot;
                 StopNativeBackup(false);
@@ -147,6 +162,7 @@ internal sealed partial class WorkspaceWindow
             {
                 if (nativeBackupStream != null) throw new InvalidOperationException("仍有备份文件未写完。");
                 var result = nativeBackupTarget;
+                RememberCompletedCloudBackup(result);
                 nativeBackupTarget = null;
                 nativeBackupChosenRoot = null;
                 PostWorkspaceMessage(web, new { type = "native-backup-result", id, path = result });
