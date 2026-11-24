@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收桌面发布包解压后的 workspace 目录。
- * [OUTPUT]: 验证总览、栏目工具栏、长 PDF、记录保存与网页摘录回跳。
+ * [OUTPUT]: 验证总览、栏目工具栏、长 PDF、记录保存、网页摘录回跳与 PDF 摘录追加。
  * [POS]: 发布回归入口。浏览器使用临时账户和本地模拟宿主。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -732,6 +732,67 @@ async function testWebExcerpt(page) {
   console.log('PASS web excerpt: record keeps its source and jumps back to the quote');
 }
 
+async function testAppendPdfExcerpt(page) {
+  const saved = await page.evaluate(async () => {
+    const fileId = crypto.randomUUID();
+    const ownerId = crypto.randomUUID();
+    const issueId = crypto.randomUUID();
+    const dailyId = crypto.randomUUID();
+    const pdf = new Blob(['%PDF-1.1\n%%EOF'], { type: 'application/pdf' });
+    const image = new Blob([Uint8Array.from([137, 80, 78, 71])], { type: 'image/png' });
+    const capturedAt = new Date().toISOString();
+    await put({
+      id: ownerId, type: 'resource', title: 'SAR ADC 论文', author: '', reference: '', url: '',
+      body: '', date: today(), tags: [], status: '待读', pinned: false,
+      attachments: [{ id: fileId, name: 'sar-adc.pdf', mime: 'application/pdf', size: pdf.size, addedAt: capturedAt }]
+    }, [{ key: fileKey(appState.activeId, fileId), blob: pdf }]);
+    const base = { date: today(), pinned: false, attachments: [], author: '', reference: '', url: '' };
+    await put({ ...base, id: issueId, type: 'issue', title: '比较器失调', body: '待查', tags: [], status: '待排查' });
+    await put({ ...base, id: dailyId, type: 'journal', title: '普通日志', body: '今天开会', tags: [], status: '已记录', journalKind: 'daily' });
+    if (pdfExcerptTargets().some(item => item.id === dailyId)) throw new Error('plain journal was offered');
+    if (!pdfExcerptTargets().some(item => item.id === issueId)) throw new Error('issue was hidden');
+    const session = { file: { id: fileId, name: 'sar-adc.pdf' }, profileId: appState.activeId };
+    const picked = { page: 3, rects: [[0.1, 0.2, 0.4, 0.15]], quote: '图 4', image };
+    await appendPdfExcerpt(session, picked, issueId);
+    const issue = records.find(item => item.id === issueId);
+    if (!validate(issue) || issue.pdfEvidence?.[0]?.page !== 3 || issue.pdfEvidence[0].fileId !== fileId) throw new Error('evidence was not stored');
+    if (!issue.attachments.some(file => file.mime === 'image/png')) throw new Error('chart image was not attached');
+    const next = structuredClone(appState);
+    const folderId = folderFromImportPath(next.profiles.find(item => item.id === next.activeId), 'issue', ['设计夹']);
+    await commitState(next);
+    const current = records.find(item => item.id === issueId);
+    const edited = { ...current, folderId };
+    delete edited.pdfEvidence;
+    await put(edited);
+    const moved = records.find(item => item.id === issueId);
+    if (moved.folderId !== folderId || moved.pdfEvidence?.[0]?.fileId !== fileId) throw new Error('folder move dropped evidence');
+    showDetail(issueId);
+    const labeled = [...document.querySelectorAll('#detailContent h3')].some(node => node.textContent === '引用资料');
+    const button = [...document.querySelectorAll('#detailContent button')].some(node => node.textContent === '打开 sar-adc.pdf · 第 3 页');
+    if (!labeled || !button) throw new Error('source link missing');
+    const zip = new JSZip();
+    const owner = structuredClone(records.find(item => item.id === ownerId));
+    const issueCopy = structuredClone(moved);
+    owner.attachments[0].path = 'files/sar-adc.pdf';
+    delete owner.attachments[0].sha256;
+    zip.file(owner.attachments[0].path, pdf);
+    for (const file of issueCopy.attachments || []) {
+      file.path = 'files/' + file.id + '.png';
+      delete file.sha256;
+      zip.file(file.path, image);
+    }
+    const staged = await stageBackupRecords([owner, issueCopy], zip, { records: [] });
+    const newFileId = staged.find(entry => entry.note.id === ownerId).note.attachments[0].id;
+    const evidence = staged.find(entry => entry.note.id === issueId).note.pdfEvidence[0];
+    if (evidence.fileId !== newFileId || evidence.page !== 3 || evidence.rects[0][0] !== 0.1) throw new Error('backup did not keep the source selection');
+    return { issueId, fileId };
+  });
+  await page.reload();
+  await page.waitForFunction(() => typeof ready !== 'undefined' && ready);
+  assert.equal(await page.evaluate(saved => records.find(item => item.id === saved.issueId)?.pdfEvidence?.[0]?.fileId === saved.fileId, saved), true);
+  console.log('PASS pdf excerpt append: evidence survives folder move, reload and backup remap');
+}
+
 const { chromium } = playwright();
 const browserPath = process.env.DONOTE_BROWSER_EXECUTABLE;
 const channel = process.env.DONOTE_BROWSER_CHANNEL ?? 'msedge';
@@ -750,6 +811,7 @@ try {
   await testFolderManagement(page);
   await testBackgroundSubtitles(page);
   await testWebExcerpt(page);
+  await testAppendPdfExcerpt(page);
   assert.deepEqual(errors, []);
 } finally {
   try { await browser?.close(); }

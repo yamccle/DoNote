@@ -278,7 +278,7 @@ function installPdfAnnotationTools(session, tools) {
  research.onclick=()=>openPdfResearchDialog(session.file.id);
  chart.onclick=()=>{
   setPdfDrawMode(session,session.drawMode==='excerpt'?'select':'excerpt');
-  $('markSaveStatus').textContent=session.drawMode==='excerpt'?'拖动框选图表，松开即保存为研究笔记。':'已退出框选。';
+  $('markSaveStatus').textContent=session.drawMode==='excerpt'?'拖动框选图表，松开后选择保存或追加。':'已退出框选。';
  };
  bindPdfAnnotationExports(session);
 }
@@ -324,7 +324,11 @@ function startPdfDrawing(event,session,pad,pageNumber){
   }
   if(mode==='excerpt'){
    setPdfDrawMode(session,'select');
-   void savePdfChartRegion(session,box,rectangle(point(e)),pageNumber).catch(error=>toast(error.message));
+   const rect=rectangle(point(e));
+   void capturePdfChart(session,box,rect,pageNumber).then(picked=>{
+    if(!picked||readingSession!==session)return;
+    showPdfExcerptMenu(session,picked,e.clientX,e.clientY);
+   }).catch(error=>toast(error.message));
   }
   if(mode==='ocr'){
    const rect=rectangle(point(e));

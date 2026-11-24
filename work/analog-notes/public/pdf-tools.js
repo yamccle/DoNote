@@ -81,6 +81,7 @@ function installPdfSelectionMenu(session,scroller,actions){
   ['删除线',()=>actions.mark('strike'),'strike'],
   ['添加批注',()=>actions.mark('comment')],
   ['保存为研究笔记',picked=>savePdfExcerpt(session,picked)],
+  ['追加到已有记录',async picked=>{const id=await askPdfExcerptTarget();if(id)await appendPdfExcerpt(session,picked,id)}],
   ['复制',async picked=>{await navigator.clipboard.writeText(picked.quote);toast('已复制所选文字')}],
   ['询问 AI',picked=>actions.ask(picked)]
  ];

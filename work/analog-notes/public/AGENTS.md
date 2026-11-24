@@ -28,7 +28,8 @@
 - `workspace-dialogs.js` 按浮窗实例恢复当前草稿，并保留滚动位置。
 - `design-system.css` 提供主题颜色、焦点和通用浮窗动画。
 - `theme.css` 提供页面布局、浮窗遮罩和整页编辑器的主题颜色。
-- `pdf-tools.js` 定位阅读器工具菜单，处理工具菜单与侧栏标签的键盘焦点。
+- `pdf-tools.js` 定位阅读器工具菜单，处理工具菜单与侧栏标签的键盘焦点。选中文字或框选图表后，可新建研究笔记，或追加到设计问题与仿真记录。
+- `pdf-research-notes.js` 把摘录写进目标记录的 `pdfEvidence`。详情「引用资料」按页码和选区打开原 PDF。
 - `pdf-annotations.js` 和 `pdf-reflow.js` 为标注与排版菜单复用阅读器控制。
 - `reader-toolbar.css` 和 `reader-panels.css` 限定工具菜单和抽屉动画。
 - `web-reader.js` 阅读已保存网页。选中正文或已有标注可保存为研究笔记，笔记经 `webSource` 打开原文并定位摘录。

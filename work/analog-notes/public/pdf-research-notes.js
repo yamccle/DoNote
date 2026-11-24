@@ -58,23 +58,117 @@ async function savePdfExcerpt(session,picked){
  toast('摘录已保存为研究笔记',{label:'打开笔记',run:notice});
 }
 
-async function savePdfChartRegion(session,box,[x,y,w,h],page){
+ async function savePdfChartRegion(session,box,[x,y,w,h],page){
+ const picked=await capturePdfChart(session,box,[x,y,w,h],page);
+ if(!picked||readingSession!==session)return;
+ await savePdfExcerpt(session,picked);
+}
+
+async function capturePdfChart(session,box,[x,y,w,h],page){
  const source=box.querySelector('canvas');
- if(!source||w<.008||h<.008)return;
+ if(!source||w<.008||h<.008)return null;
  const width=source.width*w,height=source.height*h,scale=Math.min(1,2200/Math.max(width,height));
  const crop=document.createElement('canvas');
  crop.width=Math.max(1,Math.round(width*scale));crop.height=Math.max(1,Math.round(height*scale));
  crop.getContext('2d').drawImage(source,source.width*x,source.height*y,width,height,0,0,crop.width,crop.height);
  const image=await new Promise(resolve=>crop.toBlob(resolve,'image/png'));
  if(!image)throw new Error('无法截取图表。');
- if(readingSession!==session)return;
- await savePdfExcerpt(session,{page,rects:[[x,y,w,h]],image});
+ return {page,rects:[[x,y,w,h]],image};
+}
+
+function pdfExcerptTarget(note){
+ if(!note)return false;
+ if(note.type==='issue')return true;
+ if(!['journal','study'].includes(note.type))return false;
+ return /仿真/.test([note.title,...(note.tags||[]),note.body].filter(Boolean).join('\n'));
+}
+
+function pdfExcerptTargets(){
+ return records.filter(pdfExcerptTarget).slice(0,100);
+}
+
+function pdfExcerptSource(session,picked){
+ const owner=records.find(note=>note.attachments?.some(file=>file.id===session.file.id));
+ if(!owner)throw new Error('请先把 PDF 保存到当前工作台。');
+ if(!picked?.quote&&!picked?.image&&!picked?.rects?.length)throw new Error('请先选中文字或框选图表。');
+ const source={recordId:owner.id,fileId:session.file.id,fileName:session.file.name,page:picked.page,rects:picked.rects??[]};
+ if(!validPdfNoteSource(source))throw new Error('无法定位这段摘录。');
+ return source;
+}
+
+function askPdfExcerptTarget(){
+ const targets=pdfExcerptTargets();
+ if(!targets.length)throw new Error('没有可追加的设计问题或仿真记录。');
+ const reader=$('reader'),panel=document.createElement('div');
+ panel.className='pdf-selection-menu';panel.setAttribute('role','group');panel.setAttribute('aria-label','追加到已有记录');
+ const select=document.createElement('select');
+ select.setAttribute('aria-label','选择设计问题或仿真记录');
+ select.add(new Option('选择设计问题或仿真记录…',''));
+ for(const item of targets)select.add(new Option(item.title,item.id));
+ const go=document.createElement('button'),cancel=document.createElement('button');
+ go.type=cancel.type='button';go.textContent='追加';cancel.textContent='取消';
+ panel.append(select,go,cancel);reader.append(panel);
+ panel.hidden=false;panel.style.left='16px';panel.style.top='64px';
+ select.focus();
+ return new Promise(resolve=>{
+  const finish=value=>{panel.remove();resolve(value)};
+  cancel.onclick=()=>finish(null);
+  go.onclick=()=>{if(select.value)finish(select.value)};
+  panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();finish(null)}});
+ });
+}
+
+async function appendPdfExcerpt(session,picked,targetId){
+ const source=pdfExcerptSource(session,picked);
+ const profileId=session.profileId??appState.activeId;
+ const latest=records.find(item=>item.id===targetId);
+ if(!latest||!pdfExcerptTarget(latest))throw new Error('请选择设计问题或仿真记录。');
+ const evidence=[...(latest.pdfEvidence||[])];
+ if(evidence.length>=240)throw new Error('这条记录的引用已达上限。');
+ const same=evidence.some(item=>item.fileId===source.fileId&&item.page===source.page&&JSON.stringify(item.rects)===JSON.stringify(source.rects));
+ const next={...latest,pdfEvidence:same?evidence:[...evidence,source]};
+ const writes=[];
+ if(picked.image&&!same){
+  const id=crypto.randomUUID();
+  next.attachments=[...(latest.attachments||[]),{id,name:'第 '+picked.page+' 页图表.png',mime:'image/png',size:picked.image.size,addedAt:new Date().toISOString()}];
+  const html=typeof latest.bodyHtml==='string'?latest.bodyHtml:esc(latest.body||'').replace(/\n/g,'<br>');
+  next.bodyHtml=html+'<span class="inline-media" data-image-id="'+id+'" data-width="85" data-align="center"></span>';
+  writes.push({key:fileKey(profileId,id),blob:picked.image});
+  validateInlineReferences(next);
+ }
+ if(profileId!==appState.activeId)throw new Error('工作台已切换。');
+ if(!validate(next))throw new Error('无法追加到这条记录。');
+ await put(next,writes);
+ toast('已追加到「'+latest.title+'」',{label:'打开记录',run:()=>showDetail(targetId)});
+}
+
+function showPdfExcerptMenu(session,picked,clientX,clientY){
+ const reader=$('reader'),menu=document.createElement('div');
+ menu.className='pdf-selection-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','图表摘录');
+ const actions=[
+  ['保存为研究笔记',()=>savePdfExcerpt(session,picked)],
+  ['追加到已有记录',async()=>{const id=await askPdfExcerptTarget();if(id)await appendPdfExcerpt(session,picked,id)}]
+ ];
+ for(const [label,run] of actions){
+  const button=document.createElement('button');button.type='button';button.setAttribute('role','menuitem');button.textContent=label;
+  button.onclick=async()=>{menu.remove();try{await run()}catch(error){toast(error.message)}};
+  menu.append(button);
+ }
+ reader.append(menu);menu.hidden=false;
+ menu.style.left=Math.max(8,Math.min(clientX||16,innerWidth-menu.offsetWidth-8))+'px';
+ menu.style.top=Math.max(8,Math.min(clientY||64,innerHeight-menu.offsetHeight-8))+'px';
+ menu.firstElementChild.focus();
 }
 
 function renderPdfSourceLinks(note){
  const body=$('detailContent');
- const source=note.pdfSource;
- for(const source of [note.pdfSource,...(note.pdfEvidence||[])].filter(source=>source&&validPdfNoteSource(source))){
+ const sources=[note.pdfSource,...(note.pdfEvidence||[])].filter(item=>item&&validPdfNoteSource(item));
+ if(sources.length){
+  const heading=document.createElement('h3');
+  heading.textContent='引用资料';
+  body.append(heading);
+ }
+ for(const source of sources){
   const button=document.createElement('button');
   button.type='button';button.className='secondary';
   button.textContent='打开 '+source.fileName+' · 第 '+source.page+' 页';
@@ -85,7 +179,7 @@ function renderPdfSourceLinks(note){
   };
   body.append(button);
  }
- if(!source&&!note.pdfEvidence?.length&&note.researchLinks===undefined)return;
+ if(!sources.length&&note.researchLinks===undefined)return;
  const select=document.createElement('select'),label=document.createElement('label');
  label.textContent='关联设计问题或仿真记录 ';
  select.add(new Option('选择记录…',''));
