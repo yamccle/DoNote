@@ -50,6 +50,8 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 
 ### 模型包（不在 Git，发布用）
 
+> GitHub Release：`models-2026-11-23`（13 个分卷，每个约 700 MB，含拼接说明与 SHA256SUMS.txt）。内层 `DoNote-Models-x64-2026-11-23.zip` 的 SHA-256 为 `ca4eb5ce…c7cb6`。
+
 | 文件 | 说明 |
 | --- | --- |
 | `outputs/DoNote-Models-x64-2026-11-23.zip`（9.25 GB） | 修复版安装器，模型文件与旧包一致 |

@@ -26,7 +26,7 @@ DoNote 是一个 Windows 桌面端的研究工作台：把网页、PDF、图片�
 
 运行要求：Windows 10 / 11 x64。解压后双击 `DoNote.exe`。
 
-> 模型包（语音识别 + 本地大模型翻译，约 9.25 GB）超出 GitHub Release 单文件上限，不放在本仓库；获取方式见下方「模型」。
+> 模型包（语音识别 + 本地大模型翻译，约 9.25 GB）以 **13 个分卷** 的形式放在 [models-2026-11-23 Release](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)（每个分卷约 700 MB），下载后按 Release 说明拼接、解压并运行 `安装模型.cmd`。
 
 ## 安装与升级
 
@@ -38,7 +38,7 @@ DoNote 是一个 Windows 桌面端的研究工作台：把网页、PDF、图片�
 
 | 用途 | 获取方式 |
 | --- | --- |
-| 语音识别（faster-whisper：base / small / large-v3-turbo / large-v3） | 首次使用时自动下载，默认走 `hf-mirror.com`；可用 `DONOTE_HF_ENDPOINT` 换源（`official` 表示官方地址），也可手动放入 `models\asr\<模型名>` |
+| 语音识别（faster-whisper：base / small / large-v3-turbo / large-v3） | 首次使用时自动下载，默认走 `hf-mirror.com`；可用 `DONOTE_HF_ENDPOINT` 换源（`official` 表示官方地址），也可手动放入 `models\asr\<模型名>`，或使用 [模型包分卷](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23) |
 | 本地大模型翻译（Qwen3 4B / 1.7B / 0.6B，GGUF） | 按 [本地离线翻译模型说明](work/desktop/本地离线翻译模型说明.md) 的链接下载后放入 `models\translation`，或安装模型包 |
 | 离线字幕英译中（内置小模型） | 随安装包自带 |
 
