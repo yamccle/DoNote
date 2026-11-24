@@ -2,7 +2,13 @@
 
 > L2 | 项目规则来自工作区 AGENTS.md。
 
-- `notebook.html` 装配工作台、记录类型选择和记录编辑器。
+- `notebook.html` 装配主页、栏目工具栏与记录编辑器。
+- `workspace-home.js` 从保存的附件位置和计划生成主页首屏。
+- `reader-session.js` 从附件检查点恢复阅读位置。多附件资料使用该附件的阅读完成状态。
+- `workspace-home.css` 布置继续阅读、近期计划和主页组件。
+- `workspace-toolbar.js` 重用搜索、栏目筛选和菜单动作，按当前栏目排列。
+- `workspace-toolbar.css` 布置栏目的主操作和响应式菜单。
+- `workspace-layout.css` 布置标题、主页侧栏及记录列表。
 - `categories.js` 为导航和编辑器同步当前工作台的栏目与类型名称。
 - `record-editor.js` 按当前栏目选择新建路径。编辑器切换类型时保留已填写的正文与计划日期。
 - `plans.js` 提供计划日期和周期字段，切换类型时由编辑器决定是否初始化日期。

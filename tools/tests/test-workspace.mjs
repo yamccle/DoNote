@@ -1,11 +1,11 @@
 /**
  * [INPUT]: 接收桌面发布包解压后的 workspace 目录。
- * [OUTPUT]: 验证长 PDF、后台字幕、新建记录、草稿、附件与文件夹。
+ * [OUTPUT]: 验证总览、栏目工具栏、长 PDF 与记录保存。
  * [POS]: 发布回归入口。浏览器使用临时账户和本地模拟宿主。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 import assert from 'node:assert/strict';
-import { access, mkdtemp, rmdir, unlink } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rmdir, unlink } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
@@ -142,6 +142,127 @@ async function testLongPdf(page, fixture) {
 async function closeReader(page) {
   await page.locator('#reader [data-close="reader"]').click();
   await page.waitForFunction(() => !document.getElementById('reader').open && !readingSession);
+}
+
+async function testWorkspaceNavigation(page, fixture) {
+  const pdf = Array.from(await readFile(fixture));
+  const seeded = await page.evaluate(async bytes => {
+    const date = today();
+    const record = { date, body: '', tags: [], attachments: [] };
+    const blob = new Blob([new Uint8Array(bytes)], { type: 'application/pdf' });
+    const files = ['旧的阅读位置.pdf', '继续阅读目标.pdf', '已经读完.pdf'].map(name => ({
+      id: crypto.randomUUID(), name, mime: blob.type, size: blob.size, addedAt: new Date().toISOString()
+    }));
+    const profileId = appState.activeId;
+    const article = await put({
+      ...record, id: crypto.randomUUID(), type: 'resource', title: '混合附件阅读记录',
+      status: '已读', attachments: files
+    }, files.map(file => ({ key: fileKey(profileId, file.id), blob })));
+    const plan = await put({
+      ...record, id: crypto.randomUUID(), type: 'plan', title: '尚待推进的计划',
+      planStart: date, planEnd: date, status: '进行中'
+    });
+    const archived = await put({
+      ...record, id: crypto.randomUUID(), type: 'plan', title: '已归档的计划',
+      planStart: date, planEnd: date, status: '已完成'
+    });
+    const daily = await put({
+      ...record, id: crypto.randomUUID(), type: 'journal', title: '发布回归日常记录', status: '已记录'
+    });
+    const weekly = await put({
+      ...record, id: crypto.randomUUID(), type: 'journal', title: '发布回归周报记录',
+      status: '已记录', journalKind: 'weekly'
+    });
+    const next = structuredClone(appState);
+    const profile = next.profiles.find(entry => entry.id === profileId);
+    const openedAt = delta => new Date(Date.now() + delta).toISOString();
+    const position = { kind: 'pdf', page: 1, pages: 3, lastOpened: openedAt(-2000) };
+    profile.reading[files[0].id] = { ...position, lastOpened: openedAt(-1000) };
+    profile.reading[files[1].id] = { ...position, page: 2 };
+    profile.reading[files[2].id] = { ...position, page: 3, finished: true, lastOpened: openedAt(500) };
+    profile.reading[article.id] = profile.reading[files[2].id];
+    await commitState(next);
+    storeReadingCheckpoint(profileId, files[1].id, { ...position, page: 3, lastOpened: openedAt(0) });
+    return {
+      articleId: article.id, fileId: files[1].id, planId: plan.id,
+      archivedId: archived.id, dailyId: daily.id, weeklyId: weekly.id
+    };
+  }, pdf);
+
+  // 刷新工作台，确认总览读取持久化位置，而非当前预览的内存状态。
+  await page.reload();
+  await page.waitForFunction(() => ready);
+  const home = page.locator('#workspaceHome');
+  await home.waitFor();
+  const resume = home.locator(`#homeResume [data-home-resume="${seeded.articleId}"][data-home-file="${seeded.fileId}"]`);
+  const plan = home.locator(`#homePlans [data-home-plan="${seeded.planId}"]`);
+  await plan.waitFor();
+  assert.equal(await home.locator(`[data-home-plan="${seeded.archivedId}"]`).count(), 0);
+  await resume.click();
+  await page.waitForFunction(({ fileId, text }) => readingSession?.file.id === fileId && readingSession.page === 3 &&
+    readingSession.pageBox?.querySelector('.pdf-text-layer')?.textContent.includes(text), {
+    fileId: seeded.fileId, text: LAST_PAGE_TEXT
+  });
+  assert.equal(await page.evaluate(() => readingSession.progress.finished), false, '完成状态以实际打开的附件为准');
+  await closeReader(page);
+
+  const viewport = page.viewportSize();
+  const search = page.locator('#search');
+  const filters = page.locator('#workspaceFiltersToggle');
+  const more = page.locator('#workspaceMoreToggle');
+  const insideWindow = selector => page.locator(selector).evaluate(button => {
+    const { left, right, width, height } = button.getBoundingClientRect();
+    return width > 0 && height > 0 && left >= 0 && right <= innerWidth;
+  });
+  const recordRow = id => page.locator(`#records .card[data-id="${id}"]`);
+  await page.setViewportSize({ width: 400, height: 600 });
+  try {
+    await page.locator('[data-rail-view="journal"]').click();
+    assert.equal(await home.isVisible(), false, '工作日志不应展示总览组件');
+    assert.equal(await page.locator('.workspace > aside').isVisible(), false, '普通栏目不应留出通用侧栏');
+    for (const selector of ['#search', '#workspaceFiltersToggle', '#workWeeklyBtn', '#workspaceMoreToggle']) {
+      assert.equal(await insideWindow(selector), true, selector + ' 应留在窄窗口内');
+    }
+    await page.keyboard.press('Control+f');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'search');
+    await search.fill('日常记录');
+    await recordRow(seeded.dailyId).waitFor();
+    assert.equal(await recordRow(seeded.weeklyId).count(), 0);
+    await search.clear();
+    await recordRow(seeded.weeklyId).waitFor();
+
+    await filters.click();
+    await page.locator('#workspaceFilters #weeklyOnly').check();
+    await recordRow(seeded.dailyId).waitFor({ state: 'hidden' });
+    assert.equal(await recordRow(seeded.weeklyId).isVisible(), true);
+    assert.match(await filters.innerText(), /1/, '应显示启用的筛选数量');
+    await page.keyboard.press('Escape');
+    await more.click();
+    await page.locator('#workspaceMore #openPdfSearch').waitFor();
+    await page.locator('#workspaceMore #openFolderManager').waitFor();
+    await page.keyboard.press('Escape');
+
+    await page.locator('[data-rail-view="plan"]').click();
+    const archive = page.locator('#planArchiveToggle');
+    await archive.click();
+    await recordRow(seeded.archivedId).waitFor();
+    assert.equal(await recordRow(seeded.planId).count(), 0);
+    await archive.click();
+    await recordRow(seeded.planId).waitFor();
+
+    await page.locator('[data-rail-view="resource"]').click();
+    for (const selector of ['#search', '#libraryAddToggle', '#libraryFiltersToggle', '#libraryMoreToggle', '#librarySelection']) {
+      assert.equal(await insideWindow(selector), true, selector + ' 应留在资料库窄窗口内');
+    }
+    await page.locator('#libraryMoreToggle').click();
+    await page.locator('#libraryMore #openPdfSearch').waitFor();
+    await page.keyboard.press('Escape');
+  } finally {
+    await page.setViewportSize(viewport);
+  }
+  await page.locator('[data-rail-view="all"]').click();
+  await home.waitFor();
+  console.log('PASS workspace navigation: exact reading resume, active plans, compact controls, scoped filters and keyboard search');
 }
 
 async function testRecordEditor(page) {
@@ -419,6 +540,7 @@ async function testFolderManagement(page) {
     assert.deepEqual(stored, { parents: [ids.destination, ids.source, ids.source], title: recordTitle, folderId: ids.child, bytes });
 
     await page.locator('[data-rail-view="journal"]').click();
+    await page.locator('#workspaceMoreToggle').click();
     await page.locator('#openFolderManager').click();
     await folderRow(ids.journal).waitFor();
     assert.equal(await folderRow(ids.source).count(), 0, '日志栏目应只管理自己的文件夹');
@@ -574,11 +696,13 @@ const browserPath = process.env.DONOTE_BROWSER_EXECUTABLE;
 const channel = process.env.DONOTE_BROWSER_CHANNEL ?? 'msedge';
 const directory = await mkdtemp(join(tmpdir(), 'donote-release-workspace-'));
 const fixture = join(directory, 'long-range-document.pdf');
+const resumeFixture = join(directory, 'resume-document.pdf');
 let browser;
 try {
-  await writeLargePdf(fixture, PAGE_COUNT, pdfMib * MIB);
+  await Promise.all([writeLargePdf(fixture, PAGE_COUNT, pdfMib * MIB), writeLargePdf(resumeFixture, 3, 0)]);
   browser = await chromium.launch({ headless: true, ...(browserPath ? { executablePath: browserPath } : channel ? { channel } : {}) });
   const { page, errors } = await openWorkspace(browser);
+  await testWorkspaceNavigation(page, resumeFixture);
   await testLongPdf(page, fixture);
   await testRecordEditor(page);
   await testDraft(page);
@@ -588,7 +712,8 @@ try {
 } finally {
   try { await browser?.close(); }
   finally {
-    await unlink(fixture).catch(error => { if (error.code !== 'ENOENT') throw error; });
+    await Promise.all([fixture, resumeFixture].map(path =>
+      unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; })));
     await rmdir(directory);
   }
 }

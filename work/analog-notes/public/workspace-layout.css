@@ -1,4 +1,9 @@
-/* The workbench uses rows and separators for information that is read in order. */
+/**
+ * [INPUT]: 读取工作台栏目、主题颜色和窗口宽度。
+ * [OUTPUT]: 布置标题、侧栏、组件和记录列表。
+ * [POS]: 各栏目共用的页面布局。主页与栏目工具栏各自覆盖局部样式。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 .intro {
   align-items: baseline;
   gap: 12px 24px;
@@ -23,7 +28,14 @@
   white-space: nowrap;
 }
 .intro [hidden], .section-heading[hidden] {display: none}
-main[data-view]:not([data-view="all"]) .date-block {display: none}
+.workspace-intro-actions {display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px}
+main:not([data-view="all"]) .workspace-intro-actions {display:none}
+main[data-view]:not([data-view="all"]) {padding-block-start:var(--space-4)}
+main[data-view]:not([data-view="all"]) #workspaceIntro {padding-block-end:9px;margin-block-end:10px}
+main[data-view]:not([data-view="all"]) #pageTitle {font-size:clamp(1.25rem,1.18rem + .36vw,1.55rem)}
+main:not([data-view="all"]) #workspaceAside,#workspaceAside:not(:has(> :not([hidden]))),#pendingBox[hidden] {display:none}
+main:not([data-view="all"]) .workspace,.workspace:not(:has(#workspaceAside > :not([hidden]))) {grid-template-columns:minmax(0,1fr)}
+#dashboardWidgets:has(#dashboardTop:empty) {display:none}
 main[data-view="plan"] .section-heading:not([hidden]) {display: flex}
 .section-heading {margin-bottom: 10px}
 .section-heading h2 {font-size: 1.0625rem}
@@ -87,10 +99,6 @@ main[data-view="plan"] .section-heading:not([hidden]) {display: flex}
 }
 
 #dashboardWidgets {margin-bottom: 22px}
-.dashboard-header {justify-content: space-between; margin-bottom: 2px}
-.dashboard-header h2 {font-size: var(--type-label); color: var(--muted)}
-.dashboard-header .secondary {border-color: transparent; background: transparent}
-.dashboard-header .secondary:hover {background: var(--surface-hover)}
 #dashboardTop {gap: 0; border-bottom: 1px solid var(--line)}
 #dashboardTop .dashboard-card {
   flex: 1 1 146px;

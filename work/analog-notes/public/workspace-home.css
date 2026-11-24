@@ -1,0 +1,122 @@
+/**
+ * [INPUT]: 读取总览首屏、首页标题和工作台主题。
+ * [OUTPUT]: 布置继续阅读、近期计划和总览内容层级。
+ * [POS]: 样式仅作用于总览，在窄窗中按自然顺序排列。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+main[data-view="all"] #workspaceIntro {
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ flex-wrap:wrap;
+ gap:8px 20px;
+ margin-block-end:14px;
+ padding-block-end:0;
+ border-block-end:0;
+}
+main[data-view="all"] #workspaceIntro h1 {line-height:1.2}
+main[data-view="all"] #workspaceIntro .date-block {font-variant-numeric:tabular-nums}
+main[data-view="all"] #dashboardCustomize {
+ min-height:32px;
+ padding:4px 8px;
+ color:var(--text-soft);
+ background:transparent;
+ border-color:transparent;
+}
+main[data-view="all"] #dashboardCustomize:hover {background:var(--surface-hover)}
+
+#workspaceHome {
+ display:grid;
+ grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);
+ align-items:stretch;
+ gap:14px;
+ margin-block-end:18px;
+}
+#workspaceHome[hidden],#homePlans[hidden] {display:none}
+#workspaceHome:has(#homePlans[hidden]) {grid-template-columns:minmax(0,1fr)}
+#homeResume,#homePlans {
+ min-width:0;
+ padding:14px 16px;
+ border:1px solid var(--line);
+ border-radius:var(--radius-card);
+ background:var(--surface);
+}
+#homeResume {
+ background:color-mix(in srgb,var(--accent) 7%,var(--surface));
+ border-inline-start:2px solid var(--accent);
+}
+#workspaceHome h2 {
+ display:flex;
+ align-items:center;
+ gap:7px;
+ font-size:var(--type-control);
+ line-height:1.35;
+ font-weight:650;
+ margin:0;
+}
+#workspaceHome h2 svg {width:16px;height:16px;flex:none;color:var(--accent)}
+.home-resume-entry {
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:12px;
+ width:100%;
+ min-height:72px;
+ padding:8px 8px 8px 6px;
+ margin-block-start:7px;
+ border:0;
+ border-radius:var(--radius-control);
+ background:transparent;
+ color:var(--ink);
+ text-align:start;
+}
+.home-resume-entry:hover {background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.home-resume-text {display:grid;min-width:0;gap:4px;overflow-wrap:anywhere}
+.home-resume-text :is(strong,small) {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.home-resume-text strong {font-size:clamp(1.05rem,.94rem + .32vw,1.25rem);font-weight:650;line-height:1.4}
+.home-resume-text small {color:var(--text-soft);font-size:var(--type-label)}
+.home-resume-arrow {color:var(--accent);font-size:1.4rem;flex:none}
+.home-plan-heading {display:flex;align-items:center;justify-content:space-between;gap:8px}
+.home-plan-list {margin:6px 0 0;padding:0;list-style:none}
+.home-plan-list li + li {border-block-start:1px solid var(--line)}
+.home-plan-entry {
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:8px;
+ width:100%;
+ min-height:36px;
+ padding:5px 2px;
+ border:0;
+ border-radius:var(--radius-control);
+ background:transparent;
+ color:var(--ink);
+ text-align:start;
+}
+.home-plan-entry:hover,.home-link:hover {background:var(--surface-hover)}
+.home-plan-name {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--type-control)}
+.home-plan-entry time {color:var(--muted);font-size:var(--type-label);white-space:nowrap;flex:none}
+.home-plan-entry .home-overdue {color:var(--strong)}
+.home-link {
+ min-height:30px;
+ padding:3px 6px;
+ border:0;
+ border-radius:var(--radius-control);
+ background:transparent;
+ color:var(--accent);
+ font-size:var(--type-label);
+ white-space:nowrap;
+}
+.home-empty {margin:10px 0 3px;color:var(--muted);font-size:var(--type-label)}
+main[data-view="all"] #dashboardWidgets {margin-block-end:18px}
+main[data-view="all"] #records .card .card-excerpt {
+ display:-webkit-box;
+ -webkit-line-clamp:2;
+ -webkit-box-orient:vertical;
+ overflow:hidden;
+}
+@media (max-width:690px) {
+ #workspaceHome {grid-template-columns:minmax(0,1fr);gap:10px}
+ #homeResume,#homePlans {padding:12px 14px}
+ main[data-view="all"] #workspaceIntro {gap:5px 12px}
+}

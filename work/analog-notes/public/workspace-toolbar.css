@@ -1,0 +1,48 @@
+/**
+ * [INPUT]: 读取栏目工具栏控件、窗口宽度和主题颜色。
+ * [OUTPUT]: 布置紧凑工具栏和原生筛选浮层。
+ * [POS]: 搜索随窗口换行。次要操作折叠在同一位置。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+.workspace-toolbar-source,
+.workspace-toolbar[hidden],
+.workspace-toolbar [hidden],
+:is(#workspaceFilters,#workspaceMore) [hidden],
+#resultCount[hidden] {display:none !important}
+
+.searchrow.workspace-toolbar {
+ display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;
+ margin-block:0 12px;
+}
+.workspace-toolbar > .searchbox {
+ flex:1 1 200px;min-width:0;max-width:none;min-height:35px;margin:0;
+}
+.workspace-toolbar :is(.workspace-toolbar-buttons,#libraryControls) {
+ display:flex;flex-wrap:wrap;align-items:center;gap:5px;
+ min-width:0;margin:0;padding:0;
+}
+.workspace-toolbar :is(.workspace-toolbar-buttons,#libraryControls) > button {
+ min-height:35px;padding:4px 8px;white-space:normal;
+ color:var(--ink);font-size:var(--type-label);box-shadow:none;
+}
+.workspace-toolbar :is(.workspace-toolbar-buttons,#libraryControls) > .primary {color:var(--on-strong)}
+.workspace-toolbar button[data-active-filters]:not([data-active-filters="0"]) {
+ border-color:var(--accent);color:var(--accent);background:var(--surface-soft);
+}
+.workspace-toolbar button[aria-pressed="true"] {border-color:var(--accent);background:var(--surface-soft)}
+.workspace-toolbar-field {
+ display:grid;gap:4px;min-width:0;color:var(--muted);font-size:var(--type-label);
+}
+.workspace-toolbar-field select {width:100%;min-width:0}
+.workspace-toolbar-checkbox {
+ display:flex;align-items:center;gap:6px;margin:4px 0;
+ color:var(--ink);font-size:var(--type-control);
+}
+.workspace-toolbar-checkbox > input {width:auto;margin:0}
+#workspaceMore:popover-open {gap:2px;padding:6px}
+#resultCount {display:block;margin-block:4px 8px}
+#libraryBatchActions:not([hidden]) {display:flex;flex-wrap:wrap;margin-block:0 10px}
+
+@media(max-width:620px) {
+ .workspace-toolbar > .searchbox {flex-basis:100%}
+}

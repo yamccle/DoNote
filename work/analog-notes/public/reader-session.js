@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取附件、所属资料和本机阅读位置。
+ * [OUTPUT]: 建立阅读会话，并保存位置和完成状态。
+ * [POS]: 在 PDF 与视频阅读器之间共用。多附件资料按附件恢复状态。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 let readingSession = null;
@@ -118,9 +124,15 @@ function createReadingSession(file, kind) {
   const reading = activeProfile().reading;
   const legacy = owner && loadReadingCheckpoint(profileId, owner.id, reading?.[owner.id] || owner.readerProgress);
   const hasAttachmentProgress = owner?.attachments.some(attachment => reading?.[attachment.id]);
-  const checkpoint = loadReadingCheckpoint(profileId, file.id, reading?.[file.id]) ||
+  const attachmentCheckpoint = loadReadingCheckpoint(profileId, file.id, reading?.[file.id]);
+  const checkpoint = attachmentCheckpoint ||
     (!hasAttachmentProgress && legacyReadingAttachment(owner, legacy)?.id === file.id ? legacy : null);
-  const progress = sanitizeReadingProgress({ ...checkpoint, kind, finished: legacy?.finished ?? checkpoint?.finished });
+  const hasOtherReadableFile = owner?.attachments.some(attachment =>
+    attachment.id !== file.id && (fileIsPdf(attachment) || fileIsVideo(attachment)));
+  const finished = attachmentCheckpoint && hasOtherReadableFile
+    ? attachmentCheckpoint.finished
+    : legacy?.finished ?? checkpoint?.finished;
+  const progress = sanitizeReadingProgress({ ...checkpoint, kind, finished });
   return {
     file,
     ownerId: owner?.id,
