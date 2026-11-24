@@ -812,7 +812,9 @@ try {
   await testBackgroundSubtitles(page);
   await testWebExcerpt(page);
   await testAppendPdfExcerpt(page);
-  assert.deepEqual(errors, []);
+  // 网页阅读器的快照 iframe 故意沙箱隔离。浏览器会报告其中没有 Service Worker，这不是页面脚本错误。
+  const sandboxedWorker = "Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.";
+  assert.deepEqual(errors.filter(message => message !== sandboxedWorker), []);
 } finally {
   try { await browser?.close(); }
   finally {
