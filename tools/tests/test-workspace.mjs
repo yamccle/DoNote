@@ -579,6 +579,7 @@ async function testFolderManagement(page) {
     assert.match(await page.locator('#librarySelectedCount').innerText(), /2/);
     await page.locator('#libraryMoveSelected').click();
     await dialog.waitFor();
+    await search.fill(labels.child);
     await target(ids.child).click();
     await submit.click();
     await dialog.waitFor({ state: 'hidden' });
