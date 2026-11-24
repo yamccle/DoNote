@@ -21,7 +21,7 @@
 - `record-folders.js` 验证目录树，提供路径和栏目筛选。
 - `library-folders.js` 显示资料库当前层、路径和每张卡片的菜单入口。
 - `folder-context-menu.js` 复用工作台菜单，将目录操作传给文件夹窗口。
-- `folder-manager.js` 为各栏目提供目录树搜索和目标选择。删除与回收站在同一事务提交。
+- `folder-manager.js` 为各栏目提供目录树搜索和目标选择。子文件夹默认折叠，搜索时仍列出匹配项。删除与回收站在同一事务提交。
 - `folder-management.css` 布置目录卡片、路径、搜索和操作窗口。
 - `library-organization.js` 将多选资料交给同一移动窗口，并保留批量标签和阅读清单。
 - `trash.js` 为文件夹和单条记录暂存回收站变化。

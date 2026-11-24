@@ -499,6 +499,10 @@ async function testFolderManagement(page) {
     assert.match(await sourceCard.innerText(), new RegExp(labels.renamed));
 
     await library.locator('[data-folder-manage]').click();
+    await folderRow(ids.source).waitFor();
+    assert.equal(await folderRow(ids.child).count(), 0, '子文件夹默认折叠');
+    await folderRow(ids.source).locator('[data-folder-toggle]').click();
+    await folderRow(ids.child).waitFor();
     await managerSearch.fill(labels.renamed);
     await folderRow(ids.archive).waitFor({ state: 'hidden' });
     await chooseAction(folderRow(ids.source).locator('[data-folder-more]'), '移动到…');

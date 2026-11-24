@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 读取目录树、当前资料位置和记录移动回调。
- * [OUTPUT]: 搜索目录并提交新建、改名、移动与删除操作。
+ * [OUTPUT]: 搜索目录并提交新建、改名、移动与删除操作。子文件夹默认折叠。
  * [POS]: 共用文献库和各栏目的目录操作窗口。每次提交只写一次工作台状态。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -26,27 +26,65 @@ function matchingFolderRows(scope,query){
  return folderTreeRows(scope).filter(({path})=>path.join(' › ').toLocaleLowerCase().includes(search));
 }
 
-function folderRowLabel(folder,path,searching){
+function folderRowLabel(folder,path,searching,hint=''){
  const parents=path.slice(0,-1).join(' › ');
  return '<span class="folder-row-label"><strong>'+esc(folder.name)+'</strong>'
-  +(searching&&parents?'<small>'+esc(parents)+'</small>':'')+'</span>';
+  +(searching&&parents?'<small>'+esc(parents)+'</small>':'')
+  +(hint?'<small>'+esc(hint)+'</small>':'')+'</span>';
+}
+
+function folderChildIds(scope){
+ const children=new Map();
+ for(const folder of recordFolders(scope)){
+  if(!children.has(folder.parentId))children.set(folder.parentId,[]);
+  children.get(folder.parentId).push(folder.id);
+ }
+ return children;
+}
+
+function visibleFolderRows(scope,query,expanded){
+ const rows=matchingFolderRows(scope,query);
+ if(query.trim())return rows;
+ const byId=new Map(rows.map(row=>[row.folder.id,row]));
+ return rows.filter(({folder})=>{
+  let parent=folder.parentId,seen=new Set();
+  while(parent){
+   if(seen.has(parent)||!expanded.has(parent))return false;
+   seen.add(parent);
+   parent=byId.get(parent)?.folder.parentId||'';
+  }
+  return true;
+ });
+}
+
+function folderToggleButton(id,name,childCount,expanded){
+ if(!childCount)return '<span class="folder-row-spacer" aria-hidden="true"></span>';
+ const open=expanded.has(id);
+ return '<button type="button" class="folder-row-toggle" data-folder-toggle="'+esc(id)+'" aria-expanded="'+open+'" aria-label="'+(open?'折叠 ':'展开 ')+esc(name)+'"><span aria-hidden="true">›</span></button>';
+}
+
+function toggleFolderBranch(expanded,id){
+ if(expanded.has(id))expanded.delete(id);
+ else expanded.add(id);
 }
 
 function renderFolderManager(){
- const {scope} = folderManagerContext;
+ const {scope,expanded}=folderManagerContext;
  const query=$('folderManagerSearch').value;
- const rows=matchingFolderRows(scope,query);
+ const children=folderChildIds(scope);
+ const rows=visibleFolderRows(scope,query,expanded);
  $('folderRows').innerHTML=rows.map(({folder,path})=>{
-  const id=esc(folder.id),label=esc(folder.name+'的操作');
+  const id=esc(folder.id),label=esc(folder.name+'的操作'),childCount=(children.get(folder.id)||[]).length;
   return '<div class="folder-manager-row" data-folder-item="'+id+'" style="--folder-depth:'+(query.trim()?0:path.length-1)+'">'
-   +'<button type="button" class="folder-row-open" data-folder-browse="'+id+'">'+folderRowLabel(folder,path,query.trim())+'</button>'
+   +folderToggleButton(folder.id,folder.name,query.trim()?0:childCount,expanded)
+   +'<button type="button" class="folder-row-open" data-folder-browse="'+id+'" title="'+esc(path.join(' › '))+'">'+folderRowLabel(folder,path,query.trim(),childCount&&!query.trim()?childCount+' 个子文件夹':'')+'</button>'
    +'<button type="button" class="icon-button" data-folder-more="'+id+'" aria-label="'+label+'" title="'+label+'" aria-haspopup="menu">…</button></div>';
  }).join('')||'<p class="section-note">'+(query.trim()?'没有匹配的文件夹。':'这里还没有文件夹。')+'</p>';
 }
 
 function openFolderManager({scope=folderScope(view)}={}){
  if(!ensureReady()||folderManagerDialog.open)return;
- folderManagerContext={scope,profileId:appState.activeId};
+ folderManagerContext={scope,profileId:appState.activeId,expanded:new Set()};
  $('folderManagerTitle').textContent='文件夹管理';
  $('folderManagerSearch').value='';
  $('folderManagerMessage').replaceChildren();
@@ -56,27 +94,30 @@ function openFolderManager({scope=folderScope(view)}={}){
 }
 
 function renderFolderDestinations(){
- const {scope,folder,currentFolder,destination,mode}=folderActionContext;
+ const {scope,folder,currentFolder,destination,mode,expanded}=folderActionContext;
  const query=$('folderDestinationSearch').value;
  const record=mode==='recordMove';
  const excluded=folder?folderDescendants(scope,folder.id):new Set();
- const rows=matchingFolderRows(scope,query).filter(({folder:item})=>
+ const children=folderChildIds(scope);
+ const rows=visibleFolderRows(scope,query,expanded).filter(({folder:item})=>
   item.id!==currentFolder&&!excluded.has(item.id));
  const root=folderLocation(scope,'',record);
- function option(id,label,depth){
-  return '<button class="folder-destination" type="button" data-folder-destination="'+esc(id)+'" aria-pressed="'+
-   (id===destination)+'" style="--folder-depth:'+depth+'">'+label+'</button>';
+ function option(id,label,depth,childCount,name){
+  return '<div class="folder-destination-row" style="--folder-depth:'+depth+'">'
+   +folderToggleButton(id,name,query.trim()?0:childCount,expanded)
+   +'<button class="folder-destination" type="button" data-folder-destination="'+esc(id)+'" aria-pressed="'+
+   (id===destination)+'">'+label+'</button></div>';
  }
- const rootChoice=currentFolder!==''&&root.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())?option('',esc(root),0):'';
+ const rootChoice=currentFolder!==''&&root.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())?option('',esc(root),0,0,''):'';
  const choices=rows.map(({folder,path})=>
-  option(folder.id,folderRowLabel(folder,path,query.trim()),query.trim()?0:path.length)).join('');
+  option(folder.id,folderRowLabel(folder,path,query.trim(),!query.trim()&&(children.get(folder.id)||[]).length?(children.get(folder.id)||[]).length+' 个子文件夹':''),query.trim()?0:path.length-1,(children.get(folder.id)||[]).length,folder.name)).join('');
  $('folderDestinationChoices').innerHTML='<legend class="visually-hidden">目标文件夹</legend>'
   +(rootChoice+choices||'<p class="section-note">'+(query.trim()?'没有匹配的目标文件夹。':'没有其他可用文件夹。')+'</p>');
 }
 
 function updateFolderDestination(){
  const {destination,scope,mode}=folderActionContext;
- for(const option of $('folderDestinationChoices').querySelectorAll('button')){
+ for(const option of $('folderDestinationChoices').querySelectorAll('[data-folder-destination]')){
   option.setAttribute('aria-pressed',String(option.dataset.folderDestination===destination));
  }
  $('folderDestinationPath').textContent=destination===null?'请选择目标文件夹':'目标位置 · '+folderLocation(scope,destination,mode==='recordMove');
@@ -101,6 +142,7 @@ function openFolderAction(mode,{scope=folderScope(view),id='',parentId='',descri
  folderActionContext={
   mode,scope,folder:folder?{...folder}:null,parentId,profileId:appState.activeId,apply,
   currentFolder:folder?.parentId??currentFolder,destination:null,branchSize:branch.size,
+  expanded:new Set(),
   recordIds:new Set(removing?records.filter(note=>branch.has(note.folderId)).map(note=>note.id):[])
  };
  const [title,label]=folderActionLabels[mode];
@@ -252,6 +294,8 @@ $('folderActionForm').onsubmit=async event=>{
    folderActionDialog.close();
   }else{
    const {notice,action}=await saveFolderChange(context);
+   if(context.mode==='create'&&context.parentId)folderManagerContext?.expanded?.add(context.parentId);
+   if(context.mode==='move'&&context.destination)folderManagerContext?.expanded?.add(context.destination);
    folderActionDialog.close();
    refreshFolderLocations();
    showFolderNotice(notice,action);
@@ -264,6 +308,13 @@ folderActionDialog.querySelectorAll('[data-close]').forEach(button=>{button.oncl
 $('folderRemoveContents').onchange=updateFolderRemoveEffect;
 $('folderDestinationSearch').oninput=renderFolderDestinations;
 $('folderDestinationChoices').onclick=event=>{
+ const toggle=event.target.closest('[data-folder-toggle]');
+ if(toggle&&!folderSaving){
+  toggleFolderBranch(folderActionContext.expanded,toggle.dataset.folderToggle);
+  renderFolderDestinations();
+  $('folderDestinationChoices').querySelector('[data-folder-toggle="'+CSS.escape(toggle.dataset.folderToggle)+'"]')?.focus();
+  return;
+ }
  const option=event.target.closest('[data-folder-destination]');
  if(!option||folderSaving)return;
  folderActionContext.destination=option.dataset.folderDestination;
@@ -294,6 +345,13 @@ $('openFolderManager').onclick=()=>openFolderManager();
 $('folderRows').onclick=event=>{
  const scope=readFolderManagerScope();
  if(!scope)return;
+ const toggle=event.target.closest('[data-folder-toggle]');
+ if(toggle){
+  toggleFolderBranch(folderManagerContext.expanded,toggle.dataset.folderToggle);
+  renderFolderManager();
+  $('folderRows').querySelector('[data-folder-toggle="'+CSS.escape(toggle.dataset.folderToggle)+'"]')?.focus();
+  return;
+ }
  const browse=event.target.closest('[data-folder-browse]');
  if(browse&&revealFolderLocation(scope,browse.dataset.folderBrowse)){folderManagerDialog.close();return}
  const more=event.target.closest('[data-folder-more]');

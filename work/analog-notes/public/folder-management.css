@@ -31,18 +31,24 @@
 }
 .folder-manager-rows {margin-block-start:8px}
 .folder-manager-row {
- display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px;
- padding-inline-start:min(calc(var(--folder-depth) * 15px),16%);
+ display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:2px;
+ padding-inline-start:calc(var(--folder-depth) * 12px);
  border-block-end:1px solid var(--line)
 }
+.folder-row-toggle,.folder-row-spacer {
+ width:28px;height:28px;padding:0;border:0;background:transparent;color:var(--muted)
+}
+.folder-row-toggle {border-radius:var(--radius-control)}
+.folder-row-toggle:hover {background:var(--surface-hover);color:var(--ink)}
+.folder-row-toggle[aria-expanded=true] span {display:inline-block;transform:rotate(90deg)}
 .folder-row-open,.folder-destination {
- display:flex;align-items:center;gap:8px;width:100%;min-height:36px;min-width:0;
+ display:flex;align-items:center;gap:8px;width:100%;min-height:36px;min-width:0;height:auto;
  padding:6px 8px;background:transparent;border:1px solid transparent;border-radius:var(--radius-control);
- color:var(--ink);font-size:var(--type-control);text-align:start
+ color:var(--ink);font-size:var(--type-control);text-align:start;white-space:normal
 }
 :is(.folder-row-open,.folder-destination):hover {background:var(--surface-hover)}
 .folder-row-label {display:grid;gap:1px;min-width:0;overflow-wrap:anywhere}
-.folder-row-label strong {font-weight:600}
+.folder-row-label strong {font-weight:600;overflow-wrap:anywhere;line-height:1.35}
 .folder-row-label small {color:var(--muted);font-size:var(--type-caption)}
 #folderManagerMessage {display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 #folderManagerMessage:empty,#folderActionMessage:empty {display:none}
@@ -55,7 +61,11 @@
  margin:8px 0 0;padding:4px;min-inline-size:0;max-height:min(330px,35dvh);overflow-y:auto;
  border:1px solid var(--line);border-radius:var(--radius-control)
 }
-.folder-destination {padding-inline-start:calc(8px + min(var(--folder-depth) * 14px,16%))}
+.folder-destination-row {
+ display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;
+ padding-inline-start:calc(var(--folder-depth) * 12px)
+}
+.folder-destination {padding-inline-start:4px}
 .folder-destination[aria-pressed=true] {
  background:var(--surface-soft);border-color:var(--accent);color:var(--ink)
 }
