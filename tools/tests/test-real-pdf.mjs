@@ -78,9 +78,16 @@ try {
   await page.locator('#pdfPageNumber').press('Enter');
   await page.waitForFunction(count => readingSession?.page === Number(count) && document.querySelector('[data-pdf-page="' + count + '"] .pdf-text-layer'), pageCount);
   const lastPageMs = Date.now() - jump;
+  console.log(JSON.stringify({ phase: 'reader', pages: Number(pageCount), firstReadableMs, lastPageMs }));
   const index = await page.evaluate(async () => {
     const file = readingSession.file;
     const pdf = readingSession.pdf;
+    const stub = new Blob(['%PDF-1.1\n%%EOF'], { type: 'application/pdf' });
+    await put({
+      id: crypto.randomUUID(), type: 'resource', title: file.name, author: '', reference: '', url: '',
+      body: '', date: today(), tags: [], status: '待读', pinned: false,
+      attachments: [{ id: file.id, name: file.name, mime: 'application/pdf', size: stub.size, addedAt: new Date().toISOString() }]
+    }, [{ key: fileKey(appState.activeId, file.id), blob: stub }]);
     const controller = new AbortController();
     let saw = 0;
     const first = buildPdfSearchIndex(file, {
