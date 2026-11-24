@@ -80,9 +80,11 @@ try {
   const lastPageMs = Date.now() - jump;
   const index = await page.evaluate(async () => {
     const file = readingSession.file;
+    const pdf = readingSession.pdf;
     const controller = new AbortController();
     let saw = 0;
     const first = buildPdfSearchIndex(file, {
+      pdf,
       signal: controller.signal,
       onProgress(progress) {
         saw = progress.page;
@@ -93,6 +95,7 @@ try {
     const controller2 = new AbortController();
     let resumedAt = 0;
     const second = buildPdfSearchIndex(file, {
+      pdf,
       signal: controller2.signal,
       onProgress(progress) {
         if (!resumedAt) resumedAt = progress.page;
