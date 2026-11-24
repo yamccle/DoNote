@@ -15,8 +15,8 @@ r122 完整包的版本清单为 `26.1121.0068`。其文件名和 SHA-256 位于
 ```powershell
 $outputs = '.\outputs'
 $runtime = Join-Path $outputs 'DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'
-$previous = Join-Path $outputs 'r131\DoNote-Windows-x64-r131.zip'
-pwsh -File tools/release.ps1 -Revision r132 -Version 26.1132.0078 `
+$previous = Join-Path $outputs 'r132\DoNote-Windows-x64-r132.zip'
+pwsh -File tools/release.ps1 -Revision r133 -Version 26.1133.0079 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory $outputs
 ```
 
@@ -28,6 +28,7 @@ pwsh -File tools/release.ps1 -Revision r132 -Version 26.1132.0078 `
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |
 | --- | --- | --- | --- | --- |
+| r132 | 26.1132.0078 | tag `r132` → `eb4c918` | 2026-11-24 | 文件夹管理默认折叠。点 › 展开下一层，搜索仍能找到深层文件夹。基于 r131（26.1131.0077） |
 | r131 | 26.1131.0077 | tag `r131` → `5929076` | 2026-11-24 | 网页摘录可形成记录并回到原文。PDF 选区可追加到设计问题或仿真记录，并回到同一页和选区。基于 r130（26.1130.0076） |
 | r130 | 26.1130.0076 | tag `r130` → `eb3b047` | 2026-11-24 | 主页显示继续阅读和近期计划。栏目压缩工具栏，保留原操作。基于 r129（26.1129.0075） |
 | r129 | 26.1129.0075 | tag `r129` → `5507f04` | 2026-11-23 | 统一文件夹新建/导航/移动流程；长路径不挤出按钮、位置行可滚动、选择器输入框样式统一；基于 r128（26.1128.0074） |
@@ -37,6 +38,14 @@ pwsh -File tools/release.ps1 -Revision r132 -Version 26.1132.0078 `
 | r125 | 26.1125.0071 | tag `r125` → `e02edda` | 2026-11-23 | 字幕识别时逐条同步翻译（边识别边翻译）；基于 r124（26.1124.0070） |
 | r124 | 26.1124.0070 | tag `r124` → `0d35f83` | 2026-11-23 | 按新发布流程重建；基于 r123（26.1123.0069） |
 | r123 | 26.1123.0069 | tag `r123` → `3eba4d6` | 2026-11-23 | 交互优化与工程化整理；基于 r122（26.1121.0068） |
+
+### r132
+
+- 完整包 `outputs/r132/DoNote-Windows-x64-r132.zip`
+  `c49cb53bec388fdf6a8639b64a0c2c8b86799727cde2677ad43b672e6d2ee26b`
+- 增量包 `outputs/r132/DoNote-Update-26.1131.0077-to-r132.zip`
+  `304b00e188837c6de207ac093f0658a790e06ca4ce2019286c8c3f6285c93fc3`
+- 发布记录 `outputs/r132/DoNote-r132-release.json`，检查项：`workspace`、`upgrade-and-rollback`、`package-checksums`。
 
 ### r131
 
