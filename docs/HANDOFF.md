@@ -27,10 +27,10 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 
 ## 当前状态（换手时）
 
-- 分支 `main` 已包含 r134（源码标签 `r134` → `33ebc83`）；`README.md` 已同步 r134 能力与下载信息，7 张工作流程截图来自 r132 演示账户。
+- 分支 `main` 已包含 r135（源码标签 `r135` → `2378705`）；`README.md` 已同步 r135 能力与下载信息，7 张工作流程截图来自 r132 演示账户。
 - 恢复基线 `source-baseline-recovered` 指向 `7913398`。
-- 本地发布 **r134 / 26.1134.0080**。包和发布记录位于 `outputs/r134/`；待推送 `main` / `r134` 标签并上传 GitHub Release `r134`（当前线上 GitHub Releases 已发布 `r130`–`r133` 与 `models-2026-11-23`，`latest` 指向 `r133`；上传 `r134` 后将 `latest` 指向 `r134`）。
-- GitHub Releases：`r130`、`r131`、`r132`、`r133`（各含完整包 + 增量包 + 发布记录）与 `models-2026-11-23`（13 个模型分卷 + `SHA256SUMS.txt`，共 14 个资产，全部核验）；`outputs/r134/` 三件套已本地校验完毕待上传。
+- 最新发布 **r135 / 26.1135.0081**。包和发布记录位于 `outputs/r135/`，同步发布至 GitHub Releases（`latest` 指向 `r135`）。
+- GitHub Releases：`r130`、`r131`、`r132`、`r133`、`r134`、`r135`（各含完整包 + 增量包 + 发布记录）与 `models-2026-11-23`（13 个模型分卷 + `SHA256SUMS.txt`，共 14 个资产，全部核验）。
 - 运行依赖锁定：`docs/releases/runtime-lock.json` 锁定 **r122**（`26.1121.0068`，SHA `6c4da1cf…`），**不要**改成 r123 及以后：发布包不含 `video-runtime/` 构建期资源，改了会构不出来
 - 工作树应为干净；脏树会被 `release.ps1` 直接拒绝
 
@@ -38,6 +38,7 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 
 | 版本 | 内容 |
 | --- | --- |
+| r135 | 重构 PDF 阅读器右侧栏（翻译 · 批注 · AI 问答）：「原文 → 电路术语胶囊 → 译文」无嵌套顺向排版与语向互换、高密度渐进式批注与当前页筛选、SSE 流式回答 + KaTeX 公式防转义渲染 + 页码胶囊回跳与存为笔记闭环。 |
 | r134 | 新增 PDF 页面「被引用」角标与反向引用侧栏穿梭、扫描页离线识字直转摘录并入全文检索索引、云端快照保留份数自动清理，以及跨目录增量备份引用重映射与真机压测。 |
 | r133 | 新增 Google Drive 同步目录与 WebDAV 版本化云端备份，传输带完成标记与 SHA-256 校验并复用备份文件夹恢复。 |
 | r132 | 文件夹管理默认折叠，点 › 展开下一层；搜索仍能找到深层文件夹。 |
@@ -103,15 +104,15 @@ node tools/tests/test-cloud-backup.mjs <编译后的 CloudBackupProbe.exe>
 
 ```powershell
 $runtime  = '.\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'   # 运行依赖锁
-$previous = '.\outputs\r134\DoNote-Windows-x64-r134.zip'                   # 上一版完整包
+$previous = '.\outputs\r135\DoNote-Windows-x64-r135.zip'                   # 上一版完整包
 & $pwsh7 -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 `
-  -Revision r135 -Version 26.1135.0081 `
+  -Revision r136 -Version 26.1136.0082 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory outputs
 ```
 
 命令中的包路径从源码工作区解析。独立工作区使用主工作区的 `outputs` 路径。发布后按以下四步更新发布记录。
 
-1. 打标签 `git tag -a r135 -m '…（版本）…' <本次构建用的提交>`。目标提交用发布记录里的 `sourceCommit`。
+1. 打标签 `git tag -a r136 -m '…（版本）…' <本次构建用的提交>`。目标提交用发布记录里的 `sourceCommit`。
 2. 更新 `docs/releases/runtime-lock.json` 的 `latestRelease`（运行依赖那段保持 r122 不动）
 3. 更新 `docs/releases/README.md` 的发布记录表与下一版命令示例
 4. 提交发布文档，确认 `git status` 干净。

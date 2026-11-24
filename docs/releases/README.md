@@ -15,8 +15,8 @@ r122 完整包的版本清单为 `26.1121.0068`。其文件名和 SHA-256 位于
 ```powershell
 $outputs = '.\outputs'
 $runtime = Join-Path $outputs 'DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'
-$previous = Join-Path $outputs 'r134\DoNote-Windows-x64-r134.zip'
-pwsh -File tools/release.ps1 -Revision r135 -Version 26.1135.0081 `
+$previous = Join-Path $outputs 'r135\DoNote-Windows-x64-r135.zip'
+pwsh -File tools/release.ps1 -Revision r136 -Version 26.1136.0082 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory $outputs
 ```
 
@@ -28,6 +28,7 @@ pwsh -File tools/release.ps1 -Revision r135 -Version 26.1135.0081 `
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |
 | --- | --- | --- | --- | --- |
+| r135 | 26.1135.0081 | tag `r135` → `2378705` | 2026-11-24 | 重构 PDF 右侧翻译、批注与 AI 问答界面：顺向无嵌套翻译卡与电路术语胶囊、紧凑批注与当前页筛选、SSE 流式与 KaTeX 公式渲染问答。基于 r134（26.1134.0080） |
 | r134 | 26.1134.0080 | tag `r134` → `33ebc83` | 2026-11-24 | 新增 PDF 页面反向引用与无重载穿梭、扫描页离线识字入全文索引及云端快照保留份数清理；加固增量备份引用重映射。基于 r133（26.1133.0079） |
 | r133 | 26.1133.0079 | tag `r133` → `b6278e6` | 2026-11-24 | 新增 Google Drive 同步目录与 WebDAV 版本化云端备份（含完成标记与 SHA-256 校验恢复）。基于 r132（26.1132.0078） |
 | r132 | 26.1132.0078 | tag `r132` → `eb4c918` | 2026-11-24 | 文件夹管理默认折叠。点 › 展开下一层，搜索仍能找到深层文件夹。基于 r131（26.1131.0077） |
@@ -40,6 +41,14 @@ pwsh -File tools/release.ps1 -Revision r135 -Version 26.1135.0081 `
 | r125 | 26.1125.0071 | tag `r125` → `e02edda` | 2026-11-23 | 字幕识别时逐条同步翻译（边识别边翻译）；基于 r124（26.1124.0070） |
 | r124 | 26.1124.0070 | tag `r124` → `0d35f83` | 2026-11-23 | 按新发布流程重建；基于 r123（26.1123.0069） |
 | r123 | 26.1123.0069 | tag `r123` → `3eba4d6` | 2026-11-23 | 交互优化与工程化整理；基于 r122（26.1121.0068） |
+
+### r135
+
+- 完整包 `outputs/r135/DoNote-Windows-x64-r135.zip`
+  `cffd5fd64486ccb42fd80161692008fc645e77bf317afe32f2ed127ca5c9c759`
+- 增量包 `outputs/r135/DoNote-Update-26.1134.0080-to-r135.zip`
+  `7110f472036e8da4a65adb9c2280e08efde7d3d565a449e61436d1e0fe6c588b`
+- 发布记录 `outputs/r135/DoNote-r135-release.json`，检查项：`workspace`、`cloud-backup-transport`、`upgrade-and-rollback`、`package-checksums`。
 
 ### r134
 
