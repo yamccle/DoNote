@@ -62,7 +62,7 @@ DoNote 是一款面向工程研发与学术精读的 **Windows 桌面端研究�
 
 ## 下载、安装与升级
 
-> **重要提示**：请直接前往下方核实后的 **程序 Release 页面（`r132`）** 下载桌面端程序包，**不要使用 GitHub 默认的 `releases/latest` 链接下载主程序**——由于模型分卷后于 `r132` 发布，当前 `releases/latest` 指向模型包 Release 而非主程序。所有历史程序版本可在 [Releases 列表](https://github.com/yamccle/DoNote/releases) 查看。
+> **提示**：正式程序发布页为 **[DoNote `r132` Release](https://github.com/yamccle/DoNote/releases/tag/r132)**；[GitHub Latest](https://github.com/yamccle/DoNote/releases/latest) 已确认指向 `r132`。模型整合包（分卷）位于独立的 [`models-2026-11-23` Release](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)。所有历史版本可在 [Releases 列表](https://github.com/yamccle/DoNote/releases) 查看。
 
 ### 1. 程序包下载（正式版 `r132` · `26.1132.0078`）
 
@@ -90,8 +90,25 @@ DoNote 是一款面向工程研发与学术精读的 **Windows 桌面端研究�
 
 **不下载额外模型也可正常使用 DoNote**：日常记录、PDF 阅读批注、网页收藏、全文检索、AI 问答，以及**内置的快速离线英译中模型**（用于视频离线字幕翻译和 PDF 快速离线对照翻译，已随 `DoNote-Windows-x64-r132.zip` 内置）均开箱即用。仅当需要**本地视频语音识别**或**本地 Qwen3 大语言模型翻译**时，才需按需配置以下模型。
 
-> **关于 GitHub 模型整合包分卷（`models-2026-11-23`）的核查说明**：  
-> 仓库的 [models-2026-11-23 Release](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23) 计划提供 `DoNote-Models-x64-2026-11-23.zip`（9,252,198,099 字节）的 13 个分卷（`Models.z01`～`Models.z12` + `Models.zip`）。**经逐项核实，目前该 Release 仅上传了 7 个分卷（`Models.z01`～`Models.z05`、`Models.z07`、`Models.z08`），尚缺 `Models.z06`、`Models.z09`～`Models.z12`、`Models.zip` 及 `SHA256SUMS.txt`，暂时无法拼接还原。** 在分卷补传齐全前，请直接使用下方已逐一验证可用的**按需单模型下载方式**。
+> **GitHub 模型整合包分卷（`models-2026-11-23`，已全部核验）**：  
+> 该 Release 提供内层模型包 `DoNote-Models-x64-2026-11-23.zip`（9,252,198,099 字节）的 **13 个分卷**：`Models.z01`～`Models.z12`（每卷 734,003,200 字节）+ `Models.zip`（末卷，445,573,902 字节），另附 `SHA256SUMS.txt`（1,017 字节）。全部 14 个下载链接已逐条 HTTP 校验为 `200 OK`，字节数与上述完全一致。
+>
+> **下载与还原**（把 14 个文件下载到同一目录）：
+>
+> 1. **逐卷校验**：对 `Models.z01`～`Models.z12`、`Models.zip` 运行 `Get-FileHash -Algorithm SHA256 <文件>`，与 `SHA256SUMS.txt` 对应行一致；
+> 2. **拼接**（PowerShell）：
+> ```powershell
+> $all = @(Get-ChildItem Models.z* | Sort-Object Name) + @(Get-Item Models.zip)
+> $out = [IO.File]::Create("Models.zip.full")
+> foreach ($f in $all) { $s = $f.OpenRead(); $s.CopyTo($out); $s.Dispose() }
+> $out.Dispose()
+> ```
+> 或 CMD：`copy /b Models.z01+Models.z02+Models.z03+Models.z04+Models.z05+Models.z06+Models.z07+Models.z08+Models.z09+Models.z10+Models.z11+Models.z12+Models.zip Models.zip.full`
+> 3. **校验拼接结果**：应为 9,253,612,302 字节，SHA-256 `e1b8957884885cc41e67a1fc722bf045b18259dff3a5273e4eebbc6cc56371f4`；
+> 4. 把 `Models.zip.full` 改名为 `Models.zip` 并解压，得到内层 `DoNote-Models-x64-2026-11-23.zip`（SHA-256 `ca4eb5cee6006923ef27a76074f3676116cfa7c40978b180258b90509f847cb6`）；
+> 5. 解压内层包，**先完全退出 DoNote**，双击 `安装模型.cmd`，安装器会找到 `DoNote.exe` 并只补装缺少的模型；文件被占用时会提示并继续，失败时退出码为 3。
+>
+> 若下载工具支持分卷 ZIP，也可直接打开 `Models.zip` 让其按同目录分卷解压（等价于第 2 步拼接）。只需要单个模型时，可继续使用下方按需下载表格。
 
 ### 1. 视频语音识别模型（`faster-whisper`，按需选装一档即可）
 
