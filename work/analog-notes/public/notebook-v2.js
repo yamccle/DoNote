@@ -100,6 +100,7 @@ async function put(note,writes=[],deletions=[]){
  if(saved.flashcardKind===undefined&&previous?.flashcardKind)saved.flashcardKind=previous.flashcardKind;
  if(previous?.planSourceId)saved.planSourceId=previous.planSourceId;
  if(saved.pdfSource===undefined&&previous?.pdfSource)saved.pdfSource=previous.pdfSource;
+ if(saved.webSource===undefined&&previous?.webSource)saved.webSource=previous.webSource;
  if(saved.researchLinks===undefined&&previous?.researchLinks)saved.researchLinks=previous.researchLinks;
  if(saved.pdfEvidence===undefined&&previous?.pdfEvidence)saved.pdfEvidence=previous.pdfEvidence;
  if(previous?.webArticle){

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收桌面发布包解压后的 workspace 目录。
- * [OUTPUT]: 验证总览、栏目工具栏、长 PDF 与记录保存。
+ * [OUTPUT]: 验证总览、栏目工具栏、长 PDF、记录保存与网页摘录回跳。
  * [POS]: 发布回归入口。浏览器使用临时账户和本地模拟宿主。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -691,6 +691,47 @@ async function testBackgroundSubtitles(page) {
   console.log('PASS background subtitles: range bytes, reopen progress, correct account, incremental translation from the first cue and IndexedDB persistence');
 }
 
+async function testWebExcerpt(page) {
+  const quote = '链上要找回的这一句摘录。';
+  await page.evaluate(async quoteText => {
+    const before = '锚点之前。';
+    const after = '锚点之后。';
+    const html = '<p>填充段落。</p>'.repeat(40) + '<p>' + before + quoteText + after + '</p>';
+    const fileId = crypto.randomUUID();
+    const recordId = crypto.randomUUID();
+    const blob = new Blob([html], { type: 'text/html' });
+    const capturedAt = new Date().toISOString();
+    await put({
+      id: recordId, type: 'resource', title: '出处网页', author: '', reference: '', url: '',
+      body: '', date: today(), tags: [], status: '待读', pinned: false,
+      attachments: [{ id: fileId, name: 'article.html', mime: 'text/html', size: blob.size, addedAt: capturedAt, webRole: 'article' }],
+      webArticle: { url: 'https://example.com/source', capturedAt },
+      updatedAt: capturedAt
+    }, [{ key: fileKey(appState.activeId, fileId), blob }]);
+    await saveWebExcerpt({
+      id: recordId, mode: 'article',
+      selection: { quote: quoteText, start: before.length, end: before.length + quoteText.length, before, after }
+    });
+    const note = records.find(item => item.webSource?.recordId === recordId);
+    if (!note || !validate(note)) throw new Error('excerpt note was not saved');
+    if (validate({ ...note, webSource: { recordId, quote: ' ', start: 0, end: 1, before: '', after: '' } })) throw new Error('blank quote passed validate');
+    const edited = { ...note };
+    delete edited.webSource;
+    await put(edited);
+    if (records.find(item => item.id === note.id)?.webSource?.quote !== quoteText) throw new Error('editor save dropped webSource');
+    showDetail(note.id);
+    if (![...document.querySelectorAll('#detailContent button')].some(button => button.textContent === '打开原文摘录')) throw new Error('detail has no source button');
+    await openWebEvidence(note.webSource);
+  }, quote);
+  await page.waitForFunction(quoteText => {
+    const article = document.querySelector('.web-reader-article');
+    const highlight = CSS.highlights?.get('web-article-focus');
+    const range = highlight ? [...highlight][0] : null;
+    return document.getElementById('reader')?.open && article?.textContent.includes(quoteText) && range?.toString() === quoteText;
+  }, quote);
+  console.log('PASS web excerpt: record keeps its source and jumps back to the quote');
+}
+
 const { chromium } = playwright();
 const browserPath = process.env.DONOTE_BROWSER_EXECUTABLE;
 const channel = process.env.DONOTE_BROWSER_CHANNEL ?? 'msedge';
@@ -708,6 +749,7 @@ try {
   await testDraft(page);
   await testFolderManagement(page);
   await testBackgroundSubtitles(page);
+  await testWebExcerpt(page);
   assert.deepEqual(errors, []);
 } finally {
   try { await browser?.close(); }

@@ -130,6 +130,85 @@ function webQuotePosition(text,mark){
  }
  return null;
 }
+function validWebNoteSource(source){
+ return source===undefined||(
+  source&&/^[a-zA-Z0-9-]{1,80}$/.test(source.recordId)&&
+  typeof source.quote==='string'&&source.quote.trim()&&source.quote.length<=2000&&
+  Number.isSafeInteger(source.start)&&Number.isSafeInteger(source.end)&&source.start>=0&&source.end>=source.start&&source.end<=5_000_000&&
+  typeof source.before==='string'&&source.before.length<=64&&
+  typeof source.after==='string'&&source.after.length<=64
+ );
+}
+function webExcerptOrigin(record){
+ try{return new URL(record.webArticle.url).hostname}catch{return '网页'}
+}
+async function saveWebExcerpt(session,picked){
+ const fromMark=typeof picked?.quote==='string'&&picked.quote.trim();
+ const selection=fromMark?picked:(selectedWebText(session)||session.selection);
+ if(!fromMark&&session.mode!=='article')throw new Error('请先切换到正文阅读。');
+ if(selection?.tooLong||String(selection?.quote||'').length>2000)throw new Error('请选择不超过 2,000 字的正文。');
+ const quote=String(selection?.quote||'');
+ if(!quote.trim())throw new Error('请先在正文中选中文字。');
+ const owner=webRecord(session.id);
+ if(!owner)throw new Error('此网页已从资料库移除。');
+ const profileId=appState.activeId;
+ const source={
+  recordId:owner.id,quote,
+  start:Number.isSafeInteger(selection.start)?selection.start:0,
+  end:Number.isSafeInteger(selection.end)?selection.end:0,
+  before:String(selection.before||'').slice(0,64),
+  after:String(selection.after||'').slice(0,64)
+ };
+ if(!validWebNoteSource(source))throw new Error('请输入有效的摘录。');
+ const note={
+  id:crypto.randomUUID(),type:'paper',title:(owner.title+' · 摘录').slice(0,240),
+  body:['出处：'+owner.title+' · '+webExcerptOrigin(owner),quote].join('\n\n'),
+  tags:['网页摘录'],date:today(),status:statusOptions.paper[0],pinned:false,
+  relatedResources:[owner.id],webSource:source,attachments:[]
+ };
+ if(profileId!==appState.activeId)throw new Error('工作台已切换。');
+ await put(note);
+ toast('摘录已保存为研究笔记',{label:'打开笔记',run:()=>showDetail(note.id)});
+}
+let pendingWebFocus=null;
+function focusWebQuote(session,source){
+ selectWebReaderMode(session,'article');
+ const apply=()=>{
+  if(webReaderSession!==session||session.mode!=='article')return;
+  const position=webQuotePosition(session.article.textContent,{mode:'article',...source});
+  if(!position){toast('原文中找不到这段摘录。');return}
+  const range=webTextRangeMap(session.article)(...position);
+  if(!range){toast('原文中找不到这段摘录。');return}
+  if(globalThis.Highlight&&CSS.highlights){
+   CSS.highlights.set('web-article-focus',new Highlight(range));
+   setTimeout(()=>{if(webReaderSession===session)CSS.highlights.delete('web-article-focus')},6000);
+  }
+  const top=range.getBoundingClientRect().top-session.scroll.getBoundingClientRect().top;
+  session.scroll.scrollBy({top:top-36,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+ };
+ // restoreWebArticleScroll 也在下一帧改滚动位置，定位必须晚于它。
+ requestAnimationFrame(()=>requestAnimationFrame(apply));
+}
+async function openWebEvidence(source){
+ if(!validWebNoteSource(source)||!source)return;
+ const record=webRecord(source.recordId);
+ if(!record){toast('原网页已从资料库移除。');return}
+ if($('reader').open){
+  const closed=new Promise(resolve=>$('reader').addEventListener('close',resolve,{once:true}));
+  $('reader').close();await closed;
+ }
+ pendingWebFocus=source;
+ try{await openSavedWebpage(record)}
+ finally{if(pendingWebFocus===source)pendingWebFocus=null}
+}
+function renderWebSourceLink(note){
+ const source=note.webSource;
+ if(!source||!validWebNoteSource(source))return;
+ const button=document.createElement('button');
+ button.type='button';button.className='secondary';button.textContent='打开原文摘录';
+ button.onclick=async()=>{try{await openWebEvidence(source)}catch(error){toast(error.message)}};
+ $('detailContent').append(button);
+}
 function renderWebAnnotations(session){
  const marks=currentWebAnnotations(session.id),text=session.article.textContent,rangeFor=webTextRangeMap(session.article);
  session.markList.replaceChildren();
@@ -167,6 +246,15 @@ function renderWebAnnotations(session){
    card.append(quote);
   }
   if(mark.note){const note=document.createElement('p');note.className='web-mark-note';note.textContent=mark.note;card.append(note)}
+  if(mark.quote){
+   const save=document.createElement('button');save.type='button';save.className='secondary web-mark-save';save.textContent='保存为研究笔记';
+   save.onclick=async()=>{
+    save.disabled=true;
+    try{await saveWebExcerpt(session,mark)}catch(error){toast(error.message)}
+    finally{save.disabled=false}
+   };
+   card.append(save);
+  }
   session.markList.append(card);
  }
  if(!marks.length){const empty=document.createElement('p');empty.className='web-reader-hint';empty.textContent='这里会汇总正文与原网页标注。';session.markList.append(empty)}
@@ -196,6 +284,7 @@ function selectWebReaderMode(session,mode){
   if(!session.frame.srcdoc)session.frame.srcdoc=session.snapshot;
  }else restoreWebArticleScroll(session);
  session.highlighter.disabled=mode!=='article';
+ if(session.excerptButton)session.excerptButton.disabled=mode!=='article';
  checkpointWebReading(session);
 }
 function setWebReadLabel(session){
@@ -262,10 +351,11 @@ async function openSavedWebpage(record){
      <label>背景 <select data-web-theme><option value="system">跟随工作台</option><option value="light">白天</option><option value="paper">纸张</option><option value="dark">夜间</option></select></label>
     </div>
     <div class="web-reader-notes">
-     <h3>网页标注</h3><p class="web-reader-hint">选中正文后添加高亮，也可写下阅读笔记。</p>
+     <h3>网页标注</h3><p class="web-reader-hint">选中正文后可高亮、保存笔记，或保存为研究笔记。</p>
      <textarea aria-label="阅读笔记" maxlength="1200" rows="2" placeholder="写下一条阅读笔记…"></textarea>
      <div class="web-reader-note-actions">
       <button type="button" class="secondary" data-web-highlight>高亮所选</button>
+      <button type="button" class="secondary" data-web-excerpt>保存为研究笔记</button>
       <button type="button" class="primary" data-web-save>保存笔记</button>
      </div>
      <div class="web-reader-mark-list"></div>
@@ -277,7 +367,7 @@ async function openSavedWebpage(record){
   const session={id:record.id,profileId,shell,prefs:webReaderPrefs(profileId),articleScroll:initial.scroll,mode:null,
    snapshot,article:get('.web-reader-article'),scroll:get('.web-reader-scroll'),articleArea:get('.web-reader-scroll'),snapshotArea:get('.web-reader-snapshot'),
    frame:get('iframe'),articleMode:get('[data-web-article]'),snapshotMode:get('[data-web-snapshot]'),marksButton:get('[data-web-marks]'),
-   markList:get('.web-reader-mark-list'),readButton:get('[data-web-done]'),highlighter:get('[data-web-highlight]'),exportButton:get('[data-web-export]'),selection:null};
+   markList:get('.web-reader-mark-list'),readButton:get('[data-web-done]'),highlighter:get('[data-web-highlight]'),excerptButton:get('[data-web-excerpt]'),exportButton:get('[data-web-export]'),selection:null};
   webReaderSession=session;
   const url=new URL(record.webArticle.url);
   get('.web-reader-header p').textContent=url.hostname;
@@ -342,6 +432,11 @@ async function openSavedWebpage(record){
    finally{saveButton.disabled=false;session.highlighter.disabled=session.mode!=='article'}
   }
   session.highlighter.onclick=()=>addMark(false);saveButton.onclick=()=>addMark(true);
+  session.excerptButton.onclick=async()=>{
+   session.excerptButton.disabled=true;
+   try{await saveWebExcerpt(session)}catch(error){toast(error.message)}
+   finally{session.excerptButton.disabled=session.mode!=='article'}
+  };
   session.scroll.onscroll=()=>{
    if(session.mode!=='article')return;
    const max=session.scroll.scrollHeight-session.scroll.clientHeight;
@@ -351,6 +446,9 @@ async function openSavedWebpage(record){
   reader.showModal();
   selectWebReaderMode(session,snapshot&&initial.mode==='snapshot'?'snapshot':'article');
   renderWebAnnotations(session);
+  const focus=pendingWebFocus;
+  pendingWebFocus=null;
+  if(focus?.recordId===session.id)focusWebQuote(session,focus);
  }catch(error){
   reader.classList.remove('web-reader');download.hidden=false;
   toast('无法打开网页：'+error.message);
@@ -362,5 +460,6 @@ $('reader').addEventListener('close',()=>{
  webReaderSession=null;
  $('reader').classList.remove('web-reader');$('readerDownload').hidden=false;
  CSS.highlights?.delete('web-article-mark');
+ CSS.highlights?.delete('web-article-focus');
  persistWebReading(session).then(()=>{if(!$('reader').open&&ready)render()});
 });
