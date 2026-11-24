@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 接收已打开的工作台 Playwright page、closeReader 辅助函数与 3 页测试 PDF 路径。
- * [OUTPUT]: 提供 testWebExcerpt、testAppendPdfExcerpt 与 testPdfBacklinksAndScannedOcr。
- * [POS]: 由 test-workspace.mjs 调用，专职验证「阅读 → 摘录 → 记录 → 双向回跳」及扫描页离线识字入索引。
+ * [OUTPUT]: 提供 testWebExcerpt、testAppendPdfExcerpt 与 testPdfBacklinksAndScannedOcr（含跨账户端到端备份恢复与增量引用重映射演练）。
+ * [POS]: 由 test-workspace.mjs 调用，专职验证「阅读 → 摘录 → 记录 → 双向回跳」、扫描页离线识字入索引与完整备份恢复闭环。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 import assert from 'node:assert/strict';
@@ -14,16 +14,24 @@ export async function testWebExcerpt(page) {
     const after = '锚点之后。';
     const html = '<p>填充段落。</p>'.repeat(40) + '<p>' + before + quoteText + after + '</p>';
     const fileId = crypto.randomUUID();
+    const snapId = crypto.randomUUID();
     const recordId = crypto.randomUUID();
     const blob = new Blob([html], { type: 'text/html' });
+    const snap = new Blob(['<!doctype html><title>出处网页</title>' + html], { type: 'text/html' });
     const capturedAt = new Date().toISOString();
     await put({
       id: recordId, type: 'resource', title: '出处网页', author: '', reference: '', url: '',
       body: '', date: today(), tags: [], status: '待读', pinned: false,
-      attachments: [{ id: fileId, name: 'article.html', mime: 'text/html', size: blob.size, addedAt: capturedAt, webRole: 'article' }],
-      webArticle: { url: 'https://example.com/source', capturedAt },
+      attachments: [
+        { id: fileId, name: 'article.html', mime: 'text/html', size: blob.size, addedAt: capturedAt, webRole: 'article' },
+        { id: snapId, name: 'snapshot.html', mime: 'text/html', size: snap.size, addedAt: capturedAt, webRole: 'snapshot' }
+      ],
+      webArticle: { url: canonicalWebArticleUrl('https://example.com/source'), excerpt: quoteText, searchText: before + quoteText + after, capturedAt },
       updatedAt: capturedAt
-    }, [{ key: fileKey(appState.activeId, fileId), blob }]);
+    }, [
+      { key: fileKey(appState.activeId, fileId), blob },
+      { key: fileKey(appState.activeId, snapId), blob: snap }
+    ]);
     await saveWebExcerpt({
       id: recordId, mode: 'article',
       selection: { quote: quoteText, start: before.length, end: before.length + quoteText.length, before, after }
@@ -238,4 +246,125 @@ export async function testPdfBacklinksAndScannedOcr(page, resumeFixture, closeRe
   await page.locator('#pdfSearchResults .workspace-search-result[data-search-kind="pdf"]').filter({ hasText: '扫描件讲义' }).waitFor();
   await page.locator('#pdfSearchDialog [data-close="pdfSearchDialog"]').click();
   console.log('PASS pdf backlinks and scanned OCR: live page badge, top-layer detail jump, offline OCR excerpt and full-text index');
+
+  await testBackupRestoreDrill(page, seeded, closeReader);
+}
+
+async function testBackupRestoreDrill(page, seeded, closeReader) {
+  const drill = await page.evaluate(async ({ pdfFileId }) => {
+    const sourceProfileId = appState.activeId;
+    const restoreProfileId = crypto.randomUUID();
+    function makeDirHandle(entries, prefix = '') {
+      return {
+        async getDirectoryHandle(name) {
+          const nextPrefix = prefix + name + '/';
+          if (!entries.some(item => item.path.startsWith(nextPrefix))) throw new Error('missing dir: ' + nextPrefix);
+          return makeDirHandle(entries, nextPrefix);
+        },
+        async getFileHandle(name) {
+          const entry = entries.find(item => item.path === prefix + name);
+          if (!entry) throw new Error('missing file: ' + prefix + name);
+          return { async getFile() { return new File([entry.blob], name, { type: entry.blob.type }); } };
+        }
+      };
+    }
+    const snapshot1 = await folderContents(false, { large: true, restoreOnly: true });
+    const next = structuredClone(appState);
+    next.profiles.push({
+      id: restoreProfileId, name: '隔离恢复演练账户', role: '', topics: [...DEFAULT_TOPICS],
+      categories: categoryDefaults(), journalLayoutVersion: 2, planLayoutVersion: 2,
+      navLabels: {}, navDescriptions: {}, reading: {}, reminders: [], readingLists: [], folders: [], records: [], trash: []
+    });
+    next.activeId = restoreProfileId;
+    await commitState(next);
+    updateIdentity();
+    render();
+    window.__qaBackupSnapshots = { makeDirHandle, snapshot1, sourceProfileId, restoreProfileId, pdfFileId };
+    window.showDirectoryPicker = async () => makeDirHandle(window.__qaBackupSnapshots.current);
+    window.__qaBackupSnapshots.current = snapshot1;
+    document.getElementById('restoreLargeBackupFolder').hidden = false;
+    return { sourceProfileId, restoreProfileId };
+  }, seeded);
+
+  await page.evaluate(() => document.getElementById('backupBtn').click());
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#restoreLargeBackupFolder').click();
+  await page.waitForFunction(() => /导入完成：新增/.test(document.getElementById('importMessage')?.textContent || ''));
+  await page.locator('#backup [data-close="backup"]').click();
+
+  // 1. 验证隔离空账户恢复后：目录树保留、PDF 详情回跳 + 页面「被引用 2」角标正常
+  showDetailAndJump: {
+    await page.evaluate(issueId => showDetail(issueId), seeded.issueId);
+    await page.locator('#detailContent button', { hasText: '打开 resume-backlink.pdf · 第 3 页' }).click();
+    await page.waitForFunction(() =>
+      document.getElementById('reader').open &&
+      readingSession?.page === 3 &&
+      document.querySelector('[data-pdf-page="3"] .pdf-note-source-focus'));
+    assert.equal(await page.locator('[data-pdf-page="3"] .pdf-backlink-badge').innerText(), '被引用 2');
+    await closeReader(page);
+    await page.locator('#detail [data-close="detail"]').click();
+  }
+
+  // 2. 验证网页摘录回跳与高亮在恢复账户中完好
+  await page.evaluate(async () => {
+    const webNote = records.find(note => note.webSource?.quote === '链上要找回的这一句摘录。');
+    if (!webNote) throw new Error('restored web excerpt note missing');
+    await openWebEvidence(webNote.webSource);
+  });
+  await page.waitForFunction(() => {
+    const highlight = CSS.highlights?.get('web-article-focus');
+    const range = highlight ? [...highlight][0] : null;
+    return document.getElementById('reader')?.open && range?.toString() === '链上要找回的这一句摘录。';
+  });
+  await closeReader(page);
+
+  // 3. 验证扫描页离线 OCR 索引随备份迁移，无需重跑 OCR 即可全文检索命中
+  await page.evaluate(() => document.getElementById('openPdfSearch').click());
+  await page.locator('#pdfSearchDialog').waitFor();
+  await page.locator('#workspaceSearchScope').selectOption('pdf');
+  await page.locator('#pdfSearchQuery').fill('OFFSET');
+  await page.locator('#pdfSearchResults .workspace-search-result[data-search-kind="pdf"]').filter({ hasText: '扫描件讲义' }).waitFor();
+  await page.locator('#pdfSearchDialog [data-close="pdfSearchDialog"]').click();
+
+  // 4. 增量合并恢复演练：原账户新增一条引用同一 PDF 第 2 页的仿真日志，再次合并进恢复账户（原 PDF 被跳过，新记录引用 fileId 自动重映射到恢复账户的附件 ID）
+  const simNoteId = await page.evaluate(async ({ sourceProfileId, restoreProfileId, pdfFileId }) => {
+    const switchTo = async id => {
+      const state = structuredClone(appState);
+      state.activeId = id;
+      await commitState(state);
+      updateIdentity();
+      render();
+    };
+    await switchTo(sourceProfileId);
+    const simId = crypto.randomUUID();
+    await put({
+      id: simId, type: 'study', title: '仿真复盘：再生时间常数', body: '蒙特卡洛仿真收敛记录',
+      date: today(), status: '整理中', tags: ['仿真'], pinned: false, author: '', reference: '', url: '', attachments: []
+    });
+    await appendPdfExcerpt({ file: { id: pdfFileId, name: 'resume-backlink.pdf' }, profileId: sourceProfileId }, {
+      page: 2, rects: [[0.15, 0.3, 0.4, 0.08]], quote: 'Monte Carlo sigma = 0.42 mV'
+    }, simId);
+    const snapshot2 = await folderContents(false, { large: true, restoreOnly: true });
+    await switchTo(restoreProfileId);
+    window.__qaBackupSnapshots.current = snapshot2;
+    return simId;
+  }, { ...drill, pdfFileId: seeded.pdfFileId });
+
+  await page.evaluate(() => document.getElementById('backupBtn').click());
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#restoreLargeBackupFolder').click();
+  await page.waitForFunction(() => /导入完成：新增 1 条/.test(document.getElementById('importMessage')?.textContent || ''));
+  await page.locator('#backup [data-close="backup"]').click();
+
+  await page.evaluate(simId => showDetail(simId), simNoteId);
+  assert.equal(await page.locator('#detailContent .pdf-evidence-quote').innerText(), 'Monte Carlo sigma = 0.42 mV');
+  await page.locator('#detailContent button', { hasText: '打开 resume-backlink.pdf · 第 2 页' }).click();
+  await page.waitForFunction(() =>
+    document.getElementById('reader').open &&
+    readingSession?.page === 2 &&
+    document.querySelector('[data-pdf-page="2"] .pdf-note-source-focus'));
+  assert.equal(await page.locator('[data-pdf-page="2"] .pdf-backlink-badge').innerText(), '被引用 1');
+  await closeReader(page);
+  await page.locator('#detail [data-close="detail"]').click();
+  console.log('PASS end-to-end backup & restore drill: isolated profile recovery, PDF/web jump-back, OCR index carryover and incremental fileId remap');
 }

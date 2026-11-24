@@ -355,7 +355,7 @@ async function collectBackup(includeData,{large=false,onProgress}={}){
  let attachmentBytes=0;
  for(const note of p.records)for(const a of note.attachments||[])attachmentBytes+=includeData?Math.ceil(a.size/3)*4:a.size;
  if(!large&&attachmentBytes>MAX_BACKUP)throw new Error('附件超出备份文件容量。桌面版请完全退出软件，再复制「设置」中显示的资料目录进行备份。');
- for(const note of p.records){for(const a of note.attachments||[]){const blob=await readBlob(a.id,p.id);if(blob.size!==a.size)throw new Error('附件大小异常：'+a.name);a.annotations=await fileAnnotations(p.id,a);if(fileIsVideo(a)){const frames=await fileVideoFrameNotes(p.id,a);if(frames.length)a.videoFrameNotes=frames;else delete a.videoFrameNotes}a.sha256=await fileDigest(blob,(done,total)=>onProgress?.(a.name,done,total));a.path=attachmentPath(p,note,a);if(includeData)a.data=await blobToBase64(blob);files.push({path:a.path,blob})}}
+ for(const note of p.records){for(const a of note.attachments||[]){const blob=await readBlob(a.id,p.id);if(blob.size!==a.size)throw new Error('附件大小异常：'+a.name);a.annotations=await fileAnnotations(p.id,a);if(fileIsPdf(a)&&typeof readPdfOcrPages==='function'){const ocr=await readPdfOcrPages(a.id,p.id);if(ocr?.pages&&Object.keys(ocr.pages).length)a.ocrPages=ocr.pages;else delete a.ocrPages}if(fileIsVideo(a)){const frames=await fileVideoFrameNotes(p.id,a);if(frames.length)a.videoFrameNotes=frames;else delete a.videoFrameNotes}a.sha256=await fileDigest(blob,(done,total)=>onProgress?.(a.name,done,total));a.path=attachmentPath(p,note,a);if(includeData)a.data=await blobToBase64(blob);files.push({path:a.path,blob})}}
  return {backup:{format:'analog-notes',version:2,exportedAt:new Date().toISOString(),profile:{name:p.name,role:p.role,topics:p.topics,categories:p.categories,journalLayoutVersion:p.journalLayoutVersion,planLayoutVersion:p.planLayoutVersion,navLabels:p.navLabels,navDescriptions:p.navDescriptions||{},reading:p.reading,reminders:p.reminders||[],readingLists:p.readingLists||[],folders:p.folders||[],dashboardWidgets:dashboardWidgetsFor(p),dashboardWidgetLayoutVersion:1},records:p.records},files};
 }
 function markdown(note){return '# '+note.title+'\n\n'+note.date+' · '+names[note.type]+' · '+note.status+'\n\n标签：'+note.tags.join(' / ')+'\n\n'+(note.reference?note.reference+'\n\n':'')+(note.url?note.url+'\n\n':'')+(note.bodyHtml?noteBodyHtml(note):note.body)+'\n\n'+(note.attachments?.length?'附件：\n'+note.attachments.map(a=>'- '+a.name+' ('+sizeLabel(a.size)+')').join('\n'):'')}
@@ -449,7 +449,7 @@ async function readBackupAttachment(attachment,zip,onProgress){
  return blob;
 }
 
-async function stageBackupRecords(sourceRecords,zip,profile,onProgress){
+async function stageBackupRecords(sourceRecords,zip,profile,onProgress,allBackupRecords=sourceRecords){
  const existingIds=new Set(profile.records.map(note=>note.id)),seenAttachments=new Set(),entries=[],restoredIds=new Map();
  for(const original of sourceRecords){
   if(existingIds.has(original.id))continue;
@@ -459,6 +459,7 @@ async function stageBackupRecords(sourceRecords,zip,profile,onProgress){
   if(!validWebArticle(note))throw new Error('网页收藏或标注信息无效。');
   for(const attachment of note.attachments){
    if(attachment.annotations!==undefined)attachment.annotations=checkedAnnotations(attachment.annotations);
+   if(attachment.ocrPages!==undefined)attachment.ocrPages=checkedPdfOcrPages(attachment.ocrPages);
    if(attachment.videoFrameNotes!==undefined)attachment.videoFrameNotes=checkedVideoFrameNotes(attachment.videoFrameNotes);
    const oldId=attachment.id;
    if(seenAttachments.has(oldId))throw new Error('附件编号重复。');
@@ -489,7 +490,14 @@ async function stageBackupRecords(sourceRecords,zip,profile,onProgress){
  }
  for(const {note} of entries){
   for(const source of [note.pdfSource,...(note.pdfEvidence||[])].filter(Boolean)){
-   if(restoredIds.has(source.fileId))source.fileId=restoredIds.get(source.fileId);
+   if(restoredIds.has(source.fileId)){source.fileId=restoredIds.get(source.fileId);continue;}
+   const liveOwner=(profile.records||[]).find(item=>item.id===source.recordId);
+   if(!liveOwner?.attachments?.length||liveOwner.attachments.some(item=>item.id===source.fileId))continue;
+   const backupOwner=(allBackupRecords||[]).find(item=>item.id===source.recordId);
+   const backupAtt=backupOwner?.attachments?.find(item=>item.id===source.fileId);
+   const matched=liveOwner.attachments.find(item=>backupAtt&&item.name===backupAtt.name&&item.size===backupAtt.size&&item.mime===backupAtt.mime)
+    ||liveOwner.attachments.find(item=>item.name===source.fileName);
+   if(matched)source.fileId=matched.id;
   }
  }
  return entries;
@@ -587,7 +595,7 @@ async function ensureBackupImportSpace(backup){
   message.textContent='空间检查通过，正在验证备份文件…';
   const staged=await stageBackupRecords(duplicates.records,zip,activeProfile(),(name,done,total)=>{
    message.textContent='正在验证 '+name+' · '+sizeLabel(done)+' / '+sizeLabel(total);
-  });
+  },backup.records);
   if(profileId!==appState.activeId)throw new Error('当前用户已变化，请重新导入。');
 
   // A record can be saved while attachment decoding is in progress.

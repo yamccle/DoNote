@@ -137,6 +137,8 @@ const names = {
   folders: 'DoNote-20261124T090001Z-a1b2c3d4',
   dav: 'DoNote-20261124T090002Z-aabbccdd',
   second: 'DoNote-20261124T090003Z-11223344',
+  third: 'DoNote-20261124T090007Z-33445566',
+  fourth: 'DoNote-20261124T090008Z-77889900',
   partial: 'DoNote-20261124T090004Z-abcdef12',
   cancelled: 'DoNote-20261124T090005Z-deadbeef',
   markerOnly: 'DoNote-20261124T090006Z-5555abcd'
@@ -225,7 +227,13 @@ try {
   await folder('download', names.partial, failedRestore, false);
   await folder('download', names.markerOnly, failedRestore, false);
   assert.deepEqual(await readdir(failedRestore), []);
-  console.log('PASS 网盘同步文件夹：快照与附件逐字节恢复，旧版本保留，未完成快照不可选。');
+  await writeFile(join(local, 'keep-my-note.txt'), 'unrelated user file');
+  await folder('upload', names.third);
+  await folder('upload', names.fourth);
+  assert.equal(await folder('prune', '2'), '1');
+  assert.deepEqual(listNames(await folder('list')), [names.fourth, names.third].sort());
+  assert.equal(await readFile(join(local, 'keep-my-note.txt'), 'utf8'), 'unrelated user file');
+  console.log('PASS 网盘同步文件夹：快照与附件逐字节恢复，保留份数自动清理旧快照且不触碰无关文件，未完成快照不可选。');
 
   await dav('upload', names.dav);
   const remoteZipPath = davBase + names.dav + '.zip';
@@ -243,7 +251,18 @@ try {
   assert.deepEqual(listNames(await dav('list')), [names.dav, names.second]);
   await dav('download', names.dav, restored);
   await assertRestored(restored, names.dav);
-  console.log('PASS WebDAV：认证、提交标记顺序、多版本列表和快照逐字节往返。');
+  fixture.files.set(davBase + 'unrelated.txt', Buffer.from('keep'));
+  await dav('upload', names.third);
+  await dav('upload', names.fourth);
+  const logStart = fixture.log.length;
+  assert.equal(await dav('prune', '2'), '2');
+  assert.deepEqual(listNames(await dav('list')), [names.fourth, names.third].sort());
+  assert.ok(fixture.files.has(davBase + 'unrelated.txt'));
+  const deletes = fixture.log.slice(logStart).filter(item => item.method === 'DELETE').map(item => item.path);
+  assert.ok(deletes.indexOf(davBase + names.dav + '.complete.json') < deletes.indexOf(davBase + names.dav + '.zip'), 'WebDAV 清理旧快照必须先删除完成标记再删除 ZIP');
+  await dav('upload', names.dav);
+  const republishedArchive = fixture.files.get(remoteZipPath);
+  console.log('PASS WebDAV：认证、提交标记顺序、多版本列表、先删标记后删归档的保留份数清理和快照逐字节往返。');
 
   fixture.faults.set('PUT', (path, response) => {
     if (path !== davBase + names.partial + '.complete.json') return false;
@@ -253,18 +272,18 @@ try {
   await dav('upload', names.partial, source, false);
   fixture.faults.delete('PUT');
   assert.ok(!fixture.files.has(davBase + names.partial + '.complete.json'));
-  fixture.files.set(davBase + names.partial + '.zip', remoteArchive);
+  fixture.files.set(davBase + names.partial + '.zip', republishedArchive);
   fixture.files.set(davBase + names.markerOnly + '.complete.json', remoteMarker);
-  assert.deepEqual(listNames(await dav('list')), [names.dav, names.second]);
+  assert.deepEqual(listNames(await dav('list')), [names.dav, names.fourth, names.third].sort());
   await dav('cancel-upload', names.cancelled, source, false);
   assert.ok(!fixture.files.has(davBase + names.cancelled + '.complete.json'));
 
-  const damaged = Buffer.from(remoteArchive);
+  const damaged = Buffer.from(republishedArchive);
   damaged[damaged.length - 3] ^= 1;
   fixture.files.set(remoteZipPath, damaged);
   await dav('download', names.dav, failedRestore, false);
   assert.deepEqual(await readdir(failedRestore), []);
-  fixture.files.set(remoteZipPath, remoteArchive);
+  fixture.files.set(remoteZipPath, republishedArchive);
   await dav('list', '', source, false, 'incorrect');
 
   fixture.faults.set('PROPFIND', (path, response) => {

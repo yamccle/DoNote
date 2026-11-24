@@ -13,8 +13,8 @@
 ## 云备份
 
 - `LargeBackup.cs` 写入本机备份，并把已完成的快照交给云备份。
-- `CloudBackup.cs` 绑定系统选取的同步目录。保存 Windows 用户加密设置。
-- `CloudBackupTransport.cs` 传输版本化 ZIP 和完成标记。验证下载后解包。
+- `CloudBackup.cs` 绑定系统选取的同步目录，保存 Windows 用户加密设置及保留份数策略，并在新快照上传完成后触发旧快照清理。
+- `CloudBackupTransport.cs` 传输版本化 ZIP 和完成标记，按先删标记再删归档顺序清理超限旧快照，验证下载后解包。
 
 ## 开场动画
 
@@ -33,6 +33,6 @@
 ## 云端备份
 
 - `desktop-large-backup.js` 为本地备份和云端快照暂存复用按块写入。
-- `desktop-cloud-backup.js` 配置备份目标并显示传输进度。下载完成后使用原有文件夹恢复。
+- `desktop-cloud-backup.js` 配置备份目标与保留版本数并显示传输进度。下载完成后使用原有文件夹恢复。
 
 [PROTOCOL]: Update this header on change, then check AGENTS.md

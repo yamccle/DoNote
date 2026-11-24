@@ -1,6 +1,6 @@
 /*
- * [INPUT]: 接收工作台云备份命令、原生目录选择和已完成的本地快照。
- * [OUTPUT]: 保存加密连接设置，并发送备份列表、传输进度与结果。
+ * [INPUT]: 接收工作台云备份命令、保留份数策略、原生目录选择和已完成的本地快照。
+ * [OUTPUT]: 保存加密连接设置，执行上传后旧版本清理，并发送备份列表、传输进度与结果。
  * [POS]: Windows 宿主连接现有大文件备份写入器与云备份传输。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -25,6 +25,7 @@ internal sealed class CloudBackupSettings
     public string url { get; set; }
     public string username { get; set; }
     public string password { get; set; }
+    public int keepCount { get; set; }
 }
 
 internal sealed partial class WorkspaceWindow
@@ -42,6 +43,23 @@ internal sealed partial class WorkspaceWindow
         return request.TryGetValue(key, out item) ? item as string : null;
     }
 
+    private static int ParseKeepCount(Dictionary<string, object> request, int fallback)
+    {
+        object raw;
+        if (!request.TryGetValue("keepCount", out raw) || raw == null) return NormalizeKeepCount(fallback);
+        int parsed;
+        if (raw is int) parsed = (int)raw;
+        else if (!Int32.TryParse(Convert.ToString(raw), out parsed))
+            throw new InvalidDataException("保留备份份数无效。");
+        if (parsed < 0 || parsed > 200) throw new InvalidDataException("保留备份份数需在 0 到 200 之间。");
+        return parsed;
+    }
+
+    private static int NormalizeKeepCount(int value)
+    {
+        return value < 0 || value > 200 ? 0 : value;
+    }
+
     private static object CloudView(CloudBackupSettings settings)
     {
         return new
@@ -50,7 +68,8 @@ internal sealed partial class WorkspaceWindow
             folder = settings.folder ?? "",
             url = settings.url ?? "",
             username = settings.username ?? "",
-            hasPassword = !String.IsNullOrEmpty(settings.password)
+            hasPassword = !String.IsNullOrEmpty(settings.password),
+            keepCount = NormalizeKeepCount(settings.keepCount)
         };
     }
 
@@ -63,6 +82,7 @@ internal sealed partial class WorkspaceWindow
             var settings = cloudBackupJson.Deserialize<CloudBackupSettings>(Encoding.UTF8.GetString(bytes));
             if (settings == null || (settings.mode != "folder" && settings.mode != "webdav"))
                 throw new InvalidDataException("云备份设置无效。");
+            settings.keepCount = NormalizeKeepCount(settings.keepCount);
             return settings;
         }
         catch (CryptographicException)
@@ -121,7 +141,7 @@ internal sealed partial class WorkspaceWindow
         try { current = ReadCloudSettings(); }
         catch (InvalidDataException) { current = new CloudBackupSettings(); }
         var mode = CloudValue(request, "mode");
-        var settings = new CloudBackupSettings { mode = mode };
+        var settings = new CloudBackupSettings { mode = mode, keepCount = ParseKeepCount(request, current.keepCount) };
         if (mode == "folder")
         {
             var requested = CloudValue(request, "folder");
@@ -285,8 +305,17 @@ internal sealed partial class WorkspaceWindow
                 else if (action == "upload")
                 {
                     var source = cloudCompletedSnapshot;
+                    var keepCount = NormalizeKeepCount(ReadCloudSettings().keepCount);
                     await Task.Run(() => transport.UploadAsync(name, source, progress, token));
-                    result = new { type = "cloud-backup-result", id, name };
+                    var pruned = 0;
+                    string pruneWarning = null;
+                    if (keepCount > 0)
+                    {
+                        try { pruned = await Task.Run(() => transport.PruneAsync(keepCount, token)); }
+                        catch (OperationCanceledException) { throw; }
+                        catch (Exception pruneError) { pruneWarning = pruneError.Message; }
+                    }
+                    result = new { type = "cloud-backup-result", id, name, pruned, pruneWarning };
                 }
                 else
                 {

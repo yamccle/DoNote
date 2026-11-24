@@ -25,10 +25,34 @@ async function readPdfIndexSegments(fileId, profileId) {
  return items.filter(item => Number.isInteger(item?.start));
 }
 
+function checkedPdfOcrPages(value) {
+ if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('扫描识字索引格式无效。');
+ const keys = Object.keys(value);
+ if (keys.length > 10000) throw new Error('扫描识字索引页数过多。');
+ const clean = {};
+ for (const key of keys) {
+  const n = Number(key), text = value[key];
+  if (!Number.isInteger(n) || n < 1 || n > 100000 || typeof text !== 'string' || text.length > 60000) {
+   throw new Error('扫描识字索引格式无效。');
+  }
+  const trimmed = text.trim();
+  if (trimmed) clean[n] = trimmed;
+ }
+ return clean;
+}
+
 async function readPdfOcrPages(fileId, profileId) {
  const tx = database.transaction('workspace');
  const stored = await reqResult(tx.objectStore('workspace').get(pdfOcrIndexKey(profileId, fileId)));
- return stored && typeof stored === 'object' && stored.pages ? stored : null;
+ if (stored && typeof stored === 'object' && stored.pages) return stored;
+ const profile = appState?.profiles?.find(item => item.id === profileId);
+ const attachment = profile?.records?.flatMap(note => note.attachments || []).find(item => item.id === fileId);
+ if (attachment?.ocrPages && Object.keys(attachment.ocrPages).length) {
+  const pages = checkedPdfOcrPages(attachment.ocrPages);
+  const maxPage = Math.max(1, ...Object.keys(pages).map(Number));
+  return { totalPages: maxPage, pages };
+ }
+ return null;
 }
 
 async function savePdfOcrPageText(profileId, fileId, totalPages, pageNumber, quote) {

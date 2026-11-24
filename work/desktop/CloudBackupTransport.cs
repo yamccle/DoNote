@@ -1,6 +1,6 @@
 /*
- * [INPUT]: 接收完成的 DoNote 备份目录、同步目录或 WebDAV 连接。
- * [OUTPUT]: 流式传输已校验的 ZIP 快照，并按完成标记列出版本。
+ * [INPUT]: 接收完成的 DoNote 备份目录、同步目录或 WebDAV 连接及保留份数策略。
+ * [OUTPUT]: 流式传输已校验的 ZIP 快照，按完成标记列出版本，并按先删标记后删归档顺序清理超限旧快照。
  * [POS]: 位于 WebView2 宿主和远端存储之间。恢复过程先写隔离目录。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -293,6 +293,46 @@ internal sealed class CloudBackupTransport : IDisposable
             return final;
         }
         finally { RemoveTransferDirectory(destination, stage); }
+    }
+
+    internal async Task<int> PruneAsync(int keepCount, CancellationToken cancellation)
+    {
+        if (keepCount <= 0) return 0;
+        var snapshots = await ListAsync(cancellation);
+        if (snapshots.Length <= keepCount) return 0;
+        var removed = 0;
+        for (var index = keepCount; index < snapshots.Length; index++)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            await DeleteSnapshotAsync(snapshots[index], cancellation);
+            removed++;
+        }
+        return removed;
+    }
+
+    private async Task DeleteSnapshotAsync(string name, CancellationToken cancellation)
+    {
+        RequireName(name);
+        if (folder != null)
+        {
+            var markerPath = Path.Combine(folder, name + MarkerSuffix);
+            var zipPath = Path.Combine(folder, name + ZipSuffix);
+            if (File.Exists(markerPath)) File.Delete(markerPath);
+            if (File.Exists(zipPath)) File.Delete(zipPath);
+            return;
+        }
+        await DeleteWebDavIfExistsAsync(name + MarkerSuffix, cancellation);
+        await DeleteWebDavIfExistsAsync(name + ZipSuffix, cancellation);
+    }
+
+    private async Task DeleteWebDavIfExistsAsync(string name, CancellationToken cancellation)
+    {
+        using (var request = new HttpRequestMessage(HttpMethod.Delete, new Uri(endpoint, name)))
+        using (var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation))
+        {
+            if (response.StatusCode == HttpStatusCode.NotFound) return;
+            EnsureSuccess(response);
+        }
     }
 
     private async Task<CloudBackupMarker> ReadMarkerAsync(string name, CancellationToken cancellation)

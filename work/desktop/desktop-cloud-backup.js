@@ -1,6 +1,6 @@
 /**
- * [INPUT]: 读取已授权的备份目标和本机备份写入接口。
- * [OUTPUT]: 配置目标、上传当前工作台、下载并校验历史备份。
+ * [INPUT]: 读取已授权的备份目标、保留策略和本机备份写入接口。
+ * [OUTPUT]: 配置目标与保留份数、上传当前工作台并自动清理旧快照、下载并校验历史备份。
  * [POS]: 云端备份窗口。恢复沿用本地资料导入入口。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -35,6 +35,7 @@
         </div>
         <label id="cloudBackupClearRow" hidden><input id="cloudBackupClearPassword" type="checkbox"> 清除已保存的密码</label>
        </div>
+       <div class="field"><label for="cloudBackupKeep">保留版本数</label><select id="cloudBackupKeep"><option value="0">保留全部历史版本</option><option value="3">保留最近 3 份</option><option value="5">保留最近 5 份</option><option value="10">保留最近 10 份</option><option value="20">保留最近 20 份</option></select></div>
        <button type="submit" class="primary" id="cloudBackupSave">保存并检查</button>
       </form>
      </details>
@@ -60,7 +61,7 @@
    </dialog>`);
   const dialog=$('cloudBackupDialog'),form=$('cloudBackupForm'),mode=$('cloudBackupMode');
   const fields=$('cloudBackupTarget'),folder=$('cloudBackupFolder'),url=$('cloudBackupUrl');
-  const username=$('cloudBackupUser'),password=$('cloudBackupPassword'),list=$('cloudBackupList');
+  const username=$('cloudBackupUser'),password=$('cloudBackupPassword'),keep=$('cloudBackupKeep'),list=$('cloudBackupList');
   const message=$('cloudBackupMessage'),progress=$('cloudBackupProgress');
   const pending=new Map();
   let settings=null,operation=false,cancellable=false,stopRequested=false,transferring=false,downloadedPath='';
@@ -118,9 +119,15 @@
    $('cloudBackupClearPassword').checked=false;
    password.placeholder=settings.hasPassword?'已保存，留空保留':'';
    $('cloudBackupClearRow').hidden=!settings.hasPassword;
+   const keepCount=Number.isInteger(settings.keepCount)&&settings.keepCount>0?settings.keepCount:0;
+   if(keepCount&&![...keep.options].some(option=>Number(option.value)===keepCount)){
+    keep.add(new Option('保留最近 '+keepCount+' 份',String(keepCount)));
+   }
+   keep.value=String(keepCount);
+   const retention=keepCount?' · 保留最近 '+keepCount+' 份':'';
    $('cloudBackupSummary').textContent=!configured()?'请选择备份目标。':settings.mode==='folder'
-    ?'备份位置 · '+settings.folder+'。写入后由 Google Drive 桌面版上传。'
-    :'备份位置 · '+settings.url;
+    ?'备份位置 · '+settings.folder+retention+'。写入后由 Google Drive 桌面版上传。'
+    :'备份位置 · '+settings.url+retention;
    fields.open=!configured();
    updateMode();updateActions();
   }
@@ -183,7 +190,7 @@
     const target=mode.value==='webdav'
      ?{url:url.value.trim(),username:username.value,password:password.value,clearPassword:$('cloudBackupClearPassword').checked}
      :{folder:folder.value};
-    await request('configure',{mode:mode.value,...target});
+    await request('configure',{mode:mode.value,keepCount:Number(keep.value)||0,...target});
     showSettings((await request('status')).settings);showSnapshots([]);
     setMessage('目标已连接。找到 '+await refresh()+' 份备份。');
    });
@@ -202,11 +209,13 @@
     });
     if(profileChanged())throw new Error('当前工作台已切换，请重新发起备份。');
     setMessage('正在打包并传输…');
-    await transfer('upload',name);
+    const uploaded=await transfer('upload',name);
     if(!profileChanged()){markBackupExport();void refreshStorageSummary();}
-    showSnapshots([{name},...[...list.options].filter(option=>option.value&&option.value!==name).map(option=>({name:option.value}))]);
-    list.value=name;
-    setMessage(settings.mode==='folder'?'备份已写入同步目录。请在 Google Drive 桌面版确认上传完成。':'备份已上传到 WebDAV。');
+    if(Number(settings.keepCount)>0){try{await refresh()}catch{}}
+    else showSnapshots([{name},...[...list.options].filter(option=>option.value&&option.value!==name).map(option=>({name:option.value}))]);
+    if([...list.options].some(option=>option.value===name))list.value=name;
+    const pruneNote=uploaded?.pruneWarning?'（清理旧版本提示：'+uploaded.pruneWarning+'）':uploaded?.pruned>0?' 已自动清理 '+uploaded.pruned+' 份旧备份。':'';
+    setMessage((settings.mode==='folder'?'备份已写入同步目录。请在 Google Drive 桌面版确认上传完成。':'备份已上传到 WebDAV。')+pruneNote);
    }finally{
     try{await request('discard')}catch{}
    }

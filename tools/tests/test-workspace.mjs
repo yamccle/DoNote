@@ -70,14 +70,23 @@ async function openWorkspace(browser) {
         const { id, action } = message;
         if (action === 'status') result = { settings: cloud.settings };
         if (action === 'choose-folder') result = { folder: 'X:/My Drive/DoNote' };
-        if (action === 'configure') cloud.settings = { mode: message.mode, folder: message.folder };
-        if (action === 'list') result = { snapshots: cloud.names.map(name => ({ name })) };
+        if (action === 'configure') cloud.settings = { mode: message.mode, folder: message.folder, keepCount: message.keepCount || 0 };
+        if (action === 'list') result = { snapshots: [...cloud.names].reverse().map(name => ({ name })) };
         if (action === 'upload') {
           if (cloud.failUpload) result = { error: '测试传输失败' };
-          else cloud.names.push(message.name);
+          else {
+            cloud.names.push(message.name);
+            const keep = cloud.settings?.keepCount || 0;
+            const pruned = keep > 0 && cloud.names.length > keep ? cloud.names.splice(0, cloud.names.length - keep).length : 0;
+            result = { name: message.name, pruned };
+          }
         }
         if (action === 'download') result = { path: 'X:/DoNote-Restore/' + message.name };
         queueMicrotask(() => post({ type: 'cloud-backup-result', id, ...result }));
+        return;
+      }
+      if (message?.type === 'native-storage-space') {
+        queueMicrotask(() => post({ type: 'native-backup-result', id: message.id, freeBytes: 10 * 1024 ** 3 }));
         return;
       }
       if (cloud && typeof message?.type === 'string' && message.type.startsWith('native-backup-')) {
@@ -719,17 +728,19 @@ async function testBackgroundSubtitles(page) {
 
 async function testCloudBackupUi(page) {
   await page.evaluate(() => {
-    qaRelease.cloud = { settings: null, names: [], failUpload: true };
+    qaRelease.cloud = { settings: null, names: ['DoNote-20261124T010001Z-00000001', 'DoNote-20261124T010002Z-00000002', 'DoNote-20261124T010003Z-00000003'], failUpload: true };
     $('backupBtn').click();
   });
   await page.locator('#cloudBackupOpen').click();
   await page.locator('#cloudBackupChoose').click();
+  await page.locator('#cloudBackupKeep').selectOption('3');
   await page.locator('#cloudBackupSave').click();
   await page.waitForFunction(() => !$('cloudBackupRun').disabled);
+  assert.match(await page.locator('#cloudBackupSummary').innerText(), /保留最近 3 份/);
   await page.locator('#cloudBackupRun').click();
   await page.waitForFunction(() =>
     $('cloudBackupMessage').textContent === '测试传输失败' && !$('cloudBackupRun').disabled);
-  assert.equal(await page.locator('#cloudBackupList').locator('option').count(), 1);
+  assert.equal(await page.locator('#cloudBackupList').locator('option').count(), 4);
   const attempted = await page.evaluate(() => {
     qaRelease.cloud.failUpload = false;
     return qaRelease.messages.filter(message => typeof message === 'object');
@@ -744,7 +755,8 @@ async function testCloudBackupUi(page) {
   assert.ok(types.indexOf('upload') < types.indexOf('discard'));
   await page.locator('#cloudBackupRun').click();
   await page.waitForFunction(() =>
-    /确认上传完成/.test($('cloudBackupMessage').textContent) && !$('cloudBackupDownload').disabled);
+    /已自动清理 1 份旧备份/.test($('cloudBackupMessage').textContent) && !$('cloudBackupDownload').disabled);
+  assert.equal(await page.locator('#cloudBackupList').locator('option').count(), 4, '保留最近 3 份加占位项应为 4 项');
   await page.locator('#cloudBackupDownload').click();
   await page.waitForFunction(() => /已下载并通过校验/.test($('cloudBackupMessage').textContent));
   assert.match(await page.locator('#cloudBackupDownloaded').textContent(), /DoNote-Restore/);

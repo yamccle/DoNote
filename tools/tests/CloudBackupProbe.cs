@@ -34,6 +34,10 @@ internal static class CloudBackupProbe
                 {
                     Console.WriteLine(transport.DownloadAsync(args[4], args[5], null, cancellation).GetAwaiter().GetResult());
                 }
+                else if (operation == "prune")
+                {
+                    Console.WriteLine(transport.PruneAsync(Int32.Parse(args[4]), cancellation).GetAwaiter().GetResult());
+                }
                 else
                 {
                     throw new ArgumentException("未知测试步骤。");
