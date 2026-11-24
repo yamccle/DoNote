@@ -27,10 +27,10 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 
 ## 当前状态（换手时）
 
-- 分支 `main` 已包含 r132（源码标签 `r132` → `eb4c918`）；README 与 7 张截图已更新到 r132 界面。
+- 分支 `main` 已包含 r133（源码标签 `r133` → `b6278e6`）；`README.md` 已同步 r133 云端备份与下载信息，7 张工作流程截图来自 r132 演示账户。
 - 恢复基线 `source-baseline-recovered` 指向 `7913398`。
-- 本地发布 **r132 / 26.1132.0078**。包和发布记录位于 `outputs/r132/`；GitHub Release `r132` 已发布并标记为 latest。
-- GitHub Releases：`r130`、`r131`、`r132`（各含完整包 + 增量包 + 发布记录）与 `models-2026-11-23`（13 个模型分卷 + `SHA256SUMS.txt`，共 14 个资产，全部核验）；`latest` 已确认指向 `r132`。
+- 本地发布 **r133 / 26.1133.0079**。包和发布记录位于 `outputs/r133/`；GitHub Release `r133` 已发布并标记为 `latest`。
+- GitHub Releases：`r130`、`r131`、`r132`、`r133`（各含完整包 + 增量包 + 发布记录）与 `models-2026-11-23`（13 个模型分卷 + `SHA256SUMS.txt`，共 14 个资产，全部核验）；`latest` 已确认指向 `r133`。
 - 运行依赖锁定：`docs/releases/runtime-lock.json` 锁定 **r122**（`26.1121.0068`，SHA `6c4da1cf…`），**不要**改成 r123 及以后：发布包不含 `video-runtime/` 构建期资源，改了会构不出来
 - 工作树应为干净；脏树会被 `release.ps1` 直接拒绝
 
@@ -38,6 +38,7 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 
 | 版本 | 内容 |
 | --- | --- |
+| r133 | 新增 Google Drive 同步目录与 WebDAV 版本化云端备份，传输带完成标记与 SHA-256 校验并复用备份文件夹恢复。 |
 | r132 | 文件夹管理默认折叠，点 › 展开下一层；搜索仍能找到深层文件夹。 |
 | r131 | 网页摘录可形成记录并跳回原文；PDF 选区可追加到设计问题或仿真记录，回到同一页与选区。 |
 | r130 | 主页显示继续阅读和近期计划；栏目压缩工具栏，保留原操作。 |
@@ -85,10 +86,12 @@ $edge  = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 发布级检查（`release.ps1` 会自动跑）：
 
 ```powershell
-# 工作台：321 页 / 约 1.01 GiB 合成 PDF、草稿与附件字节、后台字幕与识别中同步翻译
+# 工作台：321 页 / 约 1.01 GiB 合成 PDF、草稿与附件字节、后台字幕与识别中同步翻译、云端备份面板
 node tools/tests/test-workspace.mjs <候选 stage>/workspace
 # 本地快速试跑可加 128（把填充降到 128 MiB）
 node tools/tests/test-workspace.mjs <候选 stage>/workspace 128
+# 云端备份传输（同步目录与模拟 WebDAV 完成标记、SHA-256 校验与解包）
+node tools/tests/test-cloud-backup.mjs <编译后的 CloudBackupProbe.exe>
 # 升级 / 自选资料目录 / 中断回退
 & tools/tests/test-release-update.ps1 -PreviousReleaseZip <上一版完整包> -UpdateZip <候选增量包>
 ```
@@ -99,15 +102,15 @@ node tools/tests/test-workspace.mjs <候选 stage>/workspace 128
 
 ```powershell
 $runtime  = '.\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'   # 运行依赖锁
-$previous = '.\outputs\r132\DoNote-Windows-x64-r132.zip'                   # 上一版完整包
+$previous = '.\outputs\r133\DoNote-Windows-x64-r133.zip'                   # 上一版完整包
 & $pwsh7 -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 `
-  -Revision r133 -Version 26.1133.0079 `
+  -Revision r134 -Version 26.1134.0080 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory outputs
 ```
 
 命令中的包路径从源码工作区解析。独立工作区使用主工作区的 `outputs` 路径。发布后按以下四步更新发布记录。
 
-1. 打标签 `git tag -a r133 -m '…（版本）…' <本次构建用的提交>`。目标提交用发布记录里的 `sourceCommit`。
+1. 打标签 `git tag -a r134 -m '…（版本）…' <本次构建用的提交>`。目标提交用发布记录里的 `sourceCommit`。
 2. 更新 `docs/releases/runtime-lock.json` 的 `latestRelease`（运行依赖那段保持 r122 不动）
 3. 更新 `docs/releases/README.md` 的发布记录表与下一版命令示例
 4. 提交发布文档，确认 `git status` 干净。
@@ -139,8 +142,8 @@ $previous = '.\outputs\r132\DoNote-Windows-x64-r132.zip'                   # 上
 1. 产品主线：「阅读 → 摘录 → 形成记录 → 找回出处」这条链做稳。
 2. 把发布收尾四步自动化进 `release.ps1`（打 tag、回写 lock 与 README、提交）。
 3. 给本地翻译 GGUF 加内置下载器（设置页下载 + 镜像 + 进度），摆脱"必须装 9 GB 模型包"。
-4. GitHub Releases 已启用：`r130`–`r132` 与 `models-2026-11-23`（14 个核验资产）已发布，`latest` 指向 `r132`。后续每版继续发布；模型包 9.25 GB 建议同时放对象存储/网盘，国内下载建议镜像。
-5. 继续补齐 `tools/tests/` 覆盖（工作台、升级回退、大 PDF、草稿/字幕）。
+4. GitHub Releases 已启用：`r130`–`r133` 与 `models-2026-11-23`（14 个核验资产）已发布，`latest` 指向 `r133`。后续每版继续发布；模型包 9.25 GB 建议同时放对象存储/网盘，国内下载建议镜像。
+5. 继续补齐 `tools/tests/` 覆盖（工作台、云端备份传输、升级回退、大 PDF、草稿/字幕）。
 6. 用户明确说过：**不需要**把发布包复制/分卷到 `OUT/`。
 
 ## 换手时先做这几件事
@@ -150,7 +153,7 @@ cd H:\WorkSpace\Codex\2026-11-03\sites-plugin-sites-openai-curated-remote-2
 & $git log --oneline -8
 & $git tag -l
 & $git status --porcelain
-Get-ChildItem outputs\r132
+Get-ChildItem outputs\r133
 Get-ChildItem outputs -Filter 'DoNote-Models*'
 Get-Content docs\releases\runtime-lock.json
 & $git remote -v

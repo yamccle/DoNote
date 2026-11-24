@@ -4,7 +4,7 @@ DoNote 是一款面向工程研发与学术精读的 **Windows 桌面端研究�
 
 - **本地优先**：桌面端基于 C# WinForms 和 Microsoft Edge WebView2，工作台采用原生 JavaScript。记录、附件、阅读进度、批注、OCR、全文检索、语音识别和本地模型翻译都在本机处理。在线翻译、外部 AI 和云端备份按所选服务处理相应内容。
 - **数据自主可控**：工作台数据保存在本机（WebView2 IndexedDB 与程序同级 `Data/` 目录，或 `data-location.txt` 指定的自定义资料目录），不改写原始 PDF 与媒体文件；常规程序升级自动保护用户资料与本地模型，整目录拷贝即可离线迁移。
-- **当前正式程序基线**：`r132`（版本号 `26.1132.0078`，对应源码标签 `r132` / 提交 `eb4c918`）。界面截图来自 `r132`，使用独立测试账户和演示资料。
+- **当前正式程序基线**：`r133`（版本号 `26.1133.0079`，对应源码标签 `r133` / 提交 `b6278e6`）。界面截图来自 `r132`，使用独立测试账户和演示资料。
 
 ---
 
@@ -71,25 +71,25 @@ DoNote 是一款面向工程研发与学术精读的 **Windows 桌面端研究�
 
 ## 下载、安装与升级
 
-> **提示**：正式程序发布页为 **[DoNote `r132` Release](https://github.com/yamccle/DoNote/releases/tag/r132)**；[GitHub Latest](https://github.com/yamccle/DoNote/releases/latest) 已确认指向 `r132`。模型整合包（分卷）位于独立的 [`models-2026-11-23` Release](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)。所有历史版本可在 [Releases 列表](https://github.com/yamccle/DoNote/releases) 查看。
+> **提示**：正式程序发布页为 **[DoNote `r133` Release](https://github.com/yamccle/DoNote/releases/tag/r133)**；[GitHub Latest](https://github.com/yamccle/DoNote/releases/latest) 已确认指向 `r133`。模型整合包（分卷）位于独立的 [`models-2026-11-23` Release](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)。所有历史版本可在 [Releases 列表](https://github.com/yamccle/DoNote/releases) 查看。
 
-### 1. 程序包下载（正式版 `r132` · `26.1132.0078`）
+### 1. 程序包下载（正式版 `r133` · `26.1133.0079`）
 
-程序发布页：**[DoNote `r132` Release](https://github.com/yamccle/DoNote/releases/tag/r132)**
+程序发布页：**[DoNote `r133` Release](https://github.com/yamccle/DoNote/releases/tag/r133)**
 
 | 文件 | 适用场景 | 大小 | SHA-256 |
 | --- | --- | ---: | --- |
-| [`DoNote-Windows-x64-r132.zip`](https://github.com/yamccle/DoNote/releases/download/r132/DoNote-Windows-x64-r132.zip) | **首次安装**，或从任意早于 `r131` 的旧版跨版本升级 | 1,070,401,707 字节（约 1.00 GiB） | `c49cb53bec388fdf6a8639b64a0c2c8b86799727cde2677ad43b672e6d2ee26b` |
-| [`DoNote-Update-26.1131.0077-to-r132.zip`](https://github.com/yamccle/DoNote/releases/download/r132/DoNote-Update-26.1131.0077-to-r132.zip) | **增量升级**（仅限本机当前版本为 `r131` / `26.1131.0077`） | 449,891 字节（约 439 KB） | `304b00e188837c6de207ac093f0658a790e06ca4ce2019286c8c3f6285c93fc3` |
-| [`DoNote-r132-release.json`](https://github.com/yamccle/DoNote/releases/download/r132/DoNote-r132-release.json) | 发布溯源清单（源码提交 `eb4c918`、依赖锁与回归检查记录） | 953 字节 | `83967002eef31365d411a7c17849c75da6cb692d148c0c64d47a31568ba5354d` |
+| [`DoNote-Windows-x64-r133.zip`](https://github.com/yamccle/DoNote/releases/download/r133/DoNote-Windows-x64-r133.zip) | **首次安装**，或从任意早于 `r132` 的旧版跨版本升级 | 1,070,408,220 字节（约 1.00 GiB） | `d36c3035fdc88d34d1747d2f46a79a1ec19f73c1c8f2bd31037bc711cf73486c` |
+| [`DoNote-Update-26.1132.0078-to-r133.zip`](https://github.com/yamccle/DoNote/releases/download/r133/DoNote-Update-26.1132.0078-to-r133.zip) | **增量升级**（仅限本机当前版本为 `r132` / `26.1132.0078`） | 498,945 字节（约 487 KB） | `046314d2d813ebd943bb13b23c166de3cc4316d1a30bd27c1a271b0638f07f3a` |
+| [`DoNote-r133-release.json`](https://github.com/yamccle/DoNote/releases/download/r133/DoNote-r133-release.json) | 发布溯源清单（源码提交 `b6278e6`、依赖锁与回归检查记录） | 984 字节 | `67b96a4c88afee3a3c03b6b05f269afda4b93f82786f0e4698c30ac40c3e0e6a` |
 
 ### 2. 运行环境与安装步骤
 
 - **运行要求**：Windows 10 / 11 x64，需已安装 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)（Windows 11 与新版 Windows 10 通常已自带；若启动提示缺少运行时，从微软官方链接安装后重开即可）。
-- **首次安装**：将 `DoNote-Windows-x64-r132.zip` 完整解压到任意具有读写权限的文件夹（如 `D:\DoNote`），双击 `DoNote.exe` 启动。首次打开默认建立空资料库（默认账户为「默认用户」）。
+- **首次安装**：将 `DoNote-Windows-x64-r133.zip` 完整解压到任意具有读写权限的文件夹（如 `D:\DoNote`），双击 `DoNote.exe` 启动。首次打开默认建立空资料库（默认账户为「默认用户」）。
 - **本地包升级（保留全部资料与模型）**：
   1. 在软件内打开「设置 → 更新与关于 → 检查更新包…」；
-  2. 若当前版本为 `26.1131.0077`（`r131`），直接选择体积更小的增量包 `DoNote-Update-26.1131.0077-to-r132.zip`；若来自更早版本，选择完整包 `DoNote-Windows-x64-r132.zip`；
+  2. 若当前版本为 `26.1132.0078`（`r132`），直接选择体积更小的增量包 `DoNote-Update-26.1132.0078-to-r133.zip`；若来自更早版本，选择完整包 `DoNote-Windows-x64-r133.zip`；
   3. 更新器会校验清单与文件哈希，确认后自动退出主程序、将旧程序备份至上级目录 `DoNote-Backups`，完成替换后重新启动；**升级过程不会删除或覆盖 `Data/`、`data-location.txt` 与 `models/`**，如遇异常中断会自动回退旧版程序。
 - **整机迁移**：完全退出 DoNote 后，将整个程序目录（及自定义资料目录，如有配置）复制到新电脑即可继续使用。
 
@@ -97,7 +97,7 @@ DoNote 是一款面向工程研发与学术精读的 **Windows 桌面端研究�
 
 ## 离线语音与本地翻译模型配置
 
-**不下载额外模型也可正常使用 DoNote**：日常记录、PDF 阅读批注、网页收藏、全文检索、AI 问答，以及**内置的快速离线英译中模型**（用于视频离线字幕翻译和 PDF 快速离线对照翻译，已随 `DoNote-Windows-x64-r132.zip` 内置）均开箱即用。仅当需要**本地视频语音识别**或**本地 Qwen3 大语言模型翻译**时，才需按需配置以下模型。
+**不下载额外模型也可正常使用 DoNote**：日常记录、PDF 阅读批注、网页收藏、全文检索、AI 问答，以及**内置的快速离线英译中模型**（用于视频离线字幕翻译和 PDF 快速离线对照翻译，已随 `DoNote-Windows-x64-r133.zip` 内置）均开箱即用。仅当需要**本地视频语音识别**或**本地 Qwen3 大语言模型翻译**时，才需按需配置以下模型。
 
 > **GitHub 模型整合包分卷（`models-2026-11-23`，已全部核验）**：  
 > 该 Release 提供内层模型包 `DoNote-Models-x64-2026-11-23.zip`（9,252,198,099 字节）的 **13 个分卷**：`Models.z01`～`Models.z12`（每卷 734,003,200 字节）+ `Models.zip`（末卷，445,573,902 字节），另附 `SHA256SUMS.txt`（1,017 字节）。全部 14 个下载链接已逐条 HTTP 校验为 `200 OK`，字节数与上述完全一致。
@@ -168,9 +168,9 @@ DoNote 已内置 `llama.cpp` 推理运行时，只需下载任一档 GGUF 权重
 node tools/tests/test-workspace.mjs <候选构建目录>/workspace
 
 # 2. 从干净的 Git 提交一键构建并核验下一版完整包、增量包与发布记录
-pwsh -File tools/release.ps1 -Revision r133 -Version 26.1133.0079 `
+pwsh -File tools/release.ps1 -Revision r134 -Version 26.1134.0080 `
   -RuntimeArchive .\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip `
-  -PreviousReleaseZip .\outputs\r132\DoNote-Windows-x64-r132.zip `
+  -PreviousReleaseZip .\outputs\r133\DoNote-Windows-x64-r133.zip `
   -OutputDirectory .\outputs
 ```
 
