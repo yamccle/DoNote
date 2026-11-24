@@ -15,8 +15,8 @@ r122 完整包的版本清单为 `26.1121.0068`。其文件名和 SHA-256 位于
 ```powershell
 $outputs = '.\outputs'
 $runtime = Join-Path $outputs 'DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'
-$previous = Join-Path $outputs 'r133\DoNote-Windows-x64-r133.zip'
-pwsh -File tools/release.ps1 -Revision r134 -Version 26.1134.0080 `
+$previous = Join-Path $outputs 'r134\DoNote-Windows-x64-r134.zip'
+pwsh -File tools/release.ps1 -Revision r135 -Version 26.1135.0081 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory $outputs
 ```
 
@@ -28,6 +28,7 @@ pwsh -File tools/release.ps1 -Revision r134 -Version 26.1134.0080 `
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |
 | --- | --- | --- | --- | --- |
+| r134 | 26.1134.0080 | tag `r134` → `33ebc83` | 2026-11-24 | 新增 PDF 页面反向引用与无重载穿梭、扫描页离线识字入全文索引及云端快照保留份数清理；加固增量备份引用重映射。基于 r133（26.1133.0079） |
 | r133 | 26.1133.0079 | tag `r133` → `b6278e6` | 2026-11-24 | 新增 Google Drive 同步目录与 WebDAV 版本化云端备份（含完成标记与 SHA-256 校验恢复）。基于 r132（26.1132.0078） |
 | r132 | 26.1132.0078 | tag `r132` → `eb4c918` | 2026-11-24 | 文件夹管理默认折叠。点 › 展开下一层，搜索仍能找到深层文件夹。基于 r131（26.1131.0077） |
 | r131 | 26.1131.0077 | tag `r131` → `5929076` | 2026-11-24 | 网页摘录可形成记录并回到原文。PDF 选区可追加到设计问题或仿真记录，并回到同一页和选区。基于 r130（26.1130.0076） |
@@ -39,6 +40,14 @@ pwsh -File tools/release.ps1 -Revision r134 -Version 26.1134.0080 `
 | r125 | 26.1125.0071 | tag `r125` → `e02edda` | 2026-11-23 | 字幕识别时逐条同步翻译（边识别边翻译）；基于 r124（26.1124.0070） |
 | r124 | 26.1124.0070 | tag `r124` → `0d35f83` | 2026-11-23 | 按新发布流程重建；基于 r123（26.1123.0069） |
 | r123 | 26.1123.0069 | tag `r123` → `3eba4d6` | 2026-11-23 | 交互优化与工程化整理；基于 r122（26.1121.0068） |
+
+### r134
+
+- 完整包 `outputs/r134/DoNote-Windows-x64-r134.zip`
+  `703880b1bf047ce75a0b13b1cb8eb6dbeb4649734a6cb1d8eae6172b06a45a9e`
+- 增量包 `outputs/r134/DoNote-Update-26.1133.0079-to-r134.zip`
+  `d13af26559bfa7b484ef7f017ff6fd59441c2b17afb78a2b2ba2a40b56c4a642`
+- 发布记录 `outputs/r134/DoNote-r134-release.json`，检查项：`workspace`、`cloud-backup-transport`、`upgrade-and-rollback`、`package-checksums`。
 
 ### r133
 
