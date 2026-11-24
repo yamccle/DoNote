@@ -61,7 +61,7 @@
  background:var(--surface);color:var(--text-soft);border-color:var(--field-border)
 }
 :is(.secondary,.pdf-tools button,.pdf-side button,.rich-tool,.rich-clear):hover {background:var(--surface-hover);color:var(--ink)}
-:is(.nav.active,.manager-row.active,.rich-tool[aria-pressed=true],.image-tools button.active,.reader-panel-tabs .active) {background:var(--surface-hover);color:var(--ink);border-color:var(--field-border)}
+:is(.nav.active,.manager-row.active,.rich-tool[aria-pressed=true],.image-tools button.active) {background:var(--surface-hover);color:var(--ink);border-color:var(--field-border)}
 :is(.rich-wrap:focus-within,.rich-toolbar button:hover) {border-color:var(--muted)}
 .rich-divider {background:var(--line)}
 .rich-toolbar:has(+.rich-editor:focus) {background:var(--surface-soft)}

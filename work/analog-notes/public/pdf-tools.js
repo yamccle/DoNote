@@ -353,7 +353,7 @@ async function enhancePdfReader(session, bar, scroller) {
  }
 
  session.showPdfPanel = mode => showPanel(mode, false);
- session.editTextMark = async mark => {
+ session.editTextMark = async mark => { (session.expandedAnnotationIds ??= new Set()).add(mark.id); renderPdfSidebar(session);
   await showPanel('annotations');
   if (!signal.aborted) side.querySelector('[data-annotation-id="' + mark.id + '"] textarea')?.focus();
  };

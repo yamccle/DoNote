@@ -1,5 +1,10 @@
+/**
+ * [INPUT]: 读取与保存本机翻译语言对配置（源语言与目标语言）。
+ * [OUTPUT]: 提供 storedTranslateLanguage、applyTranslateLanguage、refreshTranslateLanguageLabel 及一键互换语言事件。
+ * [POS]: 连接阅读器翻译面板顶部语言栏与语言设置弹窗。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
-// 翻译语言对：放在设置里维护，阅读器面板只显示当前语言并可一键打开设置。
 const TRANSLATE_LANG_KEY='analog-translate-lang';
 const TRANSLATE_LANG_NAMES={en:'英语',zh:'中文',de:'德语',fr:'法语'};
 function storedTranslateLanguage(){
@@ -32,7 +37,14 @@ function openTranslateLangDialog(){
  if(dialog&&!dialog.open)dialog.showModal();
 }
 document.addEventListener('click',event=>{
- if(event.target.closest('#pdfLangSettings,#openTranslateLangDialog'))openTranslateLangDialog();
+ if(event.target.closest('#pdfLangSettings,#openTranslateLangDialog')){openTranslateLangDialog();return}
+ if(event.target.closest('#pdfLangSwap')){
+  const {source,target}=storedTranslateLanguage();
+  if(source===target)return;
+  try{localStorage.setItem(TRANSLATE_LANG_KEY,JSON.stringify({source:target,target:source}))}catch{}
+  applyTranslateLanguage(target,source);
+  document.dispatchEvent(new CustomEvent('translate-language-change',{detail:{source:target,target:source}}));
+ }
 });
 $('translateLangSave').onclick=()=>{
  const source=$('pdfSourceLang').value,target=$('pdfTargetLang').value;

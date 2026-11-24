@@ -327,54 +327,74 @@ $('backupBtn').onclick=()=>$('backup').showModal();function download(name,text,t
     <button type="button" id="showReaderAi" data-pdf-panel-tab="ai" aria-controls="readerAiPanel" role="tab">AI 问答</button>
    </div>
    <section id="pdfTranslationZone" data-pdf-panel="translation" aria-labelledby="showPdfTranslation" role="tabpanel">
-    <header class="pdf-panel-head">
-     <h3>翻译</h3>
-     <label class="ai-checkbox" title="在 PDF 中选中文字后自动翻译"><input type="checkbox" id="pdfAutoTranslate"> 选中即翻</label>
+    <header class="pdf-panel-head pdf-panel-subbar">
+     <div class="pdf-lang-inline">
+      <span class="pdf-lang-pair"><b id="pdfLangFrom">英语</b><button type="button" class="pdf-lang-swap" id="pdfLangSwap" title="互换源语言与目标语言" aria-label="互换源语言与目标语言">⇄</button><b id="pdfLangTo">中文</b></span>
+      <button type="button" class="link-button" id="pdfLangSettings">语言</button>
+     </div>
+     <label class="ai-checkbox pdf-auto-toggle" title="在 PDF 中选中文字后自动翻译"><input type="checkbox" id="pdfAutoTranslate"> 选中即翻</label>
     </header>
     <div class="pdf-panel-scroll">
-     <div class="pdf-lang-bar">
-      <span class="pdf-lang-pair"><b id="pdfLangFrom">英语</b><span aria-hidden="true">→</span><b id="pdfLangTo">中文</b></span>
-      <button type="button" class="link-button" id="pdfLangSettings">更改语言</button>
-     </div>
      <div class="pdf-translate-doc">
-      <div class="pdf-translate-block">
-       <span class="pdf-translate-label" id="pdfTranslateResultLabel">翻译</span>
-       <textarea id="pdfTranslateResult" class="pdf-plain-text" aria-labelledby="pdfTranslateResultLabel" placeholder="译文会自动出现在这里，也可手动编辑…"></textarea>
+      <div class="pdf-translate-block pdf-translate-source-block">
+       <div class="pdf-translate-block-head">
+        <span class="pdf-translate-label" id="pdfTranslateSourceLabel">原文</span>
+        <span class="pdf-translate-anchor" id="pdfTranslateAnchor" hidden></span>
+        <div class="pdf-translate-mini-actions">
+         <button type="button" class="pdf-mini-btn" id="pdfUseSelection" hidden>重读选区</button>
+         <button type="button" class="pdf-mini-btn" id="pdfClearTranslation" hidden>清空</button>
+        </div>
+       </div>
+       <textarea id="pdfTranslateSource" class="pdf-plain-text" rows="3" aria-labelledby="pdfTranslateSourceLabel" placeholder="在 PDF 中选中文字或框选识字，原文会自动带入，也可直接粘贴编辑…"></textarea>
       </div>
-      <div class="pdf-translate-block">
-       <span class="pdf-translate-label" id="pdfTranslateSourceLabel">原文</span>
-       <textarea id="pdfTranslateSource" class="pdf-plain-text" aria-labelledby="pdfTranslateSourceLabel" placeholder="在 PDF 里选中文字，会自动出现在这里…"></textarea>
+      <div id="pdfGlossarySlot" class="pdf-glossary-slot"></div>
+      <div class="pdf-translate-block pdf-translate-result-block">
+       <div class="pdf-translate-block-head">
+        <span class="pdf-translate-label" id="pdfTranslateResultLabel">译文</span>
+        <span class="pdf-translate-engine" id="pdfTranslateEngine" hidden></span>
+        <div class="pdf-translate-mini-actions">
+         <button type="button" class="pdf-mini-btn" id="copyPdfTranslation" hidden>复制译文</button>
+        </div>
+       </div>
+       <textarea id="pdfTranslateResult" class="pdf-plain-text" rows="3" aria-labelledby="pdfTranslateResultLabel" placeholder="选中文字后自动生成译文，或点击下方翻译按钮；译文可直接校对修改…"></textarea>
       </div>
      </div>
-     <div class="pdf-action-row">
-      <button type="button" id="pdfLocalTranslate">本地翻译</button>
-      <button type="button" id="pdfOnlineTranslate">在线翻译</button>
-      <button type="button" id="savePdfTranslation">保存为批注</button>
-      <button type="button" id="savePdfSelectionNote">存为研究笔记</button>
-      <button type="button" id="appendPdfSelectionRecord">追加到记录</button>
+     <div class="pdf-translate-primary-actions">
+      <button type="button" class="primary" id="pdfLocalTranslate">本地翻译</button>
+      <button type="button" class="secondary" id="pdfOnlineTranslate">在线翻译</button>
      </div>
-     <button type="button" id="pdfUseSelection" hidden>重新读取所选文字</button>
-     <p id="pdfTranslationStatus" class="pdf-panel-help" role="status"></p>
-     <p class="pdf-panel-help pdf-privacy-note">「选中即翻」在本机处理。点击「在线翻译」会把原文发送到翻译服务。</p>
+     <div class="pdf-translate-save-bar" role="group" aria-label="沉淀到工作台">
+      <span class="pdf-save-bar-label">沉淀</span>
+      <button type="button" class="pdf-ghost-btn" id="savePdfTranslation">存为批注</button>
+      <button type="button" class="pdf-ghost-btn" id="savePdfSelectionNote">存为研究笔记</button>
+      <button type="button" class="pdf-ghost-btn" id="appendPdfSelectionRecord">追加到记录</button>
+     </div>
+     <p id="pdfTranslationStatus" class="pdf-panel-help pdf-status-line" role="status"></p>
+     <p class="pdf-panel-help pdf-privacy-note">「选中即翻」与本地翻译均在本机处理；点击「在线翻译」才会发送所选段落。</p>
     </div>
    </section>
    <section id="pdfAnnotationsZone" data-pdf-panel="annotations" aria-labelledby="showPdfAnnotations" role="tabpanel" hidden>
-    <header class="pdf-panel-head"><h3>批注</h3><span class="tiny" id="pdfAnnotationCount"></span></header>
+    <header class="pdf-panel-head pdf-panel-subbar">
+     <span class="pdf-subbar-meta"><strong class="pdf-subbar-title">批注</strong><span class="tiny" id="pdfAnnotationCount"></span></span>
+     <button type="button" class="pdf-pill-toggle" id="pdfAnnotationCurrentPage" aria-pressed="false" title="只显示当前阅读页的批注">仅当前页</button>
+    </header>
     <div class="pdf-panel-scroll">
      <div class="pdf-field-card" id="pdfAnnotationFilters">
       <input type="search" id="pdfAnnotationSearch" aria-label="搜索批注" placeholder="搜索摘录、批注或页码…">
       <select id="pdfAnnotationType" aria-label="批注类型"><option value="">全部类型</option></select>
-      <select id="pdfAnnotationOrder" aria-label="批注排序"><option value="recent">最新添加</option><option value="page">按页码</option></select>
+      <select id="pdfAnnotationOrder" aria-label="批注排序"><option value="recent">最新添加</option><option value="page">按页码排序</option></select>
      </div>
      <div id="pdfAnnotationList"></div>
      <details class="pdf-annotation-compose">
-      <summary>添加文字批注</summary>
-      <label>新批注内容<textarea id="pdfComment" placeholder="输入内容后，在页面上选中文字或添加文字框。"></textarea></label>
+      <summary>预设新批注文字 / 导出与恢复</summary>
+      <div class="pdf-annotation-drawer-body">
+       <label>预设批注内容（选中文字点「注释」或添加文字框时带入）<textarea id="pdfComment" rows="2" placeholder="可选：先写批注，再在页面上选中文字添加注释…"></textarea></label>
+       <div class="pdf-annotation-footer">
+        <button type="button" class="secondary" id="exportPdfMarks">导出批注 JSON</button>
+        <p id="markSaveStatus" class="pdf-panel-help">批注保存在本机并随完整备份导出，原始 PDF 不改写。</p>
+       </div>
+      </div>
      </details>
-     <div class="pdf-annotation-footer">
-      <button type="button" id="exportPdfMarks">导出批注</button>
-      <p id="markSaveStatus" class="pdf-panel-help">批注保存在本机并随完整备份导出，原始 PDF 不改写。</p>
-     </div>
     </div>
    </section>
    <section id="pdfBacklinksZone" data-pdf-panel="backlinks" aria-labelledby="showPdfBacklinks" role="tabpanel" hidden>

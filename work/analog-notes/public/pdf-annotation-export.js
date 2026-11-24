@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取当前阅读会话的批注数组、原始 PDF Blob 与 PDFLib。
+ * [OUTPUT]: 提供 exportAnnotatedPdf 与 bindPdfAnnotationExports（JSON 导出/恢复与带批注 PDF 副本导出）。
+ * [POS]: 挂载在批注面板底部折叠抽屉中，提供可校验的批注迁移与分享副本。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 async function exportAnnotatedPdf(session, status) {
@@ -53,7 +59,7 @@ function bindPdfAnnotationExports(session){
  const exportMarks=$('exportPdfMarks');
  const status=$('markSaveStatus');
  const copy=document.createElement('button');
- copy.type='button';copy.textContent='导出带批注的 PDF';exportMarks.after(copy);
+ copy.type='button';copy.className='secondary';copy.textContent='导出带批注 PDF';exportMarks.after(copy);
  exportMarks.onclick=async()=>{
   exportMarks.disabled=true;
   try{
@@ -72,7 +78,7 @@ function bindPdfAnnotationExports(session){
   finally{copy.disabled=false;}
  };
  const restore=document.createElement('button'),input=document.createElement('input');
- restore.type='button';restore.textContent='恢复批注 JSON';
+ restore.type='button';restore.className='secondary';restore.textContent='恢复批注 JSON';
  input.type='file';input.accept='.json';input.hidden=true;
  copy.after(restore,input);
  restore.onclick=()=>input.click();

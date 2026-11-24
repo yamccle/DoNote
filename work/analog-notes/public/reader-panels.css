@@ -1,7 +1,7 @@
 /**
- * [INPUT]: 读取目录、批注、引用和阅读侧栏的可见状态。
- * [OUTPUT]: 提供页签反馈、页面被引用角标及窄窗口侧栏动效。
- * [POS]: 装饰 PDF 侧栏、导航控件与页面反向引用指示器。
+ * [INPUT]: 读取目录、翻译、批注、引用与 AI 问答侧栏的可见状态及主题变量。
+ * [OUTPUT]: 提供右侧栏分段页签、无嵌套双栏翻译卡、紧凑批注卡、页面被引用角标与公式级 AI 问答样式。
+ * [POS]: 统一装饰 PDF 阅读器左右侧栏控件与交互动效。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 #reader.reader-enhanced .pdf-outline {
@@ -20,37 +20,43 @@
 #reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) {
   display:flex;
   flex:none;
-  gap:4px;
-  padding:4px 10px 0;
+  gap:2px;
+  padding:4px 8px 0;
   border-bottom:1px solid var(--line);
   background:var(--pdf-chrome);
 }
 #reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button {
-  display:block;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
   flex:1 1 0;
   min-width:0;
-  min-height:36px;
+  min-height:35px;
   width:auto;
-  padding:6px 3px;
+  padding:6px 4px;
   border:0;
   border-bottom:2px solid transparent;
-  border-radius:0;
+  border-radius:6px 6px 0 0;
   background:transparent;
   color:var(--text-soft);
-  font:500 var(--type-label)/1.4 var(--font-ui);
+  font:500 var(--type-label)/1.35 var(--font-ui);
+  font-variant-numeric:tabular-nums;
   text-align:center;
-  white-space:normal;
-  overflow-wrap:anywhere;
+  white-space:nowrap;
 }
-#reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button[aria-selected=true] {
+#reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button[aria-selected=true],
+#reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button.active {
   border-bottom-color:var(--accent);
+  background:transparent;
   color:var(--accent);
-  font-weight:600;
+  font-weight:650;
 }
 #reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button:is(:hover,:focus-visible) {
   background:var(--surface-hover);
 }
 #reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button:focus-visible {outline-offset:-2px}
+
 .pdf-nav-pane {
   flex:1 1 auto;
   min-height:0;
@@ -113,74 +119,308 @@
 #pdfFindPane #pdfFindCount:empty {display:none}
 #pdfFindResults {display:grid;gap:0;max-height:none;overflow:visible}
 #reader.reader-enhanced #pdfFindResults button {
-  display:block;
-  width:100%;
-  min-width:0;
-  padding:8px;
-  border-radius:0;
-  text-align:left;
-  line-height:1.5;
-  overflow-wrap:anywhere;
+  display:block;width:100%;min-width:0;padding:8px;border-radius:0;
+  text-align:left;line-height:1.5;overflow-wrap:anywhere;
 }
 #reader.reader-enhanced #pdfFindResults button + button {border-top:1px solid var(--line)}
 #reader.reader-enhanced #pdfFindResults button:hover {background:var(--surface-hover)}
 
-/* Side panels share the navigation strip and use rules between sections. */
-#pdfSide {min-height:0;border-left:1px solid var(--line)}
-#pdfSide .pdf-panel-head {align-items:center;flex-wrap:wrap;min-height:38px;padding:7px 12px}
-#pdfSide .pdf-panel-head h3 {font-weight:600}
-#pdfSide .pdf-panel-head :is(.ai-checkbox,.link-button) {margin:0 0 0 auto}
+/* ---------------------------------------------------------------- 右侧栏通用壳层 */
+#pdfSide {min-height:0;border-left:1px solid var(--line);background:var(--surface)}
+#pdfSide .pdf-panel-head {
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 10px;
+  min-height:38px;padding:6px 12px;border-bottom:1px solid var(--line);background:var(--surface);
+}
+#pdfSide .pdf-panel-head h3, #pdfSide .pdf-subbar-title {margin:0;font-size:var(--type-label);font-weight:650;color:var(--ink)}
+#pdfSide .pdf-subbar-meta {display:inline-flex;align-items:baseline;gap:6px;min-width:0}
 #pdfSide .pdf-panel-scroll {
- grid-auto-rows:max-content;align-content:start;gap:10px;padding:12px;
- overscroll-behavior:contain;scrollbar-width:thin;
+  display:grid;grid-auto-rows:max-content;align-content:start;gap:10px;padding:11px 12px 16px;
+  overscroll-behavior:contain;scrollbar-width:thin;
 }
-#pdfSide .pdf-lang-bar {
- flex-wrap:wrap;padding:0 0 7px;border:0;border-bottom:1px solid var(--line);
- border-radius:0;background:transparent;
+#pdfSide :is(input[type=search],select,textarea:not(.pdf-plain-text),button:not([role=tab]):not(.pdf-note-swatch):not(.pdf-pill-toggle):not(.ai-model-pill):not(.ai-page-chip):not(.pdf-lang-swap)) {
+  max-width:100%;border-radius:var(--pdf-control-radius);
 }
-#pdfSide .pdf-lang-pair {flex-wrap:wrap;min-width:0}
-#pdfSide .pdf-lang-pair b {overflow-wrap:anywhere}
-#pdfSide .pdf-translate-doc {border-radius:var(--pdf-control-radius)}
-#pdfSide .pdf-translate-block {padding:10px}
-#pdfSide .pdf-translate-label {font-weight:600;letter-spacing:normal}
-#pdfSide .pdf-translate-block + .pdf-translate-block {background:var(--pdf-chrome)}
-#pdfSide .pdf-translate-block:focus-within {background:var(--pdf-active)}
-#pdfSide .pdf-plain-text {font-family:var(--font-ui);line-height:1.65}
-#pdfSide .pdf-privacy-note {padding-top:8px;border-top:1px solid var(--line);line-height:1.6}
-#pdfSide .pdf-panel-foot {padding:8px 12px;background:var(--pdf-chrome)}
-#pdfSide :is(input[type=search],select,textarea,button:not([role=tab])) {
- max-width:100%;border-radius:var(--pdf-control-radius);
+#pdfSide .link-button {
+  padding:2px 6px;border:0;background:transparent;color:var(--text-soft);
+  font-size:11.5px;line-height:1.35;cursor:pointer;
 }
+#pdfSide .link-button:hover {background:var(--surface-hover);color:var(--accent)}
+#pdfSide button.primary {
+  border-color:var(--accent);background:var(--accent);color:#fff;
+}
+[data-theme=dark] #pdfSide button.primary {color:#101815}
+#pdfSide button.primary:hover:not(:disabled) {filter:brightness(1.06)}
+#pdfSide .pdf-pill-toggle {
+  padding:3px 9px;border:1px solid var(--line);border-radius:999px;
+  background:var(--surface-soft);color:var(--text-soft);font-size:11.5px;line-height:1.35;cursor:pointer;
+}
+#pdfSide .pdf-pill-toggle:hover {background:var(--surface-hover);color:var(--ink)}
+#pdfSide .pdf-pill-toggle[aria-pressed=true] {
+  border-color:color-mix(in srgb,var(--accent) 45%,var(--line));
+  background:color-mix(in srgb,var(--accent) 12%,var(--surface));
+  color:var(--accent);font-weight:600;
+}
+
+/* ---------------------------------------------------------------- 1. 翻译面板 */
+.pdf-lang-inline {display:inline-flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}
+.pdf-lang-pair {display:inline-flex;align-items:center;gap:5px;font-size:var(--type-label);color:var(--ink)}
+.pdf-lang-pair b {font-weight:600}
+#pdfSide .pdf-lang-swap {
+  display: inline-grid;place-items:center;width:22px;height:22px;padding:0;
+  border:1px solid var(--line);border-radius:999px;background:var(--surface-soft);
+  color:var(--text-soft);font-size:12px;line-height:1;cursor:pointer;
+}
+#pdfSide .pdf-lang-swap:hover {border-color:var(--accent);color:var(--accent);background:var(--surface-hover)}
+#pdfSide .pdf-auto-toggle {margin:0;font-size:12px;color:var(--text-soft);cursor:pointer;white-space:nowrap}
+
+#pdfSide .pdf-translate-doc {
+  border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.03);
+}
+#pdfSide .pdf-translate-block {display:grid;gap:5px;padding:10px 12px;background:var(--surface)}
+#pdfSide .pdf-translate-result-block {
+  border-top:1px solid var(--line);
+  background:color-mix(in srgb,var(--accent) 3%,var(--surface-soft));
+}
+#pdfSide .pdf-translate-block:focus-within {
+  background:color-mix(in srgb,var(--accent) 6%,var(--surface));
+}
+.pdf-translate-block-head {display:flex;align-items:center;gap:6px;min-height:20px}
+#pdfSide .pdf-translate-label {font-size:11.5px;font-weight:650;color:var(--muted);letter-spacing:.02em}
+.pdf-translate-anchor, .pdf-translate-engine {
+  padding:1px 6px;border-radius:999px;background:var(--pdf-chrome);
+  color:var(--text-soft);font-size:11px;font-variant-numeric:tabular-nums;
+}
+.pdf-translate-mini-actions {margin-inline-start:auto;display:inline-flex;align-items:center;gap:4px}
+#pdfSide .pdf-mini-btn {
+  padding:2px 7px;border:1px solid transparent;border-radius:5px;
+  background:transparent;color:var(--accent);font-size:11.5px;line-height:1.3;cursor:pointer;
+}
+#pdfSide .pdf-mini-btn:hover {background:var(--surface-hover);border-color:var(--line)}
+#pdfSide .pdf-mini-btn[hidden], .pdf-translate-anchor[hidden], .pdf-translate-engine[hidden] {display:none}
+
+/* 彻底消除双层嵌套边框，让原文与译文像纸面排版一样自然呼吸 */
+#pdfSide textarea.pdf-plain-text {
+  display:block;width:100%;min-height:66px;max-height:220px;margin:0;padding:2px 0 0;
+  border:0;border-radius:0;background:transparent;box-shadow:none;outline:none;resize:none;
+  color:var(--ink);font:400 var(--type-control)/1.68 var(--font-ui);box-sizing:border-box;
+}
+#pdfSide textarea.pdf-plain-text::placeholder {color:var(--muted);font-size:12.5px}
+
+.pdf-glossary-bar {
+  display:grid;gap:6px;padding:6px 12px;border-top:1px solid var(--line);
+  background:var(--surface-soft);
+}
+.pdf-glossary-bar.has-matches {background:color-mix(in srgb,var(--accent) 6%,var(--surface-soft))}
+.pdf-glossary-head {display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pdf-glossary-title {font-size:11.5px;color:var(--muted)}
+.pdf-glossary-bar.has-matches .pdf-glossary-title {color:var(--accent);font-weight:600}
+.pdf-glossary-chips {display:flex;flex-wrap:wrap;gap:5px}
+.pdf-glossary-chips[hidden] {display:none}
+#pdfSide .pdf-glossary-chip {
+  display:inline-block;max-width:100%;padding:3px 9px;
+  border:1px solid color-mix(in srgb,var(--accent) 28%,var(--line));border-radius:7px;
+  background:var(--surface);color:var(--text-soft);font-size:11.5px;line-height:1.45;
+  text-align:left;cursor:pointer;
+}
+#pdfSide .pdf-glossary-chip i {margin:0 4px;font-style:normal;color:var(--muted)}
+#pdfSide .pdf-glossary-chip b {color:var(--ink);font-weight:600;white-space:nowrap}
+#pdfSide .pdf-glossary-chip:hover {border-color:var(--accent);background:var(--pdf-active)}
+
+.pdf-translate-primary-actions {display:grid;grid-template-columns:1.15fr 1fr;gap:8px}
+.pdf-translate-primary-actions button {width:100%;justify-content:center;padding:7px 10px;font-weight:600}
+.pdf-translate-save-bar {
+  display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:4px 6px;
+  border:1px solid var(--line);border-radius:8px;background:var(--surface-soft);
+}
+.pdf-save-bar-label {padding:0 5px 0 3px;color:var(--muted);font-size:11px;font-weight:600}
+#pdfSide .pdf-ghost-btn {
+  flex:1 1 auto;padding:4px 7px;border:0;border-radius:5px;
+  background:transparent;color:var(--text-soft);font-size:12px;text-align:center;cursor:pointer;white-space:nowrap;
+}
+#pdfSide .pdf-ghost-btn:hover {background:var(--surface);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.pdf-status-line {margin:0;color:var(--text-soft);font-size:12px;line-height:1.5}
+.pdf-status-line:empty {display:none}
+#pdfSide .pdf-privacy-note {margin:0;padding-top:8px;border-top:1px solid var(--line);font-size:11.5px;line-height:1.55}
+
+/* ---------------------------------------------------------------- 2. 批注面板 */
 #pdfAnnotationFilters {
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:6px;
-  padding:0;
-  border:0;
-  background:transparent;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;
+  padding:0;border:0;background:transparent;
 }
 #pdfAnnotationFilters input {grid-column:1 / -1}
-#pdfAnnotationFilters :is(input,select) {width:100%;min-width:0;margin:0;box-sizing:border-box}
-#pdfAnnotationList {min-width:0;overflow-wrap:anywhere}
-.pdf-annotation-compose {border:1px solid var(--line);border-radius:8px;background:var(--surface)}
-.pdf-annotation-compose summary {padding:8px 10px;color:var(--text-soft);font-size:var(--type-label);cursor:pointer}
-.pdf-annotation-compose label {margin:0;padding:0 10px 10px}
-.pdf-annotation-compose textarea {width:100%;min-height:80px;box-sizing:border-box}
-.pdf-annotation-footer {
- display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding-top:2px;
+#pdfAnnotationFilters :is(input,select) {width:100%;min-width:0;margin:0;padding:6px 8px;font-size:12px;box-sizing:border-box}
+#pdfAnnotationList {display:grid;gap:8px;min-width:0;overflow-wrap:anywhere}
+#pdfAnnotationList .pdf-empty-state {
+  margin:0;padding:16px 12px;border:1px dashed var(--line);border-radius:9px;
+  background:var(--surface-soft);color:var(--muted);font-size:12.5px;line-height:1.6;text-align:center;
 }
-.pdf-annotation-footer .pdf-panel-help {flex-basis:100%;margin:2px 0 0;color:var(--muted);line-height:1.5}
+#pdfSide .pdf-note {
+  display:grid;gap:6px;margin:0;padding:9px 11px;
+  border:1px solid var(--line);border-radius:9px;background:var(--surface);
+}
+#pdfSide .pdf-note.pdf-note-highlight {
+  background:color-mix(in srgb,var(--pdf-note-color) 10%,var(--surface));
+  border-color:color-mix(in srgb,var(--pdf-note-color) 32%,var(--line));
+}
+[data-theme=dark] #pdfSide .pdf-note.pdf-note-highlight {
+  background:color-mix(in srgb,var(--pdf-note-color) 8%,var(--surface));
+}
+.pdf-note-top {display:flex;align-items:center;gap:6px;min-width:0}
+#pdfSide .pdf-note-swatch {
+  flex:0 0 12px;width:12px;min-width:12px;height:12px;padding:0;
+  border:1px solid rgba(0,0,0,.22);border-radius:50%;
+  background:var(--pdf-note-color,var(--accent));cursor:pointer;
+}
+#pdfSide .pdf-note-swatch:hover {transform:scale(1.15)}
+#pdfSide .pdf-note-highlight .pdf-note-link::before {display:none}
+#pdfSide .pdf-note-top .pdf-note-link {
+  padding:2px 5px;border:0;background:transparent;color:var(--ink)!important;
+  font:600 12px/1.35 var(--font-ui);text-decoration:none;cursor:pointer;
+}
+#pdfSide .pdf-note-top .pdf-note-link:hover {background:var(--surface-hover);color:var(--accent)!important}
+.pdf-note-tools {margin-inline-start:auto;display:inline-flex;align-items:center;gap:2px}
+#pdfSide .pdf-note-tool {
+  padding:2px 6px;border:0;border-radius:5px;background:transparent;
+  color:var(--muted);font-size:11.5px;line-height:1.3;cursor:pointer;
+}
+#pdfSide .pdf-note-tool:hover {background:var(--surface-hover);color:var(--ink)}
+#pdfSide .pdf-note-tool.is-danger:hover {color:#c43c39;background:color-mix(in srgb,#c43c39 10%,var(--surface))}
+#pdfSide .pdf-note blockquote {
+  margin:0;padding:4px 8px;border-inline-start:2.5px solid var(--pdf-note-color,var(--accent));
+  color:var(--text-soft);font-size:12.5px;line-height:1.55;
+}
+#pdfSide .pdf-note-add-body {
+  justify-self:start;padding:2px 6px;border:0;border-radius:5px;
+  background:transparent;color:var(--muted);font-size:11.5px;cursor:pointer;
+}
+#pdfSide .pdf-note-add-body:hover {background:var(--surface-hover);color:var(--accent)}
+#pdfSide .pdf-note textarea {
+  width:100%;min-height:54px;margin:0;padding:6px 8px;border:1px solid var(--line);
+  background:var(--surface-soft);color:var(--ink);font:400 12.5px/1.55 var(--font-ui);
+  resize:vertical;box-sizing:border-box;
+}
+.pdf-annotation-compose {border:1px solid var(--line);border-radius:9px;background:var(--surface-soft)}
+.pdf-annotation-compose summary {padding:8px 11px;color:var(--text-soft);font-size:12px;font-weight:600;cursor:pointer}
+.pdf-annotation-drawer-body {display:grid;gap:8px;padding:0 11px 11px}
+.pdf-annotation-drawer-body label {margin:0;display:grid;gap:5px;font-size:11.5px;color:var(--text-soft)}
+.pdf-annotation-drawer-body textarea {width:100%;min-height:58px;box-sizing:border-box}
+.pdf-annotation-footer {display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding-top:2px}
+.pdf-annotation-footer button {padding:5px 9px;font-size:12px}
+.pdf-annotation-footer .pdf-panel-help {flex-basis:100%;margin:2px 0 0;color:var(--muted);font-size:11.5px;line-height:1.5}
+
+/* ---------------------------------------------------------------- 3. AI 问答面板 */
+#pdfSide .ai-model-pill {
+  display:inline-flex;align-items:center;gap:6px;max-width:72%;padding:3px 9px;
+  border:1px solid var(--line);border-radius:999px;background:var(--surface-soft);
+  color:var(--text-soft);font-size:11.5px;line-height:1.3;cursor:pointer;
+}
+#pdfSide .ai-model-pill:hover {border-color:var(--accent);color:var(--ink)}
+.ai-model-dot {width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
+.ai-model-pill.is-ready .ai-model-dot {background:var(--accent)}
+.ai-model-pill span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 #pdfSide .pdf-ai-context {
- border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 10px;
+  display:grid;gap:6px;padding:8px 10px;border:1px solid var(--line);
+  border-radius:9px;background:var(--surface-soft);
 }
+.pdf-ai-context-row {display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pdf-ai-context-row select {flex:1 1 130px;min-width:0;padding:5px 7px;font-size:12px}
+#pdfSide .ai-vision-pill {
+  display:inline-flex;align-items:center;gap:5px;flex:none;margin:0;padding:5px 8px;
+  border:1px solid var(--line);border-radius:6px;background:var(--surface);
+  color:var(--text-soft);font-size:11.5px;line-height:1.2;cursor:pointer;white-space:nowrap;
+}
+#pdfSide .ai-vision-pill input {width:14px;height:14px;min-width:14px;margin:0;padding:0;flex:none}
+#pdfSide .ai-vision-pill:has(input:checked) {
+  border-color:color-mix(in srgb,var(--accent) 45%,var(--line));
+  background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--accent);
+}
+.pdf-ai-context-meta {display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--muted)}
+#readerAiContextPreview {
+  margin:0;padding:8px 9px;max-height:150px;overflow:auto;
+  border:1px solid var(--line);border-radius:6px;background:var(--surface);
+  font:11.5px/1.5 var(--font-ui);white-space:pre-wrap;
+}
+#readerAiContextPreview[hidden], .reader-ai-empty[hidden] {display:none}
+
+.reader-ai-empty {
+  display:grid;gap:8px;padding:12px;border:1px dashed var(--line);
+  border-radius:10px;background:var(--surface-soft);
+}
+.reader-ai-empty p {margin:0;color:var(--text-soft);font-size:12px;line-height:1.55}
+.ai-prompt-chips {display:grid;gap:5px}
+#pdfSide .ai-prompt-chip {
+  padding:6px 10px;border:1px solid var(--line);border-radius:7px;
+  background:var(--surface);color:var(--ink);font-size:12px;line-height:1.4;
+  text-align:left;cursor:pointer;
+}
+#pdfSide .ai-prompt-chip:hover {border-color:var(--accent);background:var(--pdf-active);color:var(--accent)}
+
+#pdfSide .reader-ai-messages {display:grid;gap:12px;align-content:start}
 #pdfSide .ai-exchange {
- gap:6px;padding:8px 0 12px;border-bottom:1px solid var(--line);
+  display:grid;gap:8px;padding:10px 11px;border:1px solid var(--line);
+  border-radius:10px;background:var(--surface);
 }
 #pdfSide .ai-bubble-user {
- max-width:100%;justify-self:stretch;padding:6px 0 6px 10px;border-inline-start:2px solid var(--accent);
- border-radius:0;background:transparent;
+  display:flex;align-items:flex-start;gap:6px;max-width:100%;justify-self:stretch;
+  padding:0 0 7px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;
 }
-#pdfSide .ai-bubble-assistant {border:0;padding:4px 0 0;background:transparent}
+.ai-user-page {
+  flex:none;padding:1px 6px;border-radius:999px;background:var(--pdf-chrome);
+  color:var(--accent);font:600 11px/1.4 var(--font-ui);
+}
+#pdfSide .ai-quote {margin:0;color:var(--ink);font:600 12.5px/1.5 var(--font-ui);white-space:pre-wrap}
+#pdfSide .ai-bubble-assistant {border:0;padding:0;background:transparent;display:grid;gap:8px}
+#pdfSide .ai-answer-body {
+  color:var(--ink);font:400 13px/1.68 var(--font-ui);white-space:normal;overflow-wrap:anywhere;
+}
+#pdfSide .ai-answer-body :is(p,ul,ol,blockquote,pre,table) {margin:0 0 8px}
+#pdfSide .ai-answer-body > :last-child {margin-bottom:0}
+#pdfSide .ai-answer-body :is(ul,ol) {padding-inline-start:18px}
+#pdfSide .ai-answer-body li + li {margin-top:3px}
+#pdfSide .ai-answer-body :is(h1,h2,h3,h4) {margin:10px 0 5px;font-size:13.5px;font-weight:650;line-height:1.4}
+#pdfSide .ai-answer-body code {padding:1px 4px;border-radius:4px;background:var(--surface-soft);font-size:12px}
+#pdfSide .ai-answer-body pre {padding:8px;border-radius:6px;background:var(--surface-soft);overflow-x:auto}
+#pdfSide .ai-answer-body .katex-display {margin:8px 0;padding:6px 8px;border-radius:6px;background:var(--surface-soft);overflow-x:auto;overflow-y:hidden}
+#pdfSide .ai-page-chip {
+  display:inline-flex;align-items:center;margin:0 2px;padding:0 6px;
+  border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:999px;
+  background:color-mix(in srgb,var(--accent) 10%,var(--surface));
+  color:var(--accent);font:600 11px/1.5 var(--font-ui);cursor:pointer;vertical-align:baseline;
+}
+#pdfSide .ai-page-chip:hover {background:var(--pdf-active)}
+#pdfSide .ai-thinking {color:var(--muted);font-size:12.5px;font-style:italic}
+#pdfSide .ai-actions {
+  display:flex;align-items:center;flex-wrap:wrap;gap:3px;margin:0;padding-top:6px;
+  border-top:1px dashed var(--line);
+}
+#pdfSide .ai-action {
+  padding:3px 7px;border:0;border-radius:5px;background:transparent;
+  color:var(--muted);font-size:11.5px;cursor:pointer;
+}
+#pdfSide .ai-action:hover {background:var(--surface-hover);color:var(--ink)}
+#pdfSide .ai-action.is-danger:hover {color:#c43c39;background:color-mix(in srgb,#c43c39 10%,var(--surface))}
+
+#pdfSide .pdf-panel-foot {
+  display:grid;gap:6px;padding:9px 12px 10px;border-top:1px solid var(--line);background:var(--pdf-chrome);
+}
+#pdfSide .pdf-ai-composer {
+  display:grid;gap:6px;padding:7px 9px;border:1px solid var(--field-border);
+  border-radius:9px;background:var(--surface);
+}
+#pdfSide .pdf-ai-composer:focus-within {border-color:var(--accent)}
+#pdfSide #readerAiQuestion {
+  width:100%;min-height:46px;max-height:132px;margin:0;padding:0;border:0;
+  background:transparent;box-shadow:none;outline:none;resize:none;
+  color:var(--ink);font:400 12.5px/1.55 var(--font-ui);
+}
+.pdf-ai-send {display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pdf-ai-send .pdf-panel-help {flex:1;margin:0;min-width:0;font-size:11.5px;color:var(--muted)}
+.pdf-ai-send-btns {display:inline-flex;align-items:center;gap:6px}
+.pdf-ai-send-btns button {padding:5px 12px;font-size:12px;font-weight:600}
+
+/* ---------------------------------------------------------------- 4. 反向引用与页面角标 */
 @media(prefers-reduced-motion:no-preference) {
  #reader.reader-enhanced :is(.pdf-nav-tabs,.reader-panel-tabs) button {
   transition:color var(--motion-fast) var(--ease-standard),

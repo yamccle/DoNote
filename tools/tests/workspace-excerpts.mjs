@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 接收已打开的工作台 Playwright page、closeReader 辅助函数与 3 页测试 PDF 路径。
- * [OUTPUT]: 提供 testWebExcerpt、testAppendPdfExcerpt 与 testPdfBacklinksAndScannedOcr（含跨账户端到端备份恢复与增量引用重映射演练）。
- * [POS]: 由 test-workspace.mjs 调用，专职验证「阅读 → 摘录 → 记录 → 双向回跳」、扫描页离线识字入索引与完整备份恢复闭环。
+ * [OUTPUT]: 提供 testWebExcerpt、testAppendPdfExcerpt 与 testPdfBacklinksAndScannedOcr（含备份恢复演练及翻译/批注/AI 问答三面板回归）。
+ * [POS]: 由 test-workspace.mjs 调用，专职验证阅读摘录双向回跳、扫描页离线识字入索引、完整备份恢复与右侧三面板核心交互。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 import assert from 'node:assert/strict';
@@ -367,4 +367,109 @@ async function testBackupRestoreDrill(page, seeded, closeReader) {
   await closeReader(page);
   await page.locator('#detail [data-close="detail"]').click();
   console.log('PASS end-to-end backup & restore drill: isolated profile recovery, PDF/web jump-back, OCR index carryover and incremental fileId remap');
+
+  await testPdfReaderPanels(page, closeReader);
+}
+
+async function testPdfReaderPanels(page, closeReader) {
+  await page.evaluate(async () => {
+    const file = records.flatMap(note => note.attachments || []).find(item => item.name === 'resume-backlink.pdf');
+    await openAttachment(file);
+    await readingSession.showPage(1);
+  });
+  await page.waitForFunction(() => document.querySelector('[data-pdf-page="1"] canvas'));
+
+  // 1. 翻译面板：语向互换、电路术语胶囊插入译文、复制/清空联动
+  assert.equal(await page.locator('#pdfLangFrom').innerText(), '英语');
+  assert.equal(await page.locator('#pdfLangTo').innerText(), '中文');
+  await page.locator('#pdfLangSwap').click();
+  assert.equal(await page.locator('#pdfLangFrom').innerText(), '中文');
+  assert.equal(await page.locator('#pdfLangTo').innerText(), '英语');
+  await page.locator('#pdfLangSwap').click();
+
+  await page.locator('#pdfTranslateSource').fill('The dynamic comparator exhibits offset voltage and thermal noise.');
+  await page.locator('#pdfGlossarySlot .pdf-glossary-bar.has-matches').waitFor();
+  assert.match(await page.locator('#pdfGlossarySlot .pdf-glossary-title').innerText(), /命中 3 个电路术语/);
+  await page.locator('#pdfGlossarySlot .pdf-glossary-chip', { hasText: '比较器' }).click();
+  assert.equal(await page.locator('#pdfTranslateResult').inputValue(), '比较器');
+  assert.equal(await page.locator('#copyPdfTranslation').isVisible(), true);
+  assert.equal(await page.locator('#pdfClearTranslation').isVisible(), true);
+  await page.locator('#pdfClearTranslation').click();
+  assert.equal(await page.locator('#pdfTranslateSource').inputValue(), '');
+  assert.equal(await page.locator('#pdfTranslateResult').inputValue(), '');
+  assert.equal(await page.locator('#copyPdfTranslation').isVisible(), false);
+
+  // 2. 批注面板：页签计数、仅当前页过滤、渐进式添加思考、防抖自动保存、色点切换与回跳闪烁
+  await page.evaluate(() => {
+    readingSession.annotations.push(
+      { id: crypto.randomUUID(), kind: 'highlight', page: 1, quote: 'Input-referred offset 1.25 mV', note: '', color: MARK_COLORS[0], rects: [[0.1, 0.2, 0.4, 0.06]], points: [], createdAt: new Date().toISOString() },
+      { id: crypto.randomUUID(), kind: 'bookmark', page: 3, quote: '', note: '第 3 页频谱结果', color: MARK_COLORS[3], rects: [], points: [], createdAt: new Date().toISOString() }
+    );
+    savePdfMarks(readingSession);
+    renderPdfSidebar(readingSession);
+    renderPdfMarks(readingSession);
+  });
+  assert.equal(await page.locator('#showPdfAnnotations').innerText(), '批注 2');
+  await page.locator('#showPdfAnnotations').click();
+  assert.equal(await page.locator('#pdfAnnotationCount').innerText(), '2 条');
+
+  await page.locator('#pdfAnnotationCurrentPage').click();
+  assert.equal(await page.locator('#pdfAnnotationCurrentPage').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('#pdfAnnotationCount').innerText(), '1 / 2 条');
+  assert.equal(await page.locator('#pdfAnnotationList .pdf-note').count(), 1);
+
+  const highlightCard = page.locator('#pdfAnnotationList .pdf-note').first();
+  assert.equal(await highlightCard.locator('textarea').count(), 0, '无文字批注的高亮卡默认折叠输入框');
+  await highlightCard.locator('.pdf-note-add-body').click();
+  await highlightCard.locator('textarea').fill('蒙特卡洛 200 次失配抽样复核');
+  await page.waitForFunction(() =>
+    readingSession.annotations.find(item => item.kind === 'highlight')?.note === '蒙特卡洛 200 次失配抽样复核');
+
+  const initialColor = await page.evaluate(() => readingSession.annotations.find(item => item.kind === 'highlight').color);
+  await highlightCard.locator('.pdf-note-swatch').click();
+  const nextColor = await page.evaluate(() => readingSession.annotations.find(item => item.kind === 'highlight').color);
+  assert.notEqual(nextColor, initialColor, '点击圆点色标应切换批注颜色');
+  await highlightCard.locator('.pdf-note-link').click();
+  await page.waitForFunction(() => document.querySelector('[data-pdf-page="1"] .pdf-note-source-focus'));
+  await page.locator('#pdfAnnotationCurrentPage').click();
+  assert.equal(await page.locator('#pdfAnnotationList .pdf-note').count(), 2);
+
+  // 3. AI 问答面板：快捷提问、SSE 流式回答、LaTeX 公式防转义渲染、页码胶囊跳转与存为笔记
+  const aiRoute = 'http://127.0.0.1:11434/v1/chat/completions';
+  await page.route(aiRoute, async route => {
+    const sseChunks = [
+      'data: ' + JSON.stringify({ choices: [{ delta: { content: '依据 **Pelgrom 失配模型** [第 1 页]，折合失调标准差为：\n\n$$\\sigma(V_{OS}) = \\frac{A_{VT}}{\\sqrt{W \\cdot L}}$$\n\n' } }] }) + '\n\n',
+      'data: ' + JSON.stringify({ choices: [{ delta: { content: '增大栅面积会抬升输入寄生电容 $C_{gg}$，可结合 [第 2 页] 校准时序权衡。' } }] }) + '\n\n',
+      'data: [DONE]\n\n'
+    ].join('');
+    await route.fulfill({ status: 200, contentType: 'text/event-stream; charset=utf-8', body: sseChunks });
+  });
+  try {
+    await page.evaluate(() => {
+      aiCredentials.set(appState.activeId, { base: 'http://127.0.0.1:11434/v1', model: 'Qwen3-32B-Instruct', key: '' });
+      syncAiModelPill();
+    });
+    await page.locator('#showReaderAi').click();
+    assert.equal(await page.locator('#readerAiModelLabel').innerText(), 'Qwen3-32B-Instruct');
+    assert.equal(await page.locator('#readerAiEmpty .ai-prompt-chip').count(), 4);
+    await page.locator('#readerAiContext').selectOption('nearby');
+    await page.locator('#readerAiEmpty .ai-prompt-chip', { hasText: '推导关键公式' }).click();
+
+    await page.locator('#readerAiMessages .ai-exchange .ai-actions').waitFor();
+    assert.equal(await page.locator('#readerAiEmpty').isVisible(), false);
+    assert.equal(await page.locator('#readerAiMessages .ai-answer-body strong').innerText(), 'Pelgrom 失配模型');
+    const katexCount = await page.locator('#readerAiMessages .ai-answer-body .katex').count();
+    assert.equal(katexCount >= 2, true, '独立公式与行内公式均应经 KaTeX 渲染且不被下划线破坏');
+
+    const beforeNotes = await page.evaluate(() => records.filter(note => note.type === 'paper').length);
+    await page.locator('#readerAiMessages .ai-action', { hasText: '存为笔记' }).click();
+    await page.waitForFunction(prev => records.filter(note => note.type === 'paper').length === prev + 1, beforeNotes);
+
+    await page.locator('#readerAiMessages .ai-page-chip', { hasText: '第 2 页' }).click();
+    await page.waitForFunction(() => readingSession?.page === 2);
+  } finally {
+    await page.unroute(aiRoute);
+  }
+  await closeReader(page);
+  console.log('PASS pdf reader panels: translation glossary & swap, compact annotations & current-page filter, streaming KaTeX AI Q&A & note save');
 }

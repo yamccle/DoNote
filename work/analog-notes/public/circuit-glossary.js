@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取当前工作台的模拟电路术语表与翻译面板原文。
+ * [OUTPUT]: 提供 circuitGlossaryMatches、openCircuitGlossary 与 bindCircuitGlossary。
+ * [POS]: 嵌入翻译双栏卡片中段，命中专业术语时展示一键插入胶囊，未命中时收敛为轻量术语库入口。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 const circuitGlossaryDefaults=[
@@ -27,7 +33,8 @@ function circuitGlossaryMatches(text,profileId){
 }
 function openCircuitGlossary(profileId,onSave){
  const dialog=document.createElement('dialog');
- dialog.innerHTML='<form method="dialog"><h2>模拟电路术语库</h2><p>每行填写一组术语，英文和中文之间用制表符或等号分隔。</p><textarea aria-label="术语库" rows="15" style="width:100%"></textarea><p role="status"></p><button type="button" data-default>恢复默认表</button> <button type="submit" value="cancel">取消</button> <button type="button" data-save>保存术语</button></form>';
+ dialog.className='circuit-glossary-dialog';
+ dialog.innerHTML='<form method="dialog"><div class="modalhead"><h2>模拟电路术语库</h2><button type="submit" class="icon-button" value="cancel" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">每行填写一组术语，英文和中文之间用等号（=）或制表符分隔。</p><textarea aria-label="术语库" rows="13" style="width:100%"></textarea><p class="form-message" role="status"></p></div><div class="modalfoot"><button type="button" class="secondary" data-default>恢复默认表</button><button type="submit" class="secondary" value="cancel">取消</button><button type="button" class="primary" data-save>保存术语</button></div></form>';
  const input=dialog.querySelector('textarea'),status=dialog.querySelector('[role=status]');
  const fill=rows=>{input.value=rows.map(row=>row.join(' = ')).join('\n');};
  fill(circuitGlossary(profileId));
@@ -47,24 +54,34 @@ function openCircuitGlossary(profileId,onSave){
  document.body.append(dialog);dialog.showModal();
 }
 function bindCircuitGlossary(session,panel,input,result){
- const section=document.createElement('details');
- section.innerHTML='<summary>术语核对</summary><p class="tiny">对照英文原文与推荐译法，点击术语可把译法插入译文。</p><div data-terms></div><button type="button" class="secondary">编辑术语库</button>';
- result.closest('textarea').after(section);
- const terms=section.querySelector('[data-terms]');
+ const host=panel.querySelector('#pdfGlossarySlot');
+ const bar=document.createElement('div');
+ bar.className='pdf-glossary-bar';
+ bar.innerHTML='<div class="pdf-glossary-head"><span class="pdf-glossary-title"></span><button type="button" class="link-button pdf-glossary-edit">术语库</button></div><div class="pdf-glossary-chips" data-terms></div>';
+ if(host)host.replaceChildren(bar);
+ else panel.querySelector('.pdf-translate-doc')?.after(bar);
+ const title=bar.querySelector('.pdf-glossary-title');
+ const terms=bar.querySelector('[data-terms]');
  const refresh=()=>{
   terms.replaceChildren();
   const matches=circuitGlossaryMatches(input.value,session.profileId);
+  bar.classList.toggle('has-matches',matches.length>0);
+  title.textContent=matches.length?'命中 '+matches.length+' 个电路术语（点击插入译文）':'未命中预设电路术语';
+  terms.hidden=!matches.length;
   for(const [english,chinese] of matches){
-   const button=document.createElement('button');button.type='button';button.className='secondary';
-   button.textContent=english+' → '+chinese;
-   button.onclick=()=>{result.setRangeText(chinese,result.selectionStart,result.selectionEnd,'end');result.focus();};
-   terms.append(button);
+   const chip=document.createElement('button');chip.type='button';chip.className='pdf-glossary-chip';
+   chip.innerHTML='<span>'+esc(english)+'</span><i aria-hidden="true">→</i><b>'+esc(chinese)+'</b>';
+   chip.title='点击将「'+chinese+'」插入译文光标处';
+   chip.onclick=()=>{
+    result.setRangeText(chinese,result.selectionStart,result.selectionEnd,'end');
+    result.dispatchEvent(new Event('input'));
+    result.focus();
+   };
+   terms.append(chip);
   }
-  if(!matches.length)terms.textContent='当前原文没有命中术语。';
  };
  input.addEventListener('input',refresh,{signal:session.controller.signal});
- section.addEventListener('toggle',refresh,{signal:session.controller.signal});
- section.querySelector(':scope > button').onclick=()=>openCircuitGlossary(session.profileId,refresh);
+ bar.querySelector('.pdf-glossary-edit').onclick=()=>openCircuitGlossary(session.profileId,refresh);
  refresh();
  return refresh;
 }

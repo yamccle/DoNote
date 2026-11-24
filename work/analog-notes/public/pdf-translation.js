@@ -266,9 +266,27 @@ function installPdfTranslationPanel(session, panel, showPanel) {
  const result = panel.querySelector('#pdfTranslateResult');
  const status = panel.querySelector('#pdfTranslationStatus');
  const automaticToggle = panel.querySelector('#pdfAutoTranslate');
+ const anchorBadge = panel.querySelector('#pdfTranslateAnchor');
+ const engineBadge = panel.querySelector('#pdfTranslateEngine');
+ const copyBtn = panel.querySelector('#copyPdfTranslation');
+ const clearBtn = panel.querySelector('#pdfClearTranslation');
  const {signal: sessionSignal} = session.controller;
  const refreshGlossary=bindCircuitGlossary(session,panel,input,result);
  let pending;
+ function fitBox(box){
+  box.style.height='auto';
+  box.style.height=Math.min(220,Math.max(66,box.scrollHeight))+'px';
+ }
+ function syncChrome(engineLabel){
+  fitBox(input);fitBox(result);
+  const pageNum=session.translationSelection?.page;
+  if(anchorBadge){anchorBadge.hidden=!pageNum;if(pageNum)anchorBadge.textContent='P.'+pageNum;}
+  if(engineBadge&&engineLabel!==undefined){
+   engineBadge.hidden=!engineLabel;engineBadge.textContent=engineLabel||'';
+  }
+  if(copyBtn)copyBtn.hidden=!result.value.trim();
+  if(clearBtn)clearBtn.hidden=!input.value.trim()&&!result.value.trim();
+ }
  const pageContext=()=>{
   const number=session.translationSelection?.page;
   const slot=number
@@ -284,7 +302,7 @@ function installPdfTranslationPanel(session, panel, showPanel) {
   clearTimeout(pending);
  }
 
- function setSource(picked) {
+  function setSource(picked) {
   if (!picked?.quote) return;
   const text = normalizePdfTranslationText(picked.quote);
   if (input.value !== text) {
@@ -292,9 +310,11 @@ function installPdfTranslationPanel(session, panel, showPanel) {
    session.translationKey = null;
    input.value = text;
    result.value = '';
+   syncChrome('');
   }
   session.translationSelection = picked;
   refreshGlossary();
+  syncChrome('');
  }
 
  async function translateSelection({automatic = false, online = false} = {}) {
@@ -403,6 +423,7 @@ function installPdfTranslationPanel(session, panel, showPanel) {
    if (!active()) return;
    if (!translated?.trim()) throw new Error('未返回有效译文。');
    result.value = translated;
+   syncChrome(service);
    status.textContent = '翻译完成 · ' + service;
   } catch (error) {
    if (!active()) return;
@@ -441,8 +462,8 @@ function installPdfTranslationPanel(session, panel, showPanel) {
   await showPanel('translation');
   if (sessionSignal.aborted) return;
   input.value = normalizePdfTranslationText(mark.quote);
-  input.oninput();
   session.translationSelection = mark;
+  input.oninput();
   input.focus();
  };
  sessionSignal.addEventListener('abort', () => {
@@ -466,7 +487,8 @@ function installPdfTranslationPanel(session, panel, showPanel) {
   const trimmed = input.value.trim();
   session.translationSelection = trimmed && session.translationSelection ? { ...session.translationSelection, quote: trimmed } : null;
   result.value = '';
-  status.textContent = '原文已修改，可点击「本地翻译」或「在线翻译」。';
+  syncChrome('');
+  status.textContent = trimmed ? '原文已修改，可点击「本地翻译」或「在线翻译」。' : '';
  };
  input.onpaste = event => {
   const pasted = event.clipboardData?.getData('text/plain');
@@ -478,7 +500,29 @@ function installPdfTranslationPanel(session, panel, showPanel) {
  result.oninput = () => {
   cancelQueued();
   session.translationController?.abort();
+  syncChrome();
  };
+ if (copyBtn) {
+  copyBtn.onclick = async () => {
+   const text = result.value.trim();
+   if (!text) return;
+   try { await navigator.clipboard.writeText(text); toast('译文已复制'); }
+   catch { toast('复制失败，请手动选择复制'); }
+  };
+ }
+ if (clearBtn) {
+  clearBtn.onclick = () => {
+   cancelQueued();
+   session.translationController?.abort();
+   session.translationKey = null;
+   session.translationSelection = null;
+   input.value = '';
+   result.value = '';
+   status.textContent = '';
+   refreshGlossary();
+   syncChrome('');
+  };
+ }
  document.addEventListener('translate-language-change', () => {
   refreshTranslateLanguageLabel();
   cancelQueued();

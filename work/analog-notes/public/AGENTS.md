@@ -34,9 +34,12 @@
 - `pdf-research-notes.js` 把摘录与原文片段写进目标记录的 `pdfSource` / `pdfEvidence`。详情「引用资料」展示摘录预览并按页码和选区回跳原 PDF。
 - `pdf-backlinks.js` 汇总当前 PDF 被哪些记录引用，在页面右上角显示「被引用 N」角标并在侧栏「引用」页签提供反向打开与选区定位。
 - `pdf-ocr.js` 离线识别扫描页框选区域，将识别文本交给翻译/摘录侧栏并写入 `pdf-search.js` 持久化检索索引。
-- `pdf-translation.js` 衔接选区/识字翻译、保存批注、存为研究笔记与追加到记录；手动校对文字时保留原页面与选区坐标。
-- `pdf-annotations.js` 和 `pdf-reflow.js` 为标注与排版菜单复用阅读器控制。
-- `reader-toolbar.css` 和 `reader-panels.css` 限定工具菜单和抽屉动画。
+- `pdf-translation.js` 以「原文 → 电路术语胶囊 → 译文」无嵌套双栏衔接选区/识字翻译、复制译文、保存批注、存为研究笔记与追加到记录；手动校对文字时保留原页面与选区坐标。
+- `circuit-glossary.js` 匹配模拟电路专业术语，在翻译双栏中段展示命中胶囊并支持一键插入译文或自定义术语库。
+- `translate-lang.js` 管理翻译源语言与目标语言偏好，支持副栏一键互换语向。
+- `pdf-annotations.js`、`pdf-annotation-export.js` 和 `pdf-reflow.js` 提供紧凑批注卡片、页签计数、仅当前页过滤、渐进式批注展开、圆点换色、闪烁回跳与排版重流控制。
+- `reader-ai.js` 提供工程精读快捷提问、SSE 流式回答、Markdown + KaTeX 公式防转义排版、可点击页码胶囊回跳与沉淀笔记。
+- `reader-toolbar.css` 和 `reader-panels.css` 统一布局工具菜单、右侧四页签面板、双栏翻译卡、紧凑批注卡与公式级 AI 问答界面。
 - `web-reader.js` 阅读已保存网页。选中正文或已有标注可保存为研究笔记，笔记经 `webSource` 打开原文并定位摘录。
 - `video-subtitles.js` 同步播放位置和当前字幕，按用户操作定位字幕；「识别时同步翻译」开关让识别与离线翻译并行，逐条产出中文字幕。
 - `video-subtitles.css` 提供字幕操作、任务进度和当前字幕的状态样式。

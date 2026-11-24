@@ -350,17 +350,32 @@ function startPdfDrawing(event,session,pad,pageNumber){
 function renderPdfSidebar(session){
  const list=$('pdfAnnotationList');
  if(!list||readingSession!==session)return;
- const search=$('pdfAnnotationSearch'),type=$('pdfAnnotationType'),order=$('pdfAnnotationOrder');
+ const expanded=(session.expandedAnnotationIds??=new Set());
+ const tab=$('showPdfAnnotations');
+ if(tab)tab.textContent=session.annotations.length?'批注 '+session.annotations.length:'批注';
+ const search=$('pdfAnnotationSearch'),type=$('pdfAnnotationType'),order=$('pdfAnnotationOrder'),currentPageBtn=$('pdfAnnotationCurrentPage');
  if(!search.dataset.bound){
   for(const [kind,label] of Object.entries(PDF_ANNOTATION_LABELS))type.add(new Option(label,kind));
   const update=()=>renderPdfSidebar(session);
   search.addEventListener('input',update);
   type.addEventListener('change',update);
   order.addEventListener('change',update);
+  if(currentPageBtn){
+   currentPageBtn.onclick=()=>{
+    const next=currentPageBtn.getAttribute('aria-pressed')!=='true';
+    currentPageBtn.setAttribute('aria-pressed',String(next));
+    update();
+   };
+   document.addEventListener('pdf-page-change',event=>{
+    if(event.detail?.session===session&&currentPageBtn.getAttribute('aria-pressed')==='true')update();
+   },{signal:session.controller.signal});
+  }
   search.dataset.bound='true';
  }
+ const onlyCurrentPage=currentPageBtn?.getAttribute('aria-pressed')==='true';
  const query=search.value.trim().toLocaleLowerCase();
  const filtered=[...session.annotations].reverse().filter(mark=>{
+  if(onlyCurrentPage&&mark.page!==session.page)return false;
   if(type.value&&mark.kind!==type.value)return false;
   if(!query)return true;
   return [mark.quote,mark.note,PDF_ANNOTATION_LABELS[mark.kind],String(mark.page)]
@@ -371,17 +386,72 @@ function renderPdfSidebar(session){
  if(count)count.textContent=filtered.length===session.annotations.length?session.annotations.length+' 条':filtered.length+' / '+session.annotations.length+' 条';
  list.replaceChildren();
  for(const a of filtered){
-  const card=document.createElement('div');card.className='pdf-note';card.dataset.annotationId=a.id;const head=document.createElement('button');head.className='pdf-note-link';head.textContent=PDF_ANNOTATION_LABELS[a.kind]+' · 第 '+a.page+' 页';head.onclick=()=>session.showPage(a.page);card.append(head);
+  const card=document.createElement('div');
+  card.className='pdf-note';card.dataset.annotationId=a.id;
+  card.style.setProperty('--pdf-note-color',a.color||MARK_COLORS[0]);
+  const top=document.createElement('div');top.className='pdf-note-top';
+  const swatch=document.createElement('button');swatch.type='button';swatch.className='pdf-note-swatch';
+  const colorName=PDF_MARK_PALETTE.find(([color])=>color===a.color)?.[1]||'当前颜色';
+  swatch.title='切换批注颜色（当前：'+colorName+'）';swatch.setAttribute('aria-label',swatch.title);
+  swatch.onclick=()=>{
+   const idx=MARK_COLORS.indexOf(a.color);
+   a.color=MARK_COLORS[(idx+1)%MARK_COLORS.length];
+   savePdfMarks(session);redrawPdfAnnotationPage(session,a.page);renderPdfSidebar(session);
+  };
+  const head=document.createElement('button');head.type='button';head.className='pdf-note-link';
+  head.textContent=PDF_ANNOTATION_LABELS[a.kind]+' · 第 '+a.page+' 页';
+  head.onclick=async()=>{
+   await session.showPage(a.page);
+   if(a.rects?.length&&typeof flashPdfRects==='function')flashPdfRects(a.page,a.rects);
+  };
   if(a.kind==='highlight'){
    card.classList.add('pdf-note-highlight');
-   card.style.setProperty('--pdf-note-color',a.color);
-   const colorName=PDF_MARK_PALETTE.find(([color])=>color===a.color)?.[1];
    if(colorName)head.setAttribute('aria-label',colorName+'高亮 · 第 '+a.page+' 页');
   }
-  if(a.quote){const q=document.createElement('blockquote');q.textContent=a.quote;card.append(q);
-   const translate=document.createElement('button');translate.type='button';translate.className='secondary';translate.textContent='翻译摘录';
-   translate.onclick=()=>session.translateMark?.(a);card.append(translate);
-  }const body=document.createElement('textarea');body.value=a.note;body.placeholder='补充批注…';body.setAttribute('aria-label','编辑批注');body.onchange=()=>{a.note=body.value.slice(0,30000);savePdfMarks(session);redrawPdfAnnotationPage(session,a.page)};card.append(body);
+  const tools=document.createElement('div');tools.className='pdf-note-tools';
+  const makeTool=(label,title,run,danger=false)=>{
+   const btn=document.createElement('button');btn.type='button';
+   btn.className='pdf-note-tool'+(danger?' is-danger':'');btn.textContent=label;btn.title=title;btn.onclick=run;return btn;
+  };
+  if(a.quote){
+   tools.append(
+    makeTool('译','在翻译面板打开这段摘录',()=>session.translateMark?.(a)),
+    makeTool('存笔记','将这条批注与出处保存为研究笔记',async()=>{
+     try{await savePdfExcerpt(session,{page:a.page,rects:a.rects,quote:[a.quote,a.note].filter(Boolean).join('\n\n')})}
+     catch(e){toast(e.message)}
+    })
+   );
+  }
+  tools.append(makeTool('删除','删除这条批注',()=>{
+   expanded.delete(a.id);
+   session.annotations=session.annotations.filter(n=>n.id!==a.id);
+   savePdfMarks(session);redrawPdfAnnotationPage(session,a.page);renderPdfSidebar(session);
+  },true));
+  top.append(swatch,head,tools);card.append(top);
+  if(a.quote){const q=document.createElement('blockquote');q.textContent=a.quote;card.append(q);}
+  const showEditor=Boolean(a.note)||expanded.has(a.id)||['comment','bookmark','text'].includes(a.kind);
+  if(showEditor){
+   const body=document.createElement('textarea');
+   body.value=a.note;body.rows=2;body.placeholder='记录思考、推导批注或待核对问题…';body.setAttribute('aria-label','编辑批注');
+   let saveTimer=0;
+   const commit=()=>{
+    clearTimeout(saveTimer);saveTimer=0;
+    const nextNote=body.value.slice(0,30000);
+    if(a.note===nextNote)return;
+    a.note=nextNote;savePdfMarks(session);redrawPdfAnnotationPage(session,a.page);
+   };
+   body.oninput=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(commit,450)};
+   body.onchange=commit;
+   card.append(body);
+  }else{
+   const addNote=document.createElement('button');addNote.type='button';addNote.className='pdf-note-add-body';
+   addNote.textContent='+ 添加批注思考…';
+   addNote.onclick=()=>{
+    expanded.add(a.id);renderPdfSidebar(session);
+    list.querySelector('[data-annotation-id="'+a.id+'"] textarea')?.focus();
+   };
+   card.append(addNote);
+  }
   if(a.kind==='text'){
    const settings=document.createElement('div');settings.className='pdf-text-settings';
    const font=document.createElement('select'),size=document.createElement('input'),style=pdfTextStyle(a);
@@ -394,8 +464,14 @@ function renderPdfSidebar(session){
    };
    settings.append('字体 ',font,' 字号 ',size);card.append(settings);
   }
-  const remove=document.createElement('button');remove.className='danger';remove.textContent='删除';remove.onclick=()=>{session.annotations=session.annotations.filter(n=>n.id!==a.id);savePdfMarks(session);redrawPdfAnnotationPage(session,a.page);renderPdfSidebar(session)};card.append(remove);list.append(card);
+  list.append(card);
  }
- if(!list.children.length)list.textContent=session.annotations.length?'没有匹配的批注。':'选中文字后，可高亮、划线或记录思考。';
+ if(!list.children.length){
+  const empty=document.createElement('p');empty.className='pdf-empty-state';
+  empty.textContent=onlyCurrentPage&&session.annotations.length
+   ?'当前第 '+session.page+' 页暂无批注，取消右上角「仅当前页」可查看全文 '+session.annotations.length+' 条批注。'
+   :session.annotations.length?'没有匹配的批注。':'在 PDF 正文中选中文字，可添加六色高亮、划线或记录推导思考。';
+  list.append(empty);
+ }
  const bookmarks=$('pdfBookmarkList');if(bookmarks){bookmarks.replaceChildren();for(const a of session.annotations.filter(a=>a.kind==='bookmark')){const button=document.createElement('button');button.textContent=a.note||'第 '+a.page+' 页';button.onclick=()=>session.showPage(a.page);bookmarks.append(button)}if(!bookmarks.children.length)bookmarks.textContent='暂无书签。'}
 }
