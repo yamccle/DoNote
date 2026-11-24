@@ -27,9 +27,9 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 
 ## 当前状态（换手时）
 
-- 分支 `main`，HEAD `6921c63`（r129 发布记录提交）。
-- 恢复基线 `source-baseline-recovered` 指向 `7913398`；发布标签 `r123`…`r129`（`r129` → `5507f04`，即本次发布使用的源码提交）。
-- 最新发布 **r129 / 26.1129.0075**。在 `outputs/r129/` 提供完整包、增量包与 `DoNote-r129-release.json`。
+- r130 构建自 `codex/workspace-home-ui`。原工作区的网页阅读器改动留在 `main` 工作区。
+- 恢复基线 `source-baseline-recovered` 指向 `7913398`。r130 的源码由标签 `r130` 标记。
+- 本地发布 **r130 / 26.1130.0076**。包和发布记录位于主工作区的 `outputs/r130/`。
 - GitHub 已启用 Releases：`r127`、`r128`、`r129` 各含完整包 + 增量包 + 发布记录；模型包不进 GitHub。
 - 运行依赖锁定：`docs/releases/runtime-lock.json` 锁定 **r122**（`26.1121.0068`，SHA `6c4da1cf…`），**不要**改成 r123 及以后：发布包不含 `video-runtime/` 构建期资源，改了会构不出来
 - 工作树应为干净；脏树会被 `release.ps1` 直接拒绝
@@ -42,6 +42,7 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 | r126 | 修复同步翻译漏掉**重新识别后的第一批**字幕（旧字幕条数把新字幕的入队下标带偏） |
 | r127 | 语音模型在线下载默认走 `hf-mirror.com`（原默认直连 huggingface.co，国内超时）；模型安装器加固（文件被占用不再中断）；模型说明按实测校正 |
 | r129 | 统一文件夹新建/导航/移动流程；长路径不挤出按钮、位置行可滚动、选择器输入框样式统一。 |
+| r130 | 主页显示继续阅读和近期计划。栏目共用紧凑工具栏。多附件资料按实际附件恢复位置和完成状态。 |
 | r128 | 总览新建时选择记录类型，栏目内直接新建。附件和关联资料移到正文前。切换类型保留输入，修复窄窗和夜间整页编辑。 |
 
 ### 模型包（不在 Git，发布用）
@@ -89,22 +90,22 @@ node tools/tests/test-workspace.mjs <候选 stage>/workspace 128
 
 字幕相关改动的额外自检：`tools/tests/test-workspace.mjs` 的 `testBackgroundSubtitles` 用模拟宿主（`qaRelease.post`）回放识别消息，并模拟 `subtitle-local:*` 离线翻译；改动消息契约或翻译流程时必须同步更新该测试。
 
-## 发布下一版（r130 示例）
+## 发布下一版
 
 ```powershell
 $runtime  = '.\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'   # 运行依赖锁
-$previous = '.\outputs\r129\DoNote-Windows-x64-r129.zip'                   # 上一版完整包
+$previous = '.\outputs\r130\DoNote-Windows-x64-r130.zip'                   # 上一版完整包
 & $pwsh7 -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 `
-  -Revision r130 -Version 26.1130.0076 `
+  -Revision r131 -Version 26.1201.0077 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory outputs
 ```
 
-成功后在 `outputs/r130/` 得到三个文件。发布后按以下四步更新发布记录。
+命令中的包路径从源码工作区解析。独立工作区使用主工作区的 `outputs` 路径。发布后按以下四步更新发布记录。
 
-1. 打标签 `git tag -a r130 -m '…（版本）…' <本次构建用的提交>`。目标提交用发布记录里的 `sourceCommit`。
+1. 打标签 `git tag -a r131 -m '…（版本）…' <本次构建用的提交>`。目标提交用发布记录里的 `sourceCommit`。
 2. 更新 `docs/releases/runtime-lock.json` 的 `latestRelease`（运行依赖那段保持 r122 不动）
 3. 更新 `docs/releases/README.md` 的发布记录表与下一版命令示例
-4. `git add -A && git commit -m 'Record r130 release'`，确认 `git status` 干净。
+4. 提交发布文档，确认 `git status` 干净。
 
 手工复核单个包（可选）：
 
@@ -144,7 +145,7 @@ cd H:\WorkSpace\Codex\2026-11-03\sites-plugin-sites-openai-curated-remote-2
 & $git log --oneline -8
 & $git tag -l
 & $git status --porcelain
-Get-ChildItem outputs\r129
+Get-ChildItem outputs\r130
 Get-ChildItem outputs -Filter 'DoNote-Models*'
 Get-Content docs\releases\runtime-lock.json
 & $git remote -v
