@@ -15,8 +15,8 @@ r122 完整包的版本清单为 `26.1121.0068`。其文件名和 SHA-256 位于
 ```powershell
 $outputs = '.\outputs'
 $runtime = Join-Path $outputs 'DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'
-$previous = Join-Path $outputs 'r135\DoNote-Windows-x64-r135.zip'
-pwsh -File tools/release.ps1 -Revision r136 -Version 26.1136.0082 `
+$previous = Join-Path $outputs 'r136\DoNote-Windows-x64-r136.zip'
+pwsh -File tools/release.ps1 -Revision r137 -Version 26.1137.0083 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory $outputs
 ```
 
@@ -28,6 +28,7 @@ pwsh -File tools/release.ps1 -Revision r136 -Version 26.1136.0082 `
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |
 | --- | --- | --- | --- | --- |
+| r136 | 26.1136.0082 | tag `r136` → `41f909b` | 2026-11-25 | 升级 PPT/PPTX 知识讲义工作台（胶片目录、网格总览、沉浸全屏放映、原片讲义提取、逐页批注与沉淀回跳），重构三栏聚合设置中心，打磨全站栏目 UI 并实现单进程极速收藏网页。基于 r135（26.1135.0081） |
 | r135 | 26.1135.0081 | tag `r135` → `2378705` | 2026-11-24 | 重构 PDF 右侧翻译、批注与 AI 问答界面：顺向无嵌套翻译卡与电路术语胶囊、紧凑批注与当前页筛选、SSE 流式与 KaTeX 公式渲染问答。基于 r134（26.1134.0080） |
 | r134 | 26.1134.0080 | tag `r134` → `33ebc83` | 2026-11-24 | 新增 PDF 页面反向引用与无重载穿梭、扫描页离线识字入全文索引及云端快照保留份数清理；加固增量备份引用重映射。基于 r133（26.1133.0079） |
 | r133 | 26.1133.0079 | tag `r133` → `b6278e6` | 2026-11-24 | 新增 Google Drive 同步目录与 WebDAV 版本化云端备份（含完成标记与 SHA-256 校验恢复）。基于 r132（26.1132.0078） |
@@ -41,6 +42,14 @@ pwsh -File tools/release.ps1 -Revision r136 -Version 26.1136.0082 `
 | r125 | 26.1125.0071 | tag `r125` → `e02edda` | 2026-11-23 | 字幕识别时逐条同步翻译（边识别边翻译）；基于 r124（26.1124.0070） |
 | r124 | 26.1124.0070 | tag `r124` → `0d35f83` | 2026-11-23 | 按新发布流程重建；基于 r123（26.1123.0069） |
 | r123 | 26.1123.0069 | tag `r123` → `3eba4d6` | 2026-11-23 | 交互优化与工程化整理；基于 r122（26.1121.0068） |
+
+### r136
+
+- 完整包 `outputs/r136/DoNote-Windows-x64-r136.zip`
+  `bd5d2ce6922941869f9f991c995cb200ce1d150a9a632dfc00806c5666deab58`
+- 增量包 `outputs/r136/DoNote-Update-26.1135.0081-to-r136.zip`
+  `4cb1e3518533e65d64f2dc849161aee0193c4a1c2d16e587d16bdff8a9af8620`
+- 发布记录 `outputs/r136/DoNote-r136-release.json`，检查项：`workspace`、`cloud-backup-transport`、`upgrade-and-rollback`、`package-checksums`。
 
 ### r135
 
