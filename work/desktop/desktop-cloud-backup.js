@@ -66,24 +66,26 @@
   const username=$('cloudBackupUser'),password=$('cloudBackupPassword'),keep=$('cloudBackupKeep'),list=$('cloudBackupList');
   const message=$('cloudBackupMessage'),progress=$('cloudBackupProgress');
   const pending=new Map();
-  let settings=null,operation=false,cancellable=false,stopRequested=false,transferring=false,downloadedPath='';
+  let settings=null,operation=false,trackTask=false,hadTransfer=false,cancellable=false,stopRequested=false,transferring=false,downloadedPath='';
 
   function setMessage(value,done,total){
    message.textContent=value;
    if(total>0){progress.max=total;progress.value=Math.min(done||0,total)}
    else progress.removeAttribute('value');
-   if(window.DoNoteTasks&&value&&(operation||/已上传|已写入同步目录|已下载|已取消/.test(value))){
-    const pct=total>0?Math.round((Math.min(done||0,total)/total)*100):(/已上传|已写入同步目录|已下载/.test(value)?100:null);
-    const isCancel=/^已取消/.test(value);
-    const isDone=!operation&&/已上传|已写入同步目录|已下载/.test(value);
-    const isErr=!operation&&!isCancel&&!isDone&&/失败|超时|无效|错误|不足/.test(value);
+   if(window.DoNoteTasks&&trackTask&&value){
+    const isSelectPrompt=/^请选择下载位置/.test(value);
+    if(isSelectPrompt&&!hadTransfer)return;
+    const pct=total>0?Math.round((Math.min(done||0,total)/total)*100):(/备份已写入同步目录|备份已上传到 WebDAV|备份已下载并通过校验/.test(value)?100:null);
+    const isCancel=/^已取消|^正在取消/.test(value);
+    const isDone=/备份已写入同步目录|备份已上传到 WebDAV|备份已下载并通过校验/.test(value);
+    const isErr=!isCancel&&!isDone&&/失败|超时|无效|错误|不足|已切换/.test(value);
     window.DoNoteTasks.upsert('cloud-backup',{
      kind:'cloud',
      title:'云端快照备份',
      detail:value,
      percent:pct,
-     state:operation?'running':isCancel?'cancelled':isErr?'error':isDone?'done':'done',
-     onCancel:cancellable&&!stopRequested?()=>$('cloudBackupCancel')?.click():null,
+     state:isCancel&&!operation?'cancelled':isDone?'done':isErr?'error':operation?'running':'done',
+     onCancel:operation&&cancellable&&!stopRequested?()=>$('cloudBackupCancel')?.click():null,
      onOpen:()=>{if(!dialog.open)dialog.showModal();}
     });
    }
@@ -161,15 +163,39 @@
   async function run(label,action,allowCancel=false){
    if(operation)return;
    if($('writeFolder').disabled){setMessage('请等待当前本地备份完成。');return;}
-   operation=true;cancellable=allowCancel;stopRequested=false;
+   operation=true;trackTask=allowCancel;hadTransfer=false;cancellable=allowCancel;stopRequested=false;
    $('writeFolder').disabled=true;progress.hidden=false;
    updateActions();setMessage(label);
-   try{await action()}catch(error){setMessage(error.name==='AbortError'?'已取消':error.message)}
-   finally{operation=false;cancellable=false;transferring=false;$('writeFolder').disabled=false;progress.hidden=true;updateActions()}
+   let runErr=null;
+   try{await action()}catch(error){runErr=error;setMessage(error.name==='AbortError'?'已取消':error.message)}
+   finally{
+    const wasTracked=trackTask,didTransfer=hadTransfer,finalMsg=message.textContent.trim();
+    operation=false;trackTask=false;hadTransfer=false;cancellable=false;transferring=false;
+    $('writeFolder').disabled=false;progress.hidden=true;updateActions();
+    if(wasTracked&&window.DoNoteTasks){
+     const existing=window.DoNoteTasks.list?.().find(t=>t.id==='cloud-backup');
+     if(runErr?.name==='AbortError'&&!didTransfer){
+      window.DoNoteTasks.remove('cloud-backup');
+     }else if(existing?.state==='running'){
+      const done=/备份已写入同步目录|备份已上传到 WebDAV|备份已下载并通过校验/.test(finalMsg);
+      const cancelled=runErr?.name==='AbortError'||/^已取消/.test(finalMsg);
+      if(!finalMsg&&!runErr){
+       window.DoNoteTasks.remove('cloud-backup');
+      }else{
+       window.DoNoteTasks.upsert('cloud-backup',{
+        detail:finalMsg||(done?'云端快照操作已完成':'云端操作已结束'),
+        percent:done?100:existing.percent,
+        state:cancelled?'cancelled':runErr?'error':'done',
+        onCancel:null
+       });
+      }
+     }
+    }
+   }
   }
   async function transfer(action,name){
    if(stopRequested)throw new DOMException('已取消','AbortError');
-   transferring=true;
+   hadTransfer=true;transferring=true;
    try{return await request(action,{name},true)}
    finally{transferring=false}
   }

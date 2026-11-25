@@ -403,8 +403,11 @@
     if (importMsg) {
       const syncBackupTask = () => {
         const text = importMsg.textContent.trim();
-        if (!text) return;
-        const isDone = /^(已保存|大文件备份已完成|导入完成)/.test(text);
+        if (!text) {
+          if (tasks.get('local-backup')?.state === 'running') remove('local-backup');
+          return;
+        }
+        const isDone = /^(已保存|大文件备份已完成|导入完成|没有需要导入的新记录)/.test(text);
         const isErr = /(未完成|失败|不足|无效|超出|过大|缺少|异常|已变化)/.test(text);
         const isCancel = /已取消/.test(text);
         const pct = backupBar && !backupBar.hidden && backupBar.hasAttribute('value')

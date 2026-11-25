@@ -255,8 +255,55 @@ internal sealed partial class WorkspaceWindow
                     }
 
                     var chosen = patchAsset ?? fullAsset;
+                    if (chosen == null && string.Equals(feedUrl, DefaultReleaseApiUrl, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 支持纯补丁发布流：当最新 Release 仅上传相邻增量补丁时，自动在近期 Releases 中检索当前版本可用的桥接增量包或较新完整包
+                        try
+                        {
+                            string listPayload = await client.GetStringAsync("https://api.github.com/repos/yamccle/DoNote/releases?per_page=12");
+                            var relList = serializer.Deserialize<System.Collections.ArrayList>(listPayload);
+                            if (relList != null)
+                            {
+                                foreach (object rItem in relList)
+                                {
+                                    var rDict = rItem as Dictionary<string, object>;
+                                    if (rDict == null || (rDict.ContainsKey("draft") && Equals(rDict["draft"], true))) continue;
+                                    string rTag = GetStr(rDict, "tag_name");
+                                    string rName = GetStr(rDict, "name");
+                                    string rBody = GetStr(rDict, "body");
+                                    var rVerMatch = Regex.Match(rName + " " + rBody, @"\b(26\.\d+\.\d+)\b");
+                                    Version rVer;
+                                    if (!rVerMatch.Success || !Version.TryParse(rVerMatch.Groups[1].Value, out rVer) || rVer <= curVer) continue;
+                                    var rAssets = rDict.ContainsKey("assets") ? rDict["assets"] as System.Collections.ArrayList : null;
+                                    if (rAssets == null) continue;
+                                    string stepPatchName = "DoNote-Update-" + currentVersion + "-to-" + rTag + ".zip";
+                                    string stepFullName = "DoNote-Windows-x64-" + rTag + ".zip";
+                                    Dictionary<string, object> stepPatch = null, stepFull = null;
+                                    foreach (object aObj in rAssets)
+                                    {
+                                        var aDict = aObj as Dictionary<string, object>;
+                                        if (aDict == null) continue;
+                                        string aName = GetStr(aDict, "name");
+                                        if (string.Equals(aName, stepPatchName, StringComparison.OrdinalIgnoreCase)) stepPatch = aDict;
+                                        else if (string.Equals(aName, stepFullName, StringComparison.OrdinalIgnoreCase)) stepFull = aDict;
+                                    }
+                                    if (stepPatch != null || stepFull != null)
+                                    {
+                                        chosen = stepPatch ?? stepFull;
+                                        patchAsset = stepPatch;
+                                        tag = rTag;
+                                        remoteVersion = rVerMatch.Groups[1].Value;
+                                        body = rBody;
+                                        htmlUrl = GetStr(rDict, "html_url");
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    }
                     if (chosen == null)
-                        throw new InvalidOperationException("GitHub 最新版本（" + tag + "）尚未上传可识别的桌面更新包。");
+                        throw new InvalidOperationException("GitHub 最新版本（" + tag + "）为增量补丁发布，请先从 Releases 安装最近的完整包后再在线更新。");
 
                     string chosenName = GetStr(chosen, "name");
                     string chosenUrl = GetStr(chosen, "browser_download_url");

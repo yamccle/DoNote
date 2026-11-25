@@ -8,7 +8,7 @@
 - `stage-runtime.ps1` 按运行依赖锁定文件核验旧包，只提取发布所需依赖。
 - `make-update-patch.ps1` 比较两个完整清单，生成已验证的增量 ZIP。
 - `UpdatePackage.cs` 校验文件路径、版本及内容。普通应用包拒绝模型文件。
-- `LocalUpdate.cs` 同时支持本地更新包校验启动与 GitHub Releases 在线检查更新（自动优先匹配当前版本增量包 `DoNote-Update-<current>-to-<tag>.zip`，跨版本回退完整包 `DoNote-Windows-x64-<tag>.zip`，完成流式下载与 SHA-256 校验后拉起 `DoNoteUpdater.exe`）。
+- `LocalUpdate.cs` 同时支持本地更新包校验启动与 GitHub Releases 在线检查更新（自动优先匹配当前版本增量包 `DoNote-Update-<current>-to-<tag>.zip`，支持纯补丁 Release 逐级桥接检索或回退完整包，完成流式下载与 SHA-256 校验后拉起 `DoNoteUpdater.exe`）。
 - `Program.cs` 为已验证来源的工作台消息选择 Windows 宿主服务。
 
 ## 云备份
@@ -34,6 +34,6 @@
 ## 云端备份
 
 - `desktop-large-backup.js` 为本地备份和云端快照暂存复用按块写入。
-- `desktop-cloud-backup.js` 配置备份目标与保留版本数并显示传输进度。下载完成后使用原有文件夹恢复。
+- `desktop-cloud-backup.js` 配置备份目标与保留版本数并显示传输进度（仅在实际上传/下载快照传输期间接入后台任务中心，纯查看设置或刷新列表不产生常驻任务）。下载完成后使用原有文件夹恢复。
 
 [PROTOCOL]: Update this header on change, then check AGENTS.md

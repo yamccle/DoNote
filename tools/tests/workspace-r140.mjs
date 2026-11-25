@@ -337,6 +337,35 @@ export async function verifyRefinementsAndSyncProR140(page) {
     notifiedNativeHost: true
   });
 
+  // 14 (r141 hotfix). 打开查看「云端备份」但未选择云盘或仅读取设置/刷新列表时，绝不在后台任务中心残留「正在读取设置…」常驻任务
+  const cloudInspectNoGhostTask = await page.evaluate(async () => {
+    window.DoNoteTasks.clearCompleted();
+    window.DoNoteTasks.remove('cloud-backup');
+    const origPost = window.chrome.webview.postMessage;
+    window.chrome.webview.postMessage = msg => {
+      if (msg?.type === 'cloud-backup' && msg.action === 'status') {
+        queueMicrotask(() => window.qaRelease.post({
+          type: 'cloud-backup-result',
+          id: msg.id,
+          settings: { mode: 'folder', folder: '', url: '', username: '', hasPassword: false, keepCount: 0 }
+        }));
+        return;
+      }
+      return origPost(msg);
+    };
+    try {
+      document.getElementById('cloudBackupOpen')?.click();
+      await new Promise(r => setTimeout(r, 80));
+      const cloudTasks = window.DoNoteTasks.list().filter(t => t.id === 'cloud-backup');
+      const activeCount = window.DoNoteTasks.activeCount();
+      document.getElementById('cloudBackupDialog')?.close();
+      return { cloudTaskCount: cloudTasks.length, activeCount };
+    } finally {
+      window.chrome.webview.postMessage = origPost;
+    }
+  });
+  assert.deepEqual(cloudInspectNoGhostTask, { cloudTaskCount: 0, activeCount: 0 });
+
   // 12 & 13b/c/d. 已撤销助手凭证自动清理与彻底删除 + PDF/PPT 批注 CRDT 细粒度合并 + SSE 实时推送 + AES-256-GCM 端到端加密
   const crdtCheck = await page.evaluate(() => {
     const merged = window.DoNoteSyncCrypto.mergeAnnotationBundle(
