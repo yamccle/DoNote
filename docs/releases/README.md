@@ -15,8 +15,8 @@ r122 完整包的版本清单为 `26.1121.0068`。其文件名和 SHA-256 位于
 ```powershell
 $outputs = '.\outputs'
 $runtime = Join-Path $outputs 'DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'
-$previous = Join-Path $outputs 'r136\DoNote-Windows-x64-r136.zip'
-pwsh -File tools/release.ps1 -Revision r137 -Version 26.1137.0083 `
+$previous = Join-Path $outputs 'r137\DoNote-Windows-x64-r137.zip'
+pwsh -File tools/release.ps1 -Revision r138 -Version 26.1138.0084 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory $outputs
 ```
 
@@ -28,6 +28,7 @@ pwsh -File tools/release.ps1 -Revision r137 -Version 26.1137.0083 `
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |
 | --- | --- | --- | --- | --- |
+| r137 | 26.1137.0083 | tag `r137` → `76dc288` | 2026-11-25 | 全站新世代 UI 变革（四色 Bento 总览进度环、7 天动态活跃柱状图、视觉封面画廊、多列拖拽看板、`Ctrl+K` 聚光灯指令面板），全站跨学科中性化改造，并打通 PPT 全库全文检索与一键导出双栏图文复习讲义。基于 r136（26.1136.0082） |
 | r136 | 26.1136.0082 | tag `r136` → `41f909b` | 2026-11-25 | 升级 PPT/PPTX 知识讲义工作台（胶片目录、网格总览、沉浸全屏放映、原片讲义提取、逐页批注与沉淀回跳），重构三栏聚合设置中心，打磨全站栏目 UI 并实现单进程极速收藏网页。基于 r135（26.1135.0081） |
 | r135 | 26.1135.0081 | tag `r135` → `2378705` | 2026-11-24 | 重构 PDF 右侧翻译、批注与 AI 问答界面：顺向无嵌套翻译卡与电路术语胶囊、紧凑批注与当前页筛选、SSE 流式与 KaTeX 公式渲染问答。基于 r134（26.1134.0080） |
 | r134 | 26.1134.0080 | tag `r134` → `33ebc83` | 2026-11-24 | 新增 PDF 页面反向引用与无重载穿梭、扫描页离线识字入全文索引及云端快照保留份数清理；加固增量备份引用重映射。基于 r133（26.1133.0079） |
@@ -42,6 +43,14 @@ pwsh -File tools/release.ps1 -Revision r137 -Version 26.1137.0083 `
 | r125 | 26.1125.0071 | tag `r125` → `e02edda` | 2026-11-23 | 字幕识别时逐条同步翻译（边识别边翻译）；基于 r124（26.1124.0070） |
 | r124 | 26.1124.0070 | tag `r124` → `0d35f83` | 2026-11-23 | 按新发布流程重建；基于 r123（26.1123.0069） |
 | r123 | 26.1123.0069 | tag `r123` → `3eba4d6` | 2026-11-23 | 交互优化与工程化整理；基于 r122（26.1121.0068） |
+
+### r137
+
+- 完整包 `outputs/r137/DoNote-Windows-x64-r137.zip`
+  `f21f88800dc78d6333c19f572c50d3dadd13bcb961991c90eacefba0744570c5`
+- 增量包 `outputs/r137/DoNote-Update-26.1136.0082-to-r137.zip`
+  `3fe91281ee2eb93f47df14f80b16a6385d357e1026776aec2a55ff5f54f5781a`
+- 发布记录 `outputs/r137/DoNote-r137-release.json`，检查项：`workspace`、`cloud-backup-transport`、`upgrade-and-rollback`、`package-checksums`。
 
 ### r136
 

@@ -229,7 +229,7 @@
             : r.date.replaceAll('-', '.');
           card.innerHTML = '<div class="kanban-card-top">'
             + '<span class="kanban-date">' + esc(dateInfo) + '</span>'
-            + (r.pinned ? '<span class="pin" title="已置顶">⌑</span>' : '')
+            + (r.pinned ? '<span class="kanban-pin-pill" title="已置顶">★ 置顶</span>' : '')
             + '</div>'
             + '<h3>' + esc(r.title) + '</h3>'
             + (excerpt ? '<p class="card-excerpt">' + esc(excerpt) + '</p>' : '')

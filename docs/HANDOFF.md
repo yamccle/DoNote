@@ -4,7 +4,7 @@
 
 ## 这是什么
 
-DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 本地网页工作台）。核心能力：文献/网页收藏与阅读、PDF 批注与翻译、离线智能排版、OCR 识字、全文检索、回收站、多开阅读、计划与工作日志、视频字幕（识别时逐条同步翻译）等。
+DoNote：本地优先的跨学科知识精读、文献管理与课题研究工作台（WinForms + WebView2 桌面壳 + 本地网页工作台）。核心能力：文献/PPT/网页收藏与精读、Bento 总览与多列拖拽看板、PDF/PPT 批注与翻译、离线智能排版、OCR 识字、跨文档全文检索、回收站、多开阅读、计划与工作日志、视频字幕（识别时逐条同步翻译）等。
 
 ## 代码在哪
 
@@ -27,10 +27,10 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 
 ## 当前状态（换手时）
 
-- 分支 `main` 已包含 r136（源码标签 `r136` → `41f909b`）；`README.md` 已同步 r136 能力与下载信息，7 张工作流程截图来自 r132 演示账户。
+- 分支 `main` 已包含 r137（源码标签 `r137` → `76dc288`）；`README.md` 已同步 r137 能力与下载信息。
 - 恢复基线 `source-baseline-recovered` 指向 `7913398`。
-- 最新发布 **r136 / 26.1136.0082**。本地正式包和发布记录位于 `outputs/r136/`；GitHub Releases 当前最新已上传为 `r135`（`r136` 待用户指令上传）。
-- GitHub Releases：`r130`、`r131`、`r132`、`r133`、`r134`、`r135`（各含完整包 + 增量包 + 发布记录）与 `models-2026-11-23`（13 个模型分卷 + `SHA256SUMS.txt`，共 14 个资产，全部核验）。
+- 最新发布 **r137 / 26.1137.0083**。包和发布记录位于 `outputs/r137/`，同步发布至 GitHub Releases（`latest` 指向 `r137`）。
+- GitHub Releases：`r130`、`r131`、`r132`、`r133`、`r134`、`r135`、`r136`、`r137`（各含完整包 + 增量包 + 发布记录）与 `models-2026-11-23`（13 个模型分卷 + `SHA256SUMS.txt`，共 14 个资产，全部核验）。
 - 运行依赖锁定：`docs/releases/runtime-lock.json` 锁定 **r122**（`26.1121.0068`，SHA `6c4da1cf…`），**不要**改成 r123 及以后：发布包不含 `video-runtime/` 构建期资源，改了会构不出来
 - 工作树应为干净；脏树会被 `release.ps1` 直接拒绝
 
@@ -38,6 +38,7 @@ DoNote：本地优先的工程研究工作台（WinForms + WebView2 桌面壳 + 
 
 | 版本 | 内容 |
 | --- | --- |
+| r137 | 全站新世代 UI 变革（四色 Bento 总览进度环、7 天动态活跃柱状图、文献视觉封面画廊、问题/计划多列拖拽看板、`Ctrl+K` 聚光灯指令面板）、全站跨学科中性化改造，以及 PPT 全库全文检索与一键导出双栏图文复习讲义。 |
 | r136 | 升级 PPT/PPTX 资料库级精读工作台（胶片目录、网格总览、沉浸全屏放映、原片讲义提取、逐页批注自动保存与沉淀回跳 + 资料库首页封面缩略图），重构三栏聚合偏好设置中心，统一打磨全站栏目 UI（修复工作日志四列挤压与导航条伪影），并新增单进程极速收藏网页与纯正文模式。 |
 | r135 | 重构 PDF 阅读器右侧栏（翻译 · 批注 · AI 问答）：「原文 → 电路术语胶囊 → 译文」无嵌套顺向排版与语向互换、高密度渐进式批注与当前页筛选、SSE 流式回答 + KaTeX 公式防转义渲染 + 页码胶囊回跳与存为笔记闭环。 |
 | r134 | 新增 PDF 页面「被引用」角标与反向引用侧栏穿梭、扫描页离线识字直转摘录并入全文检索索引、云端快照保留份数自动清理，以及跨目录增量备份引用重映射与真机压测。 |
@@ -105,9 +106,9 @@ node tools/tests/test-cloud-backup.mjs <编译后的 CloudBackupProbe.exe>
 
 ```powershell
 $runtime  = '.\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'   # 运行依赖锁
-$previous = '.\outputs\r136\DoNote-Windows-x64-r136.zip'                   # 上一版完整包
+$previous = '.\outputs\r137\DoNote-Windows-x64-r137.zip'                   # 上一版完整包
 & $pwsh7 -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 `
-  -Revision r137 -Version 26.1137.0083 `
+  -Revision r138 -Version 26.1138.0084 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory outputs
 ```
 

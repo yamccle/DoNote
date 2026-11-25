@@ -42,8 +42,13 @@ function renderWorkspaceRail(items){
   const spacer=document.createElement('div');spacer.className='rail-spacer';rail.append(spacer);
   const avatar=document.createElement('button');avatar.type='button';avatar.className='icon-button rail-avatar';avatar.dataset.railView='account';
   const initial=document.createElement('span');initial.className='rail-initial';initial.textContent=Array.from(label)[0]||'A';
+  const metaWrap=document.createElement('span');metaWrap.className='rail-user-meta';
   const accountName=document.createElement('span');accountName.className='rail-label';accountName.textContent=label;
-  avatar.append(initial,accountName);
+  const accountRole=document.createElement('small');accountRole.className='rail-sublabel';accountRole.textContent=profile?.role||'切换工作台';
+  metaWrap.append(accountName,accountRole);
+  const chevron=document.createElement('span');chevron.className='rail-chevron';chevron.setAttribute('aria-hidden','true');
+  chevron.innerHTML='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5.5 4.5 3.5 3.5-3.5 3.5"/></svg>';
+  avatar.append(initial,metaWrap,chevron);
   avatar.title=label+(profile?.role?' · '+profile.role:'')+'（点击切换账户）';
   avatar.setAttribute('aria-label','当前账户：'+label+'，点击切换账户');
   avatar.onclick=()=>{const users=$('usersBtn');if(users)users.click()};
