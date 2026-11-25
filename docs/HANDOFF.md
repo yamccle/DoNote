@@ -27,10 +27,10 @@ DoNote：本地优先的跨学科知识精读、文献管理与课题研究工�
 
 ## 当前状态（换手时）
 
-- 分支 `main` 已包含 r137（源码标签 `r137` → `295d8b3`）；`README.md` 已同步 r137 能力与下载信息。
+- 分支 `main` 已包含 r138（源码标签 `r138` → `5bd3dd1`）；`README.md` 已同步 r138 能力与下载信息。
 - 恢复基线 `source-baseline-recovered` 指向 `7913398`。
-- 最新发布 **r137 / 26.1137.0083**。包和发布记录位于 `outputs/r137/`，同步发布至 GitHub Releases（`latest` 指向 `r137`）。
-- GitHub Releases：`r130`、`r131`、`r132`、`r133`、`r134`、`r135`、`r136`、`r137`（各含完整包 + 增量包 + 发布记录）与 `models-2026-11-23`（13 个模型分卷 + `SHA256SUMS.txt`，共 14 个资产，全部核验）。
+- 最新发布 **r138 / 26.1138.0084**。包和发布记录位于 `outputs/r138/`，同步发布至 GitHub Releases（`latest` 指向 `r138`）。
+- GitHub Releases：`r130`、`r131`、`r132`、`r133`、`r134`、`r135`、`r136`、`r137`、`r138`（各含完整包 + 增量包 + 发布记录）与 `models-2026-11-23`（13 个模型分卷 + `SHA256SUMS.txt`，共 14 个资产，全部核验）。
 - 运行依赖锁定：`docs/releases/runtime-lock.json` 锁定 **r122**（`26.1121.0068`，SHA `6c4da1cf…`），**不要**改成 r123 及以后：发布包不含 `video-runtime/` 构建期资源，改了会构不出来
 - 工作树应为干净；脏树会被 `release.ps1` 直接拒绝
 
@@ -38,6 +38,7 @@ DoNote：本地优先的跨学科知识精读、文献管理与课题研究工�
 
 | 版本 | 内容 |
 | --- | --- |
+| r138 | 全站视觉比例协调性收敛与低饱和学术纸感升级（首屏纵向高度压缩 45%、12px 统一圆角、宽屏黄金视宽、标题 HTML 实体自动解码）、全栏目顶栏常驻显眼 `快捷指令 Ctrl+K` 搜索栏、总览栏目统计卡真实计数与点击直达，以及面向数十 GB 资料库重构的四层「备份与恢复中心」（三维健康栏、流式/云端双主卡、超 500MB 智能提醒、独立增量恢复区与草稿检测）。 |
 | r137 | 全站新世代 UI 变革（四色 Bento 总览进度环、7 天动态活跃柱状图、文献视觉封面画廊、问题/计划多列拖拽看板、`Ctrl+K` 聚光灯指令面板）、全站跨学科中性化改造，以及 PPT 全库全文检索与一键导出双栏图文复习讲义。 |
 | r136 | 升级 PPT/PPTX 资料库级精读工作台（胶片目录、网格总览、沉浸全屏放映、原片讲义提取、逐页批注自动保存与沉淀回跳 + 资料库首页封面缩略图），重构三栏聚合偏好设置中心，统一打磨全站栏目 UI（修复工作日志四列挤压与导航条伪影），并新增单进程极速收藏网页与纯正文模式。 |
 | r135 | 重构 PDF 阅读器右侧栏（翻译 · 批注 · AI 问答）：「原文 → 电路术语胶囊 → 译文」无嵌套顺向排版与语向互换、高密度渐进式批注与当前页筛选、SSE 流式回答 + KaTeX 公式防转义渲染 + 页码胶囊回跳与存为笔记闭环。 |
@@ -106,9 +107,9 @@ node tools/tests/test-cloud-backup.mjs <编译后的 CloudBackupProbe.exe>
 
 ```powershell
 $runtime  = '.\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'   # 运行依赖锁
-$previous = '.\outputs\r137\DoNote-Windows-x64-r137.zip'                   # 上一版完整包
+$previous = '.\outputs\r138\DoNote-Windows-x64-r138.zip'                   # 上一版完整包
 & $pwsh7 -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 `
-  -Revision r138 -Version 26.1138.0084 `
+  -Revision r139 -Version 26.1139.0085 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory outputs
 ```
 
