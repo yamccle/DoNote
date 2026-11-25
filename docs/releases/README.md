@@ -15,8 +15,8 @@ r122 完整包的版本清单为 `26.1121.0068`。其文件名和 SHA-256 位于
 ```powershell
 $outputs = '.\outputs'
 $runtime = Join-Path $outputs 'DoNote-Windows-x64-2026-11-21-r122-交互优化.zip'
-$previous = Join-Path $outputs 'r138\DoNote-Windows-x64-r138.zip'
-pwsh -File tools/release.ps1 -Revision r139 -Version 26.1139.0085 `
+$previous = Join-Path $outputs 'r139\DoNote-Windows-x64-r139.zip'
+pwsh -File tools/release.ps1 -Revision r140 -Version 26.1140.0086 `
   -RuntimeArchive $runtime -PreviousReleaseZip $previous -OutputDirectory $outputs
 ```
 
@@ -39,6 +39,7 @@ pwsh -File tools/release.ps1 -Revision r139 -Version 26.1139.0085 `
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |
 | --- | --- | --- | --- | --- |
+| r139 | 26.1139.0085 | tag `r139` → `edf6c32` | 2026-11-25 | 完善成就殿宇十张里程碑卡牌（保留 001 模拟 IC 初心并覆盖即时入库与跨日长期坚持目标）、每日打开/使用自动留痕活跃图表、GitHub Releases 在线自动检查与增量优选更新、侧边栏宁缺毋滥微层次、精简版 AI 助手连接器、篮板式全局拖拽投递与归档分拣工作台、统一后台任务进度中心，以及面向多端协同的 `/api/sync/v1` 内容寻址去重增量同步底座。基于 r138（26.1138.0084） |
 | r138 | 26.1138.0084 | tag `r138` → `5bd3dd1` | 2026-11-25 | 全站视觉比例收敛与低饱和学术纸感升级（首屏纵向压缩 45%、12px 统一圆角、自动解码标题实体）、全栏目顶栏常驻显眼 `快捷指令 Ctrl+K` 搜索栏、总览统计卡片真实计数与点击直达，以及面向数十 GB 资料库重构的四层「备份与恢复中心」。基于 r137（26.1137.0083） |
 | r137 | 26.1137.0083 | tag `r137` → `295d8b3` | 2026-11-25 | 全站新世代 UI 变革（四色 Bento 总览进度环、7 天动态活跃柱状图、视觉封面画廊、多列拖拽看板、`Ctrl+K` 聚光灯指令面板与内缩胶囊账户卡），全站跨学科中性化改造，并打通 PPT 全库全文检索与一键导出双栏图文复习讲义。基于 r136（26.1136.0082） |
 | r136 | 26.1136.0082 | tag `r136` → `41f909b` | 2026-11-25 | 升级 PPT/PPTX 知识讲义工作台（胶片目录、网格总览、沉浸全屏放映、原片讲义提取、逐页批注与沉淀回跳），重构三栏聚合设置中心，打磨全站栏目 UI 并实现单进程极速收藏网页。基于 r135（26.1135.0081） |
@@ -55,6 +56,14 @@ pwsh -File tools/release.ps1 -Revision r139 -Version 26.1139.0085 `
 | r125 | 26.1125.0071 | tag `r125` → `e02edda` | 2026-11-23 | 字幕识别时逐条同步翻译（边识别边翻译）；基于 r124（26.1124.0070） |
 | r124 | 26.1124.0070 | tag `r124` → `0d35f83` | 2026-11-23 | 按新发布流程重建；基于 r123（26.1123.0069） |
 | r123 | 26.1123.0069 | tag `r123` → `3eba4d6` | 2026-11-23 | 交互优化与工程化整理；基于 r122（26.1121.0068） |
+
+### r139
+
+- 完整包 `outputs/r139/DoNote-Windows-x64-r139.zip`
+  `19866f6cb4b8d310654bd9ad1db6935bd492589671863b77f996d9a45bc74dea`
+- 增量包 `outputs/r139/DoNote-Update-26.1138.0084-to-r139.zip`
+  `92361a82ce729fad5d9cbf7526ded784896068cfa8a7ed0a105627241c3732f0`
+- 发布记录 `outputs/r139/DoNote-r139-release.json`，检查项：`workspace`、`cloud-backup-transport`、`upgrade-and-rollback`、`package-checksums`。
 
 ### r138
 

@@ -4,7 +4,7 @@ DoNote 是一款面向跨学科文献精读、专业学习与项目研究的 **W
 
 - **本地优先**：桌面端基于 C# WinForms 和 Microsoft Edge WebView2，工作台采用原生 JavaScript。记录、附件、阅读进度、批注、OCR、全文检索、语音识别和本地模型翻译都在本机处理。在线翻译、外部 AI 和云端备份按所选服务处理相应内容。
 - **数据自主可控**：工作台数据保存在本机（WebView2 IndexedDB 与程序同级 `Data/` 目录，或 `data-location.txt` 指定的自定义资料目录），不改写原始 PDF 与媒体文件；常规程序升级自动保护用户资料与本地模型，整目录拷贝即可离线迁移。
-- **当前正式程序基线**：`r138`（版本号 `26.1138.0084`，对应源码标签 `r138` / 提交 `5bd3dd1`）。
+- **当前正式程序基线**：`r139`（版本号 `26.1139.0085`，对应源码标签 `r139` / 提交 `edf6c32`）。
 
 ---
 
@@ -71,25 +71,25 @@ DoNote 是一款面向跨学科文献精读、专业学习与项目研究的 **W
 
 ## 下载、安装与升级
 
-> **提示**：正式程序发布页为 **[DoNote `r138` Release](https://github.com/yamccle/DoNote/releases/tag/r138)**；由于仓库同时托管独立的模型整合包（[`models-2026-11-23` Release](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)），请直接从程序发布页下载桌面安装包（正式发布后 [GitHub Latest](https://github.com/yamccle/DoNote/releases/latest) 亦指向最新桌面版）。所有历史版本可在 [Releases 列表](https://github.com/yamccle/DoNote/releases) 查看。
+> **提示**：正式程序发布页为 **[DoNote `r139` Release](https://github.com/yamccle/DoNote/releases/tag/r139)**；由于仓库同时托管独立的模型整合包（[`models-2026-11-23` Release](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)），请直接从程序发布页下载桌面安装包（正式发布后 [GitHub Latest](https://github.com/yamccle/DoNote/releases/latest) 亦指向最新桌面版）。所有历史版本可在 [Releases 列表](https://github.com/yamccle/DoNote/releases) 查看。
 
-### 1. 程序包下载（正式版 `r138` · `26.1138.0084`）
+### 1. 程序包下载（正式版 `r139` · `26.1139.0085`）
 
-程序发布页：**[DoNote `r138` Release](https://github.com/yamccle/DoNote/releases/tag/r138)**
+程序发布页：**[DoNote `r139` Release](https://github.com/yamccle/DoNote/releases/tag/r139)**
 
 | 文件 | 适用场景 | 大小 | SHA-256 |
 | --- | --- | ---: | --- |
-| [`DoNote-Windows-x64-r138.zip`](https://github.com/yamccle/DoNote/releases/download/r138/DoNote-Windows-x64-r138.zip) | **首次安装**，或从任意早于 `r137` 的旧版跨版本升级 | 1,070,492,523 字节（约 1.00 GiB） | `667cacfaf13eec7e1590394d6f50c9f7abf07c09b11cae6bc730d2672eab9a2f` |
-| [`DoNote-Update-26.1137.0083-to-r138.zip`](https://github.com/yamccle/DoNote/releases/download/r138/DoNote-Update-26.1137.0083-to-r138.zip) | **增量升级**（仅限本机当前版本为 `r137` / `26.1137.0083`） | 549,014 字节（约 536 KB） | `90215956d1a5e982a3215af6770caff62b9cf888cfdadaa3327437c02948943f` |
-| [`DoNote-r138-release.json`](https://github.com/yamccle/DoNote/releases/download/r138/DoNote-r138-release.json) | 发布溯源清单（源码提交 `5bd3dd1`、依赖锁与回归检查记录） | 984 字节 | `bb804f56b2f767ae1d771e0ac3e38420b291e6ec14ddb5a2aba3b4c28f1c8d6a` |
+| [`DoNote-Windows-x64-r139.zip`](https://github.com/yamccle/DoNote/releases/download/r139/DoNote-Windows-x64-r139.zip) | **首次安装**，或从任意早于 `r138` 的旧版跨版本升级 | 1,070,544,535 字节（约 1.00 GiB） | `19866f6cb4b8d310654bd9ad1db6935bd492589671863b77f996d9a45bc74dea` |
+| [`DoNote-Update-26.1138.0084-to-r139.zip`](https://github.com/yamccle/DoNote/releases/download/r139/DoNote-Update-26.1138.0084-to-r139.zip) | **增量升级**（仅限本机当前版本为 `r138` / `26.1138.0084`） | 617,490 字节（约 603 KB） | `92361a82ce729fad5d9cbf7526ded784896068cfa8a7ed0a105627241c3732f0` |
+| [`DoNote-r139-release.json`](https://github.com/yamccle/DoNote/releases/download/r139/DoNote-r139-release.json) | 发布溯源清单（源码提交 `edf6c32`、依赖锁与回归检查记录） | 984 字节 | `f47105c4c484b9c6d85a31e622cf931dfd514ff4e145640af12d3d26fed534ec` |
 
 ### 2. 运行环境与安装步骤
 
 - **运行要求**：Windows 10 / 11 x64，需已安装 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)（Windows 11 与新版 Windows 10 通常已自带；若启动提示缺少运行时，从微软官方链接安装后重开即可）。
-- **首次安装**：将 `DoNote-Windows-x64-r138.zip` 完整解压到任意具有读写权限的文件夹（如 `D:\DoNote`），双击 `DoNote.exe` 启动。首次打开默认建立空资料库（默认账户为「默认用户」）。
-- **本地包升级（保留全部资料与模型）**：
-  1. 在软件内打开「偏好设置 → 资料与系统 → 检查更新包…」；
-  2. 若当前版本为 `26.1137.0083`（`r137`），直接选择体积更小的增量包 `DoNote-Update-26.1137.0083-to-r138.zip`；若当前为 `r136` 或更早版本，选择完整包 `DoNote-Windows-x64-r138.zip`；
+- **首次安装**：将 `DoNote-Windows-x64-r139.zip` 完整解压到任意具有读写权限的文件夹（如 `D:\DoNote`），双击 `DoNote.exe` 启动。首次打开默认建立空资料库（默认账户为「默认用户」）。
+- **在线自动升级 / 本地包升级（保留全部资料与模型）**：
+  1. 自 `r139` 起支持一键在线升级：打开「偏好设置 → 资料与系统 → **检查在线更新**」，DoNote 会自动连接 GitHub Releases，优先匹配增量补丁并完成流式 SHA-256 校验与无损替换重启；
+  2. 若本机当前为 `r138`（`26.1138.0084`）或无外网环境，可点击「本地更新包…」选择增量包 `DoNote-Update-26.1138.0084-to-r139.zip`（早于 `r138` 则选完整包 `DoNote-Windows-x64-r139.zip`）；
   3. 更新器会校验清单与文件哈希，确认后自动退出主程序、将旧程序备份至上级目录 `DoNote-Backups`，完成替换后重新启动；**升级过程不会删除或覆盖 `Data/`、`data-location.txt` 与 `models/`**，如遇异常中断会自动回退旧版程序。
 - **整机迁移**：完全退出 DoNote 后，将整个程序目录（及自定义资料目录，如有配置）复制到新电脑即可继续使用。
 
