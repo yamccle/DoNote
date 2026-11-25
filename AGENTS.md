@@ -1,6 +1,6 @@
 # DoNote
 
-DoNote 是本地优先的工程研究工作台。桌面端使用 C# WinForms、WebView2 和本地工作台。
+DoNote 是本地优先的跨学科知识精读、文献管理与课题研究工作台。桌面端使用 C# WinForms、WebView2 和本地工作台。
 
 - `work/desktop/` 提供 Windows 宿主、文件接口、更新器和离线服务入口。
 - `work/analog-notes/public/` 提供工作台、编辑器、PDF、PPT 和视频界面。

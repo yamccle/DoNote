@@ -56,7 +56,7 @@ function renderPdfBacklinkPanel(session,zone,focusPage){
  list.replaceChildren();
  if(!links.length){
   const empty=document.createElement('p');empty.className='pdf-panel-help';
-  empty.textContent='还没有记录引用这份 PDF。选中文字或框选图表后，可保存为研究笔记或追加到设计问题与仿真记录。';
+  empty.textContent='还没有记录引用这份资料。选中文字或框选图表后，可保存为研究笔记或追加到问题课题与实验/调研记录。';
   list.append(empty);return;
  }
  for(const [page,entries] of pages){

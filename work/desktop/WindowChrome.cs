@@ -1,3 +1,9 @@
+/*
+ * [INPUT]: 接收窗口消息、DPI 变更及前端 WebView2 发送的 chrome 主题/栏目同步指令。
+ * [OUTPUT]: 提供无边框现代自绘标题栏、DPI 自适应布局、窗口拖拽缩放与日夜色彩同步。
+ * [POS]: WorkspaceWindow 的窗口框体分部类，与工作台瓷白/深空主题保持零色差衔接。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 using System;
 using System.Drawing;
 using System.Globalization;
@@ -7,10 +13,10 @@ using System.Windows.Forms;
 
 internal sealed partial class WorkspaceWindow
 {
-    private Color chromeBackground = Color.FromArgb(245, 244, 240);
-    private Color chromeText = Color.FromArgb(47, 49, 46);
-    private Color chromeAccent = Color.FromArgb(49, 84, 68);
-    private Color chromeDivider = Color.FromArgb(223, 222, 217);
+    private Color chromeBackground = Color.FromArgb(244, 247, 251);
+    private Color chromeText = Color.FromArgb(15, 23, 42);
+    private Color chromeAccent = Color.FromArgb(37, 99, 235);
+    private Color chromeDivider = Color.FromArgb(226, 232, 240);
     private Panel chromePanel;
     private Button chromeNew;
     private Label chromeSection;
@@ -77,7 +83,7 @@ internal sealed partial class WorkspaceWindow
     }
 
     private static readonly string UiFontFamily = PickChromeFont();
-    private static readonly Color CloseHover = Color.FromArgb(171, 48, 40);
+    private static readonly Color CloseHover = Color.FromArgb(225, 29, 72);
 
     private static string PickChromeFont()
     {
@@ -428,10 +434,10 @@ internal sealed partial class WorkspaceWindow
     private void ApplyChromeState(bool dark, string section, Color? background = null)
     {
         if (chromePanel == null) return;
-        chromeBackground = background ?? (dark ? Color.FromArgb(35, 37, 34) : Color.FromArgb(245, 244, 240));
-        chromeText = dark ? Color.FromArgb(222, 225, 218) : Color.FromArgb(47, 49, 46);
-        chromeAccent = dark ? Color.FromArgb(177, 204, 180) : Color.FromArgb(49, 84, 68);
-        chromeDivider = MixChromeColor(chromeBackground, chromeText, dark ? 16 : 13);
+        chromeBackground = background ?? (dark ? Color.FromArgb(11, 17, 32) : Color.FromArgb(244, 247, 251));
+        chromeText = dark ? Color.FromArgb(241, 245, 249) : Color.FromArgb(15, 23, 42);
+        chromeAccent = dark ? Color.FromArgb(96, 165, 250) : Color.FromArgb(37, 99, 235);
+        chromeDivider = MixChromeColor(chromeBackground, chromeText, dark ? 14 : 10);
         Color hover = MixChromeColor(chromeBackground, chromeText, 8);
         Color pressed = MixChromeColor(chromeBackground, chromeText, 14);
         BackColor = chromeBackground;

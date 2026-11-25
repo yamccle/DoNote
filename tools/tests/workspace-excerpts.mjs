@@ -389,7 +389,7 @@ async function testPdfReaderPanels(page, closeReader) {
 
   await page.locator('#pdfTranslateSource').fill('The dynamic comparator exhibits offset voltage and thermal noise.');
   await page.locator('#pdfGlossarySlot .pdf-glossary-bar.has-matches').waitFor();
-  assert.match(await page.locator('#pdfGlossarySlot .pdf-glossary-title').innerText(), /命中 3 个电路术语/);
+  assert.match(await page.locator('#pdfGlossarySlot .pdf-glossary-title').innerText(), /命中 3 个专业术语/);
   await page.locator('#pdfGlossarySlot .pdf-glossary-chip', { hasText: '比较器' }).click();
   assert.equal(await page.locator('#pdfTranslateResult').inputValue(), '比较器');
   assert.equal(await page.locator('#copyPdfTranslation').isVisible(), true);
@@ -544,10 +544,22 @@ async function testPresentationSettingsAndFastWeb(page, closeReader) {
     if (!note || !note.attachments?.some(a => a.mime === 'image/png')) throw new Error('PPT slide note missing screenshot or source');
     return note.id;
   }, pptInfo.fileId);
+
+  // 验证 PPT 一键导出双栏图文讲义 (.html) 与结构化大纲 (.md)
+  await page.locator('#pptExportHandout').click();
+  await page.waitForFunction(() => window.__lastExportedPptHandout?.format === 'html' && window.__lastExportedPptHandout.slideCount === 3);
+  await page.locator('#pptExportHandout').click({ modifiers: ['Shift'] });
+  const mdExport = await page.evaluate(() => window.__lastExportedPptHandout);
+  assert.equal(mdExport.format, 'md');
+  assert.match(mdExport.text, /补充抽取后仿 Cgd 偏置曲线/);
+  assert.match(mdExport.text, /中和电容需兼顾寄生电容温度漂移/);
   await closeReader(page);
 
+  // 验证 Bento 总览圆环进度卡、问候眉标与 7天柱状活跃图
   await page.evaluate(() => switchView('all'));
   assert.match(await page.locator('#homeResume').innerText(), /PPT · 第 2 \/ 3 页/);
+  assert.equal(await page.locator('#homeResume .bento-study-card .bento-ring').count() >= 1, true);
+  assert.equal(await page.locator('#homeGreeting').isVisible(), true);
 
   await page.evaluate(id => showDetail(id), slideNoteId);
   await page.locator('#detailContent button', { hasText: '打开 comparator-lecture.pptx · 第 2 页' }).click();
@@ -556,6 +568,50 @@ async function testPresentationSettingsAndFastWeb(page, closeReader) {
     document.getElementById('pptPageNumber')?.value === '2' &&
     document.getElementById('pptSlideNoteInput')?.value.includes('补充抽取后仿 Cgd 偏置曲线'));
   await closeReader(page);
+  if (await page.locator('#detail').evaluate(d => d.open)) {
+    await page.locator('#detail [data-close="detail"]').click();
+  }
+
+  // 验证全库全文检索命中 PPT 讲义正文、演讲者备注与用户逐页批注，并点击直达第 2 页幻灯片
+  await page.evaluate(() => document.getElementById('openPdfSearch').click());
+  await page.locator('#pdfSearchDialog[open]').waitFor();
+  await page.locator('#workspaceSearchScope').selectOption('ppt');
+  await page.locator('#pdfSearchQuery').fill('补充抽取后仿');
+  await page.locator('#pdfSearchResults .workspace-search-result[data-search-kind="ppt"]').first().waitFor();
+  assert.match(await page.locator('#pdfSearchResults .workspace-search-result').first().innerText(), /PPT 讲义 · 第 2 页/);
+  await page.locator('#pdfSearchResults .workspace-search-result').first().click();
+  await page.waitForFunction(() =>
+    document.getElementById('reader').open &&
+    document.getElementById('pptPageNumber')?.value === '2');
+  await closeReader(page);
+
+  // 验证资料库画廊/列表双视图切换、问题与课题交互式状态看板流转以及 Ctrl+K 全局指令面板
+  await page.evaluate(() => switchView('resource'));
+  assert.equal(await page.locator('#records').evaluate(el => el.classList.contains('library-grid-mode')), true);
+  await page.locator('#libraryViewSwitcher [data-lib-view="list"]').click();
+  assert.equal(await page.locator('#records').evaluate(el => el.classList.contains('library-list-mode')), true);
+  await page.locator('#libraryViewSwitcher [data-lib-view="grid"]').click();
+
+  const kanbanIssueId = await page.evaluate(async () => {
+    const id = crypto.randomUUID();
+    await put({
+      id, type: 'issue', title: '验证看板状态流转课题', author: '', reference: '', url: '',
+      body: '测试多列看板推进状态持久化', date: today(), tags: ['验证'], status: '待排查', pinned: false, attachments: []
+    });
+    switchView('issue');
+    return id;
+  });
+  await page.locator('#boardViewSwitcher [data-board-mode="board"]').click();
+  assert.equal(await page.locator('#records .kanban-column').count(), 3);
+  await page.locator(`.kanban-card[data-id="${kanbanIssueId}"] [data-kanban-advance="进行中"]`).click();
+  await page.waitForFunction(id => records.find(r => r.id === id)?.status === '进行中', kanbanIssueId);
+  await page.locator('#boardViewSwitcher [data-board-mode="list"]').click();
+
+  await page.keyboard.press('Control+k');
+  await page.locator('#commandPalette[open]').waitFor();
+  await page.locator('#commandPaletteInput').fill('总览');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !document.getElementById('commandPalette').open && view === 'all');
 
   // 2. 三栏聚合设置中心：单窗标签切换与内联语音模型 / 默认语向即时同步
   await page.evaluate(() => document.getElementById('desktopSettingsButton').click());

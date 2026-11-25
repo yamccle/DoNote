@@ -16,7 +16,7 @@ const pdfIndexPrefix = (profileId, fileId) => 'pdf-index-v3/' + profileId + '/' 
 const pdfOcrIndexKey = (profileId, fileId) => pdfIndexPrefix(profileId, fileId) + 'ocr';
 
 function pdfSearchCandidates() {
- return records.filter(note => note.attachments?.some(fileIsPdf));
+ return records.filter(note => note.attachments?.some(f => fileIsPdf(f) || (typeof fileIsPresentation === 'function' && fileIsPresentation(f))));
 }
 
 async function readPdfIndexSegments(fileId, profileId) {
@@ -251,10 +251,13 @@ async function preIndexRecentPdfs(){
   const candidates=pdfSearchCandidates().sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||'')).slice(0,SEARCH_BACKGROUND_COUNT);
   for(const note of candidates){
    if(appState.activeId!==profileId)break;
-   const file=(note.attachments||[]).find(fileIsPdf);if(!file||file.size>MAX_DOCUMENT_PREVIEW)continue;
+   const file=(note.attachments||[]).find(f=>fileIsPdf(f)||(typeof fileIsPresentation==='function'&&fileIsPresentation(f)));if(!file||file.size>MAX_DOCUMENT_PREVIEW)continue;
    const index=await readSearchIndex(file.id,profileId);
    if(index && index.scannedPages===index.totalPages)continue;
-   try{await buildPdfSearchIndex(file,{profileId})}catch{}
+   try{
+    if(fileIsPdf(file))await buildPdfSearchIndex(file,{profileId});
+    else if(typeof buildPresentationSearchIndex==='function')await buildPresentationSearchIndex(file,{profileId});
+   }catch{}
    await new Promise(resolve=>setTimeout(resolve,60));
   }
  }catch{}

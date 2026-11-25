@@ -20,7 +20,10 @@
  padding:0;
  border:0;
  overflow:hidden;
- background:radial-gradient(ellipse at 50% 46%, color-mix(in srgb, var(--surface) 66%, var(--paper)), var(--paper) 73%);
+ background:
+  radial-gradient(640px circle at 24% 28%, color-mix(in srgb, var(--strong, #2563eb) 14%, transparent), transparent 65%),
+  radial-gradient(580px circle at 78% 72%, color-mix(in srgb, #10b981 11%, transparent), transparent 62%),
+  radial-gradient(ellipse at 50% 46%, color-mix(in srgb, var(--surface) 78%, var(--paper)), var(--paper) 75%);
 }
 .startup-splash[open] {
  display:grid;

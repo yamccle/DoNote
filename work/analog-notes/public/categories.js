@@ -6,7 +6,7 @@
  */
 'use strict';
 const WORK_LOG_TEMPLATE='今天的工作\n\n进展与结果\n\n问题与待跟进\n\n下一步\n';
-const BASE_CATEGORY_DATA=[{id:'paper',name:'文献阅读',icon:'book',template:templates.paper,statuses:['待读','在读','已读']},{id:'issue',name:'设计问题',icon:'circuit',template:templates.issue,statuses:['待排查','进行中','已解决']},{id:'journal',name:'工作日志',icon:'pen',template:WORK_LOG_TEMPLATE,statuses:['已记录','进行中']},{id:'study',name:'学习日志',icon:'book',template:'学习主题\n\n资料与练习\n\n理解与疑问\n\n下一步学习计划\n',statuses:['已记录','进行中']}];
+const BASE_CATEGORY_DATA=[{id:'paper',name:'文献阅读',icon:'book',template:templates.paper,statuses:['待读','在读','已读']},{id:'issue',name:'问题与课题',icon:'circuit',template:templates.issue,statuses:['待排查','进行中','已解决']},{id:'journal',name:'工作日志',icon:'pen',template:WORK_LOG_TEMPLATE,statuses:['已记录','进行中']},{id:'study',name:'学习日志',icon:'book',template:'学习主题\n\n资料与练习\n\n理解与疑问\n\n下一步学习计划\n',statuses:['已记录','进行中']}];
 BASE_CATEGORY_DATA.push({id:'plan',name:'计划',icon:'pen',template:'目标\n\n阶段任务\n\n参考文献与视频\n\n代码及交付资料\n',statuses:['待开始','进行中','已完成']});
 function upgradePlanCategory(profile){
  if(profile.planLayoutVersion===1)return false;
@@ -19,7 +19,7 @@ const LEGACY_JOURNAL_TEMPLATE=templates.journal;
 const WEEKLY_LOGS={
  'study-weekly':{type:'study',label:'学习周志',tag:'学习周志',template:'本周学习目标\n\n按日期补充学习进展\n\n收获与练习\n\n待弄懂的问题\n\n下周学习计划\n'},
  'work-weekly':{type:'journal',label:'工作周报',tag:'工作周志',template:'本周目标\n\n按日期补充工作进展\n\n已完成事项\n\n待跟进与下周计划\n'},
- weekly:{type:'journal',label:'工作周报',tag:'周报',template:'本周工作进展\n\n汇报材料与仿真结果（可插入图片或附上 PPT）\n\n问题总结与组会反馈\n\n下周计划\n1. \n2. \n3. \n\n待跟进事项\n'}
+ weekly:{type:'journal',label:'工作周报',tag:'周报',template:'本周工作进展\n\n阶段成果与关键图表（可插入图片或附上 PPT）\n\n问题总结与讨论反馈\n\n下周计划\n1. \n2. \n3. \n\n待跟进事项\n'}
 };
 function categoryDefaults(){return structuredClone(BASE_CATEGORY_DATA)}
 function upgradeJournalCategories(profile){

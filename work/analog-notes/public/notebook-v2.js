@@ -6,7 +6,7 @@
  */
 'use strict';
 // User-owned offline records and attachments are committed together.
-const DEFAULT_TOPICS=['运放','ADC','PLL','LDO','带隙基准','噪声','稳定性'];
+const DEFAULT_TOPICS=['文献精读','核心方法','实验验证','理论推导','读书笔记','项目复盘','待跟进'];
 const MAX_TOPICS=100,MAX_TOPIC_LENGTH=60;
 const MAX_FILE=2*1024**3;
 const MAX_DOCUMENT_PREVIEW=100*1024**2;
@@ -50,7 +50,7 @@ async function putWorkspaceForFile(profileId,fileId,key,value){
  check.onsuccess=()=>{if(check.result!==undefined)tx.objectStore('workspace').put(value,key)};
  await done;
  if(check.result===undefined)return false;
- if(key.startsWith('pdf-index-v3/')||key.startsWith('video-frame-notes/')){
+ if(key.startsWith('pdf-index-v3/')||key.startsWith('video-frame-notes/')||key.startsWith('pdf-marks/')){
   document.dispatchEvent(new CustomEvent('workspace-search-file-updated',{detail:{profileId,fileId,key}}));
  }
  return true;

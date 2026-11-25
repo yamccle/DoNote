@@ -64,7 +64,7 @@ function openPdfResearchDialog(initialFileId){
  if(!options.length){toast('请先导入带文字层的 PDF。');return;}
  const dialog=document.createElement('dialog');
  dialog.className='pdf-research-dialog';
- dialog.innerHTML='<div class="modalhead"><h2>文献检索与指标对比</h2><button type="button" data-close-research aria-label="关闭">✕</button></div><div class="modalbody"><div class="field"><label>检索范围</label><select multiple size="5" aria-label="选择 PDF"></select><p class="tiny">选择一份或多份 PDF，可用 Ctrl 多选。</p></div><div class="row"><button type="button" data-all>全选</button></div><div class="field"><label>问题</label><textarea rows="2" data-question></textarea></div><div class="field"><label>原文检索词（可选）</label><input data-keywords placeholder="例如：SAR ADC, comparator, SNDR"></div><div class="row" data-actions></div><p role="status"></p><div data-results></div></div>';
+ dialog.innerHTML='<div class="modalhead"><h2>多文献检索与对比</h2><button type="button" data-close-research aria-label="关闭">✕</button></div><div class="modalbody"><div class="field"><label>检索范围</label><select multiple size="5" aria-label="选择 PDF"></select><p class="tiny">选择一份或多份 PDF，可用 Ctrl 多选。</p></div><div class="row"><button type="button" data-all>全选</button></div><div class="field"><label>问题</label><textarea rows="2" data-question></textarea></div><div class="field"><label>原文检索词（可选）</label><input data-keywords placeholder="例如：methodology, benchmark, accuracy"></div><div class="row" data-actions></div><p role="status"></p><div data-results></div></div>';
  dialog.style.width='min(1050px,95vw)';
  const select=dialog.querySelector('select'),status=dialog.querySelector('[role=status]');
  const actions=dialog.querySelector('[data-actions]'),result=dialog.querySelector('[data-results]');

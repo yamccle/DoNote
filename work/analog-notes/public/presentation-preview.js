@@ -190,6 +190,7 @@ const PPT_STUDIO_MARKUP = `<div class="ppt-toolbar" role="toolbar" aria-label="�
  </div>
  <div class="ppt-toolbar-group">
   <button type="button" class="secondary" id="pptToggleNotes" aria-pressed="true">批注</button>
+  <button type="button" class="secondary" id="pptExportHandout" title="导出整份 PPT 双栏图文复习讲义 (.html)，按住 Shift 点击可导出 Markdown">导出讲义</button>
   <button type="button" class="secondary" id="pptExpand" aria-pressed="true" title="在铺满窗口与浮窗尺寸之间切换">浮窗化</button>
   <button type="button" class="ppt-primary-btn" id="pptFullscreenBtn" title="沉浸全屏放映（快捷键 F）">全屏放映</button>
   <button type="button" class="secondary" id="pptMarkDone">标记已读</button>
@@ -222,14 +223,14 @@ const PPT_STUDIO_MARKUP = `<div class="ppt-toolbar" role="toolbar" aria-label="�
    <div class="ppt-slide-heading-card"><small>当前页主题</small><p id="pptCurrentSlideTitle">正在读取…</p></div>
    <div class="ppt-note-editor-card">
     <div class="ppt-note-tags">
-     <button type="button" class="ppt-quick-tag" data-ppt-tag="【核心架构】">核心架构</button>
-     <button type="button" class="ppt-quick-tag" data-ppt-tag="【公式推导】">公式推导</button>
-     <button type="button" class="ppt-quick-tag" data-ppt-tag="【指标折中】">指标折中</button>
-     <button type="button" class="ppt-quick-tag" data-ppt-tag="【待复核】">待复核</button>
+     <button type="button" class="ppt-quick-tag" data-ppt-tag="【核心观点】">核心观点</button>
+     <button type="button" class="ppt-quick-tag" data-ppt-tag="【方法公式】">方法公式</button>
+     <button type="button" class="ppt-quick-tag" data-ppt-tag="【关键结论】">关键结论</button>
+     <button type="button" class="ppt-quick-tag" data-ppt-tag="【待深究】">待深究</button>
     </div>
-    <textarea class="ppt-note-textarea" id="pptSlideNoteInput" placeholder="记录这一页的推导要点、设计启发或疑问（按页自动保存，随备份迁移）…"></textarea>
+    <textarea class="ppt-note-textarea" id="pptSlideNoteInput" placeholder="记录这一页的核心论点、公式方法或启发疑问（按页自动保存，支持全库检索与导出讲义）…"></textarea>
    </div>
-   <div class="ppt-save-bar" role="group" aria-label="沉淀到记录库"><span>沉淀</span><button type="button" id="pptSaveAsNote" title="连同当前幻灯片截图保存为独立研究笔记">存为研究笔记</button><button type="button" id="pptAppendRecord" title="连同当前幻灯片截图追加到设计问题或仿真日志">追加到记录</button></div>
+   <div class="ppt-save-bar" role="group" aria-label="沉淀到记录库"><span>沉淀</span><button type="button" id="pptSaveAsNote" title="连同当前幻灯片截图保存为独立研究笔记">存为研究笔记</button><button type="button" id="pptAppendRecord" title="连同当前幻灯片截图追加到问题课题或实验调研日志">追加到记录</button></div>
    <details class="ppt-ref-box" id="pptSpeakerBox" open hidden><summary><span>原片讲义备注</span><span class="tiny">演讲者备注</span></summary><div class="ppt-ref-body"><pre class="ppt-ref-text" id="pptSpeakerText"></pre></div></details>
    <details class="ppt-ref-box" id="pptSlideTextBox"><summary><span>本页提取文字</span><button type="button" class="link-button" id="pptCopySlideText">复制文字</button></summary><div class="ppt-ref-body"><pre class="ppt-ref-text" id="pptSlideExtractedText"></pre></div></details>
   </div>
@@ -344,6 +345,7 @@ async function openPresentationAttachment(file, blob) {
       });
     }
     savePdfMarks(session);
+    document.dispatchEvent(new CustomEvent('workspace-search-file-updated', { detail: { profileId: session.profileId, fileId: file.id } }));
     $('pptNoteSaveState').textContent = trimmed ? '已自动保存' : '自动保存';
     syncNoteCounts();
     refreshThumbBadges(slideNumber - 1);
@@ -616,6 +618,14 @@ async function openPresentationAttachment(file, blob) {
       if (targetId) await appendPdfExcerpt(session, payload, targetId);
     } catch (error) { toast(error.message); }
   };
+  $('pptExportHandout').onclick = async event => {
+    try {
+      await exportPresentationHandout({
+        file, presentation, slideMetas, renderSlideCached, slideNoteRecord,
+        flushCurrent: () => flushSlideNote(activePage + 1)
+      }, event.shiftKey ? 'md' : 'html');
+    } catch (error) { toast(error.message); }
+  };
 
   // 全屏放映控制（兼容原生 Fullscreen API 与受限环境回退）
   const syncFullscreenUi = () => {
@@ -733,27 +743,13 @@ async function openPresentationAttachment(file, blob) {
 
   dialog.addEventListener('keydown', event => {
     if (event.target.closest('input,textarea,select,[contenteditable="true"]') || event.altKey || event.ctrlKey || event.metaKey) return;
-    if (event.key === 'Escape' && pseudoFullscreen) {
-      event.preventDefault();
-      event.stopPropagation();
-      void toggleFullscreen(false);
-      return;
-    }
-    if (event.key === 'f' || event.key === 'F') {
-      event.preventDefault();
-      void toggleFullscreen();
-      return;
-    }
-    if (event.key === 'g' || event.key === 'G') {
-      event.preventDefault();
-      setGridMode(!gridMode);
-      return;
-    }
+    if (event.key === 'Escape' && pseudoFullscreen) { event.preventDefault(); event.stopPropagation(); void toggleFullscreen(false); return; }
+    if (event.key === 'f' || event.key === 'F') { event.preventDefault(); void toggleFullscreen(); return; }
+    if (event.key === 'g' || event.key === 'G') { event.preventDefault(); setGridMode(!gridMode); return; }
     if (event.key === ' ' && event.target.closest('button')) return;
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(event.key)) return;
     event.preventDefault();
-    const target = event.key === 'Home' ? 0
-      : event.key === 'End' ? (presentation?.slides.length || 1) - 1
+    const target = event.key === 'Home' ? 0 : event.key === 'End' ? (presentation?.slides.length || 1) - 1
       : activePage + (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(event.key) ? 1 : -1);
     void showSlide(target);
   }, { signal });
@@ -771,6 +767,9 @@ async function openPresentationAttachment(file, blob) {
     if (!presentation.slides.length) throw new Error('文件中没有可预览的幻灯片。');
 
     slideMetas = presentation.slides.map((slide, idx) => extractSlideMetadata(slide, idx));
+    if (typeof savePresentationSearchIndex === 'function') {
+      void savePresentationSearchIndex(session.profileId, file.id, slideMetas).catch(() => {});
+    }
     pageInput.disabled = false;
     pageInput.max = String(presentation.slides.length);
     session.progress.pages = presentation.slides.length;

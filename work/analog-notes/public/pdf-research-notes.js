@@ -112,7 +112,7 @@ function pdfExcerptTarget(note){
  if(!note)return false;
  if(note.type==='issue')return true;
  if(!['journal','study'].includes(note.type))return false;
- return /仿真/.test([note.title,...(note.tags||[]),note.body].filter(Boolean).join('\n'));
+ return /实验|验证|实测|调研|复盘|案例|分析|仿真/.test([note.title,...(note.tags||[]),note.body].filter(Boolean).join('\n'));
 }
 
 function pdfExcerptTargets(){
@@ -130,12 +130,12 @@ function pdfExcerptSource(session,picked){
 
 function askPdfExcerptTarget(){
  const targets=pdfExcerptTargets();
- if(!targets.length)throw new Error('没有可追加的设计问题或仿真记录。');
+ if(!targets.length)throw new Error('没有可追加的问题课题或实验/调研记录。');
  const reader=$('reader'),panel=document.createElement('div');
  panel.className='pdf-selection-menu';panel.setAttribute('role','group');panel.setAttribute('aria-label','追加到已有记录');
  const select=document.createElement('select');
- select.setAttribute('aria-label','选择设计问题或仿真记录');
- select.add(new Option('选择设计问题或仿真记录…',''));
+ select.setAttribute('aria-label','选择问题课题或实验调研记录');
+ select.add(new Option('选择问题课题或实验/调研记录…',''));
  for(const item of targets)select.add(new Option(item.title,item.id));
  const go=document.createElement('button'),cancel=document.createElement('button');
  go.type=cancel.type='button';go.textContent='追加';cancel.textContent='取消';
@@ -154,7 +154,7 @@ async function appendPdfExcerpt(session,picked,targetId){
  const source=pdfExcerptSource(session,picked);
  const profileId=session.profileId??appState.activeId;
  const latest=records.find(item=>item.id===targetId);
- if(!latest||!pdfExcerptTarget(latest))throw new Error('请选择设计问题或仿真记录。');
+ if(!latest||!pdfExcerptTarget(latest))throw new Error('请选择问题课题或实验/调研记录。');
  const evidence=[...(latest.pdfEvidence||[])];
  if(evidence.length>=240)throw new Error('这条记录的引用已达上限。');
  const same=evidence.some(item=>item.fileId===source.fileId&&item.page===source.page&&JSON.stringify(item.rects)===JSON.stringify(source.rects));

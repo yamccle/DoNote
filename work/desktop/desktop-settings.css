@@ -22,14 +22,14 @@
   position: fixed;
   inset: 0;
   margin: auto;
-  width: min(650px, calc(100vw - 24px));
-  max-height: min(560px, calc(100dvh - 32px));
+  width: min(680px, calc(100vw - 24px));
+  max-height: min(580px, calc(100dvh - 32px));
   padding: 0;
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: var(--desktop-menu-shadow);
+  border-radius: 20px;
+  box-shadow: var(--shadow-float, var(--desktop-menu-shadow));
   overflow: hidden;
   overscroll-behavior: contain;
 }
@@ -38,7 +38,8 @@
   flex-direction: column;
 }
 #desktopSettings::backdrop {
-  background: rgba(16, 22, 18, 0.24);
+  background: var(--scrim, rgba(15, 23, 42, 0.36));
+  backdrop-filter: blur(8px) saturate(1.2);
 }
 #desktopSettings [hidden] { display: none !important; }
 

@@ -23,9 +23,17 @@ function showRecordTypePicker(){
   button.className='secondary';
   button.dataset.recordType=category.id;
   const icon=document.createElement('span');
+  icon.className='picker-icon-badge';
   icon.setAttribute('aria-hidden','true');
   icon.innerHTML=svg(categoryIcon(category));
-  button.append(icon,recordTypeName(category.id));
+  const copy=document.createElement('span');
+  copy.className='picker-choice-copy';
+  const nameNode=document.createElement('b');
+  nameNode.textContent=recordTypeName(category.id);
+  const descNode=document.createElement('small');
+  descNode.textContent=navDescription(category.id);
+  copy.append(nameNode,descNode);
+  button.append(icon,copy);
   return button;
  }));
  recordTypePicker.showModal();

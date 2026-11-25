@@ -5,19 +5,36 @@
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 :root {
- --paper:#f7f7f3; --surface:#fdfdfa; --surface-soft:#efefea; --surface-hover:#e8ebe4;
- --ink:#252a25; --text-soft:#485048; --muted:#606b61; --line:#d9ded5; --field-border:#bdc6bb;
- --strong:#31483e; --on-strong:#fff; --strong-hover:#3e5b4d; --cover:#eaece5; --reader-bg:#e3e6df;
- --heat-1:#d4e0d2; --heat-2:#9ab29d; --heat-3:#4d715b; --scrim:#12181465;
- --orange:var(--strong); --green:var(--text-soft); --purple:var(--strong);
+ --paper:#f4f7fb; --surface:#ffffff; --surface-soft:#eef3fa; --surface-hover:#e3ebf6;
+ --ink:#0f172a; --text-soft:#334155; --muted:#64748b; --line:#e2e8f0; --field-border:#cbd5e1;
+ --strong:#2563eb; --on-strong:#ffffff; --strong-hover:#1d4ed8; --cover:#e8eff9; --reader-bg:#e9eff7;
+ --heat-1:#dbeafe; --heat-2:#60a5fa; --heat-3:#2563eb; --scrim:#0f172a66;
+ --bento-blue:linear-gradient(135deg,#2563eb 0%,#38bdf8 100%);
+ --bento-amber:linear-gradient(135deg,#ea580c 0%,#fb923c 100%);
+ --bento-emerald:linear-gradient(135deg,#059669 0%,#34d399 100%);
+ --bento-gold:linear-gradient(135deg,#d97706 0%,#fbbf24 100%);
+ --bento-violet:linear-gradient(135deg,#6366f1 0%,#a855f7 100%);
+ --orange:var(--strong); --green:#059669; --purple:#6366f1;
  --type-caption:.75rem; --type-label:.8125rem; --type-control:.875rem; --type-body:1rem;
  --type-section:1.125rem; --type-page:clamp(1.75rem,1.55rem + .48vw,2.25rem);
 }
 :root[data-theme=dark] {
- --paper:#1a1e1b; --surface:#222623; --surface-soft:#282e29; --surface-hover:#323b34;
- --ink:#e9eee7; --text-soft:#cbd4ca; --muted:#a6b3a8; --line:#3d4940; --field-border:#56655a;
- --strong:#b7d0bd; --on-strong:#1d2921; --strong-hover:#d0e3d3; --cover:#303833; --reader-bg:#181c19;
- --heat-1:#364c3d; --heat-2:#587360; --heat-3:#90b39a; --scrim:#080c09b0;
+ --paper:#0b1120; --surface:#111827; --surface-soft:#1a2336; --surface-hover:#243049;
+ --ink:#f1f5f9; --text-soft:#cbd5e1; --muted:#94a3b8; --line:#1e293b; --field-border:#334155;
+ --strong:#3b82f6; --on-strong:#ffffff; --strong-hover:#2563eb; --cover:#182235; --reader-bg:#090e1a;
+ --heat-1:#1e3a8a; --heat-2:#2563eb; --heat-3:#60a5fa; --scrim:#020617b8;
+ --bento-blue:linear-gradient(135deg,#1d4ed8 0%,#0284c7 100%);
+ --bento-amber:linear-gradient(135deg,#c2410c 0%,#ea580c 100%);
+ --bento-emerald:linear-gradient(135deg,#047857 0%,#10b981 100%);
+ --bento-gold:linear-gradient(135deg,#b45309 0%,#d97706 100%);
+ --bento-violet:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);
+}
+body {
+ background-color:var(--paper);
+ background-image:
+  radial-gradient(920px circle at 8% -6%, color-mix(in srgb, var(--strong) 7%, transparent), transparent 60%),
+  radial-gradient(780px circle at 96% 2%, color-mix(in srgb, #10b981 5%, transparent), transparent 55%);
+ background-attachment:fixed;
 }
 :focus-visible {outline:2px solid var(--muted);outline-offset:3px}
 .brand .brand-logo {width:42px;height:42px;border-radius:9px;overflow:hidden;flex:none;background:transparent}
@@ -40,8 +57,17 @@
 :is(.nav:hover,.pdf-outline button:hover,.pdf-tools button:hover,.gallery-details:hover,.secondary:hover) {background:var(--surface-hover);color:var(--ink)}
 :is(.tab.active,.library-mode .filterrow .tab.active,.side-tags button.active) {color:var(--ink);border-color:var(--muted)}
 .library-mode .filterrow .tab.active:after,.dot {background:var(--muted)}
-.primary {background:var(--strong);border-color:var(--strong);color:var(--on-strong);box-shadow:none}
-.primary:hover {background:var(--strong-hover);border-color:var(--strong-hover)}
+.primary {
+ background:linear-gradient(180deg,color-mix(in srgb,var(--strong) 88%,#60a5fa) 0%,var(--strong) 100%);
+ border-color:var(--strong);color:var(--on-strong);
+ box-shadow:0 4px 14px -3px color-mix(in srgb,var(--strong) 45%,transparent),inset 0 1px 0 rgba(255,255,255,.22);
+ font-weight:600;
+}
+.primary:hover {
+ background:linear-gradient(180deg,var(--strong) 0%,var(--strong-hover) 100%);
+ border-color:var(--strong-hover);
+ box-shadow:0 7px 18px -4px color-mix(in srgb,var(--strong) 56%,transparent),inset 0 1px 0 rgba(255,255,255,.28);
+}
 :is(.side-tags button,.tag,.quick .quickicon,.library-card-tags span,.status,.status.done,.avatar,.banner,.focus,.upload-zone,.manager-row,.linked-resource,.inline-note-links,.rich-toolbar,.image-tools,.inline-media .image-loading,.empty,.pdf-note,.reader-ai-answer,.pdf-side details,.rich-content pre,.pdf-side pre) {
  background:var(--surface-soft);color:var(--text-soft);border-color:var(--line)
 }
@@ -153,9 +179,9 @@
 [data-theme=dark] .rich-content [style*="color: rgb(39, 104, 179)"] {color:#93c1ff!important}
 [data-theme=dark] .rich-content [style*="color: rgb(121, 82, 179)"] {color:#c4a5fa!important}
 .danger {color:var(--text-soft);text-decoration:underline}
-dialog {box-shadow:0 12px 36px #0002}
-dialog::backdrop {background:var(--scrim);backdrop-filter:none}
-.toast {background:var(--strong);color:var(--on-strong)}
+dialog {box-shadow:var(--shadow-float)}
+dialog::backdrop {background:var(--scrim);backdrop-filter:blur(8px) saturate(1.2)}
+.toast {background:color-mix(in srgb,var(--ink) 92%,var(--strong));color:#fff;box-shadow:0 14px 34px -8px rgba(15,23,42,.38);border-radius:999px;padding:10px 20px}
 #aiManager {width:min(760px,94vw)}
 .bridge :is(.bridge-fields,.bridge-actions,.bridge-options) {display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .bridge-fields .field {flex:1 1 210px;margin-bottom:4px}

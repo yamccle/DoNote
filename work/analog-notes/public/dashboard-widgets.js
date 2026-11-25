@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取工作台记录、计划日期与用户自定义的总览组件布局。
+ * [OUTPUT]: 渲染 2x2 风格冰蓝统计瓷砖、动态柱状活跃图/热力图切换与组件编排弹窗。
+ * [POS]: 总览仪表盘数据可视化层，提供直观研究产出节奏与里程碑倒计时反馈。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 const DASHBOARD_WIDGETS={
@@ -6,7 +12,7 @@ const DASHBOARD_WIDGETS={
  pending:['待排查设计问题','navDesign'],pinned:['置顶收藏','navPinned'],
  reminders:['临时提醒','calendar'],quick:['快速开始','plus'],
  plansActive:['进行中的计划','calendar'],planDeadline:['最近计划截止','calendar'],plansWeek:['本周计划','calendar'],
- tapeout:['流片倒计时','navDesign'],test:['测试倒计时','calendar'],deadline:['自定义倒计时','calendar']
+ tapeout:['里程碑倒计时','navDesign'],test:['节点 / 考核倒计时','calendar'],deadline:['自定义倒计时','calendar']
 };
 const DASHBOARD_ZONES={top:'总览上方',side:'右侧栏'};
 const DASHBOARD_MAX=26;
@@ -26,7 +32,7 @@ function dashboardWidgetsFor(profile){
   while(used.has(id))id+='-1';
   used.add(id);return {id,kind,zone:'side'};
  });
- return [...added,...widgets];
+ return [...widgets,...added];
 }
 function isCountdown(kind){return ['tapeout','test','deadline'].includes(kind)}
 function validWidgetDate(value){
@@ -51,15 +57,29 @@ function countdownDays(date,day=today()){
 function countdownLabel(days){
  return days===0?'今天':days>0?days+' 天':'已过 '+(-days)+' 天';
 }
+let activityChartMode='bars';
 function widgetActivity(counts,now){
  const days=[];
  for(let offset=55;offset>=0;offset--){
   const date=today(new Date(now.getFullYear(),now.getMonth(),now.getDate()-offset));
   days.push([date,counts.get(date)||0]);
  }
- return '<div class="activity" aria-label="近 8 周记录分布">'+days.map(([date,count])=>'<div class="cell '+(count?'l'+Math.min(count,3):'')
-  +'" title="'+date+' · '+count+' 条记录"></div>').join('')+'</div><div class="heat-foot"><span>'
-  +days.filter(([,count])=>count>0).length+' 天有记录</span><span>近 8 周</span></div>';
+ const recent7=days.slice(-7),max7=Math.max(3,...recent7.map(([,c])=>c));
+ const weekNames=['日','一','二','三','四','五','六'];
+ const bars='<div class="activity-bars"'+(activityChartMode==='heat'?' hidden':'')+' aria-label="近 7 天活跃柱状图">'+recent7.map(([date,count],idx)=>{
+  const pct=count?Math.max(18,Math.round(count/max7*100)):6;
+  const dow=weekNames[new Date(date+'T00:00:00').getDay()];
+  return '<div class="activity-bar-col'+(idx===6?' is-today':'')+'" title="'+date+' · '+count+' 条记录">'
+   +'<span class="activity-bar-track"><i class="activity-bar-fill'+(count?' has-value':'')+'" style="--bar-pct:'+pct+'%"></i></span>'
+   +'<small>'+(idx===6?'今':dow)+'</small></div>';
+ }).join('')+'</div>';
+ const heat='<div class="activity"'+(activityChartMode==='bars'?' hidden':'')+' aria-label="近 8 周记录分布">'+days.map(([date,count])=>'<div class="cell '+(count?'l'+Math.min(count,3):'')
+  +'" title="'+date+' · '+count+' 条记录"></div>').join('')+'</div>';
+ const switcher='<div class="activity-mode-switch" role="group" aria-label="视图切换">'
+  +'<button type="button" data-activity-mode="bars" class="'+(activityChartMode==='bars'?'active':'')+'">7天</button>'
+  +'<button type="button" data-activity-mode="heat" class="'+(activityChartMode==='heat'?'active':'')+'">8周</button></div>';
+ return switcher+bars+heat+'<div class="heat-foot"><span>'
+  +days.filter(([,count])=>count>0).length+' 天有产出</span><span>共 '+days.reduce((s,[,c])=>s+c,0)+' 条</span></div>';
 }
 function widgetPlanLinks(plans){
  return '<div class="widget-plan-list">'+plans.slice(0,3).map(plan=>'<button type="button" data-widget-plan="'+esc(plan.id)+'" title="'+esc(plan.title)+'">'+esc(plan.title)+'</button>').join('')+'</div>';
@@ -77,7 +97,8 @@ function renderDashboardWidgets(){
  const weekStart=currentPlanMonday(),weekEnd=planEndFor(weekStart,'week');
  function renderWidget(widget){
   const {kind}=widget,heading='<div class="widget-label">'+svg(DASHBOARD_WIDGETS[kind][1])+esc(widgetTitle(widget))+'</div>';
-  const metric=(value,foot,attrs='')=>'<div class="widget-value" '+attrs+'>'+value+'</div><div class="widget-foot">'+foot+'</div>';
+  const padNum=v=>typeof v==='number'&&v>=0&&v<10?'0'+v:String(v);
+  const metric=(value,foot,attrs='')=>'<div class="widget-metric-row"><i class="widget-accent-bar"></i><div class="widget-value" '+attrs+'>'+padNum(value)+'</div></div><div class="widget-foot">'+foot+'</div>';
   let content;
   if(isCountdown(kind))content=metric(countdownLabel(countdownDays(widget.date)),esc(widget.date),'data-countdown="'+widget.date+'"');
   else if(kind==='activity')content=widgetActivity(counts,now);
@@ -100,7 +121,7 @@ function renderDashboardWidgets(){
    const group=thisWeek.filter(record=>record.type===kind||kind==='paper'&&record.type==='resource');
    content=metric(group.length,'本周新增');
   }
-  return '<article class="dashboard-card'+(kind==='activity'?' widget-activity':'')+'" data-widget="'+esc(widget.id)+'">'+heading+content+'</article>';
+  return '<article class="dashboard-card'+(kind==='activity'?' widget-activity':'')+'" data-widget="'+esc(widget.id)+'" data-widget-kind="'+esc(kind)+'">'+heading+content+'</article>';
  }
  const key=JSON.stringify(widgets.map(({id,kind,zone})=>[id,kind,zone]));
  if(dashboardLayoutKey!==key){
@@ -158,6 +179,8 @@ function renderDashboardEditor(){
 function initializeDashboardWidgets(){
  const dialog=$('dashboardWidgetDialog'),form=$('dashboardWidgetForm');
  for(const id of ['dashboardTop','dashboardSide'])$(id).addEventListener('click',event=>{
+  const modeBtn=event.target.closest('[data-activity-mode]');
+  if(modeBtn){activityChartMode=modeBtn.dataset.activityMode;renderDashboardWidgets();return}
   const plan=event.target.closest('[data-widget-plan]')?.dataset.widgetPlan;
   if(plan)showDetail(plan);
  });

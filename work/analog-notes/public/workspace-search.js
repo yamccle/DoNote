@@ -1,6 +1,12 @@
+/**
+ * [INPUT]: 读取记录库、PDF/PPT 页面文字索引、逐页批注与视频字幕/定格批注。
+ * [OUTPUT]: 提供跨记录、PDF、PPT 讲义及视频时间轴的 MiniSearch 全库全文检索与直达跳页。
+ * [POS]: 工作台全局全文检索弹窗控制器，按需构建并缓存当前账户的多模态检索索引。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
-// Catalog search shares the PDF page-text cache with the reader. MiniSearch indexes are
+// Catalog search shares the PDF/PPT page-text cache with the reader. MiniSearch indexes are
 // derived on demand and kept in a small, profile-scoped working set.
 (() => {
  const dialog = $('pdfSearchDialog');
@@ -10,13 +16,13 @@
  const launch = $('openPdfSearch');
  const controls = document.createElement('div');
  controls.className = 'row';
- controls.innerHTML = '<label>范围 <select id="workspaceSearchScope"><option value="all">全部</option><option value="pdf">PDF 正文</option><option value="video">视频字幕与批注</option><option value="note">记录与笔记</option></select></label><button type="button" class="secondary" id="workspaceSearchPause" hidden>暂停 PDF 索引</button><button type="button" class="secondary" id="workspaceSearchResume" hidden>继续 / 重试 PDF 索引</button>';
+ controls.innerHTML = '<label>范围 <select id="workspaceSearchScope"><option value="all">全部</option><option value="pdf">PDF 文献与批注</option><option value="ppt">PPT 讲义与批注</option><option value="video">视频字幕与批注</option><option value="note">记录与笔记</option></select></label><button type="button" class="secondary" id="workspaceSearchPause" hidden>暂停文档索引</button><button type="button" class="secondary" id="workspaceSearchResume" hidden>继续 / 重试索引</button>';
  status.before(controls);
  const scope = $('workspaceSearchScope');
  const pause = $('workspaceSearchPause');
  const resume = $('workspaceSearchResume');
  $('pdfSearchTitle').textContent = '全库全文检索';
- dialog.querySelector('.section-note').textContent = '离线搜索记录、PDF 正文、视频字幕和定格批注。选择结果可打开记录，或跳到原文页码和视频时间。';
+ dialog.querySelector('.section-note').textContent = '离线搜索记录、PDF 正文、PPT 讲义/备注/批注、视频字幕和定格批注。点击结果直达对应页码、幻灯片或视频时间。';
  input.setAttribute('aria-label', '搜索资料库全文');
  input.maxLength = 120;
  launch.textContent = '全文检索';
@@ -132,6 +138,8 @@
  const sourceKey = ({kind, file}) => kind + '/' + file.id;
  const fileStamp = file => [file.name, file.mime, file.size, file.addedAt, file.sha256].join('\u0000');
  const allowPdf = () => scope.value === 'all' || scope.value === 'pdf';
+ const allowPpt = () => scope.value === 'all' || scope.value === 'ppt';
+ const allowDocIndex = () => allowPdf() || allowPpt();
  const activeProfile = current => current.profileId === appState.activeId;
 
  function clearCachedSource(key) {
@@ -163,7 +171,7 @@
  function searchSources(noteRecords) {
   const sources = new Map();
   for (const note of noteRecords) for (const file of note.attachments || []) {
-   const kind = fileIsPdf(file) ? 'pdf' : fileIsVideo(file) ? 'video' : '';
+   const kind = fileIsPdf(file) ? 'pdf' : (typeof fileIsPresentation === 'function' && fileIsPresentation(file)) ? 'ppt' : fileIsVideo(file) ? 'video' : '';
    if (!kind) continue;
    const source = {kind, file, note};
    const key = sourceKey(source);
@@ -196,10 +204,22 @@
   const entries = [];
   const location = {noteId: note.id, fileId: file.id};
   let pdf;
-  if (kind === 'pdf') {
-   pdf = await readSearchIndex(file.id, profileId);
-   for (const page of pdf?.pages || []) {
-    entries.push({...location, id: 'p' + page.n, kind, page: page.n, text: page.text});
+  if (kind === 'pdf' || kind === 'ppt') {
+   const [docIdx, marks] = await Promise.all([
+    readSearchIndex(file.id, profileId),
+    typeof fileAnnotations === 'function' ? fileAnnotations(profileId, file).catch(() => []) : Promise.resolve([])
+   ]);
+   pdf = docIdx;
+   const byPage = new Map((pdf?.pages || []).map(p => [p.n, p.text]));
+   for (const mark of marks || []) {
+    if (!Number.isInteger(mark?.page) || mark.page < 1) continue;
+    const extra = [mark.quote, mark.note].filter(Boolean).join(' ').trim();
+    if (!extra) continue;
+    const prev = byPage.get(mark.page) || '';
+    if (!prev.includes(extra)) byPage.set(mark.page, (prev ? prev + ' · ' + extra : extra).slice(0, 60000));
+   }
+   for (const [pageNum, pageText] of [...byPage.entries()].sort((a, b) => a[0] - b[0])) {
+    entries.push({...location, id: 'p' + pageNum, kind, page: pageNum, text: pageText});
    }
   } else {
    for (const [i, cue] of (subtitles || []).entries()) {
@@ -224,7 +244,7 @@
   const documents = new Map(entries.map(entry => [entry.id, entry]));
   const entry = {
    stamp, subtitles, backupFrames, index, documents, weight,
-   incomplete: kind === 'pdf' && (!pdf || pdf.scannedPages < pdf.totalPages),
+   incomplete: (kind === 'pdf' || kind === 'ppt') && (!pdf || pdf.scannedPages < pdf.totalPages),
    failedPages: !!pdf?.failedPages.length,
    warning: pdf && pdfIndexCoverage(pdf),
   };
@@ -257,7 +277,7 @@
   await openAttachment(file);
   const reader = readingSession;
   if (reader?.file.id !== file.id || reader.profileId !== current.profileId) return;
-  if (result.kind === 'pdf') reader.showPage?.(result.page);
+  if (result.kind === 'pdf' || result.kind === 'ppt') reader.showPage?.(result.page);
   else seekVideoResult(reader, result.time);
  }
 
@@ -273,21 +293,21 @@
   const count = groups.reduce((total, group) => total + group.count, 0);
   const rows = groups.flatMap(group => group.rows).sort((a, b) => b.rank - a.rank).slice(0, displayLimit);
   const progress = run.scanning ? '正在查找已有索引…' : current.indexProgress || '';
-  const pausedLabel = current.paused && allowPdf() ? 'PDF 索引已暂停' : '';
+  const pausedLabel = current.paused && allowDocIndex() ? '文档索引已暂停' : '';
   status.textContent = [count ? '共 ' + count + ' 处命中' + (count > rows.length ? '，显示 ' + rows.length + ' 处' : '') :
    progress ? '暂未命中' : '没有找到匹配内容', pausedLabel || progress].filter(Boolean).join(' · ');
   pause.hidden = !current.indexing || current.paused;
-  resume.hidden = !allowPdf() || (!current.paused && !run.retryable.size);
+  resume.hidden = !allowDocIndex() || (!current.paused && !run.retryable.size);
   if (results.contains(document.activeElement)) return;
   const fragment = document.createDocumentFragment();
-  const labels = {note: '记录', pdf: 'PDF', subtitle: '字幕', frame: '定格批注'};
+  const labels = {note: '记录', pdf: 'PDF', ppt: 'PPT 讲义', subtitle: '字幕', frame: '定格批注'};
   for (const row of rows) {
    const button = document.createElement('button');
    button.type = 'button';
    button.className = 'pdf-search-doc workspace-search-result';
    button.dataset.searchKind = row.kind;
    const title = document.createElement('strong');
-   const where = row.kind === 'pdf' ? ' · 第 ' + row.page + ' 页' : row.time !== undefined ? ' · ' + formatTime(row.time) : '';
+   const where = (row.kind === 'pdf' || row.kind === 'ppt') ? ' · 第 ' + row.page + ' 页' : row.time !== undefined ? ' · ' + formatTime(row.time) : '';
    title.textContent = (row.resultTitle || row.title) + ' · ' + labels[row.kind] + where;
    const snippet = document.createElement('span');
    snippet.textContent = row.snippet;
@@ -364,7 +384,8 @@
    for (const [i, source] of sources.entries()) {
     if (signal.aborted || !activeProfile(current)) break;
     const key = sourceKey(source);
-    const label = '建立 PDF 索引 ' + (i + 1) + '/' + sources.length + ' · ' + source.file.name;
+    const kindName = source.kind === 'ppt' ? 'PPT' : 'PDF';
+    const label = '建立 ' + kindName + ' 索引 ' + (i + 1) + '/' + sources.length + ' · ' + source.file.name;
     const update = suffix => {
      if (signal.aborted || session !== current || !activeProfile(current)) return;
      const old = current.indexProgress;
@@ -375,15 +396,21 @@
     };
     update('…');
     try {
-     await buildPdfSearchIndex(source.file, {profileId: current.profileId, signal, retry,
-      onProgress: ({page, total}) => update(' · ' + page + '/' + total + ' 页')});
+     if (source.kind === 'ppt' && typeof buildPresentationSearchIndex === 'function') {
+      await buildPresentationSearchIndex(source.file, {profileId: current.profileId, signal,
+       onProgress: ({page, total}) => update(' · ' + page + '/' + total + ' 页')});
+     } else {
+      await buildPdfSearchIndex(source.file, {profileId: current.profileId, signal, retry,
+       onProgress: ({page, total}) => update(' · ' + page + '/' + total + ' 页')});
+     }
      current.failures.delete(key);
     } catch (error) {
      if (signal.aborted) break;
      current.failures.set(key, source.file.name + ' · 索引失败（' + error.message + '）');
     }
     const run = current.run;
-    if (!signal.aborted && run && !run.signal.aborted && allowPdf()) {
+    if (!signal.aborted && run && !run.signal.aborted && ((source.kind === 'pdf' && allowPdf()) || (source.kind === 'ppt' && allowPpt()))) {
+     clearCachedSource(key);
      await scanSource(current, run, source);
      drawResults(current, run);
     }
@@ -405,7 +432,7 @@
   current.run = null;
   results.replaceChildren();
   pause.hidden = !current.indexing;
-  resume.hidden = !current.paused || !allowPdf();
+  resume.hidden = !current.paused || !allowDocIndex();
   if (!queryTerms(query).length) {
    stopPdfIndex(current);
    pause.hidden = true;
@@ -421,7 +448,7 @@
     run.matches.set('records', matchingRows(syncNotes(noteRecords), query));
    }
    drawResults(current, run);
-   const pdfs = allowPdf() ? sources.filter(source => source.kind === 'pdf') : [];
+   const docs = sources.filter(source => (source.kind === 'pdf' && allowPdf()) || (source.kind === 'ppt' && allowPpt()));
    const videos = scope.value === 'all' || scope.value === 'video' ? sources.filter(source => source.kind === 'video') : [];
    for (const source of videos) {
     signal.throwIfAborted();
@@ -430,7 +457,7 @@
    drawResults(current, run);
    const pending = [];
    let lastPublish = performance.now();
-   for (const source of pdfs) {
+   for (const source of docs) {
     signal.throwIfAborted();
     const entry = await scanSource(current, run, source);
     if (!current.failures.has(sourceKey(source)) && (!entry || entry.incomplete || retry && entry.failedPages)) pending.push(source);
@@ -495,7 +522,7 @@
   runCurrent();
  };
  scope.onchange = () => {
-  if (session && !allowPdf()) stopPdfIndex(session);
+  if (session && !allowDocIndex()) stopPdfIndex(session);
   runCurrent();
  };
  pause.onclick = () => {
@@ -512,12 +539,15 @@
  };
 
  document.addEventListener('workspace-search-file-updated', ({detail}) => {
-  if (detail.profileId !== cachedProfile) return;
-  const kind = detail.key.startsWith('pdf-index-v3/') ? 'pdf' :
-   detail.key.startsWith('video-frame-notes/') ? 'video' : null;
-  if (kind) {
-   cacheRevision++;
-   clearCachedSource(kind + '/' + detail.fileId);
+  if (!detail || detail.profileId !== cachedProfile) return;
+  const key = String(detail.key || '');
+  cacheRevision++;
+  if (!key || key.startsWith('pdf-index-v3/') || key.startsWith('pdf-marks/') || key.startsWith('annotations/')) {
+   clearCachedSource('pdf/' + detail.fileId);
+   clearCachedSource('ppt/' + detail.fileId);
+  }
+  if (!key || key.startsWith('video-frame-notes/')) {
+   clearCachedSource('video/' + detail.fileId);
   }
  });
  document.addEventListener('workspace-search-profile', () => {
