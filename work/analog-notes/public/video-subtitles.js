@@ -18,7 +18,24 @@ function selectedVideoAsrModel(){
 }
 function videoSubtitleKey(s){return s.profileId+'/'+s.file.id}
 function videoSubtitleNotify(job,changed){for(const view of job.views)view(changed)}
-function videoSubtitleJobStatus(job,text,percent=null,changed){job.status=text;job.percent=percent;videoSubtitleNotify(job,changed)}
+function videoSubtitleJobStatus(job,text,percent=null,changed){
+ job.status=text;job.percent=percent;videoSubtitleNotify(job,changed);
+ if(window.DoNoteTasks&&text){
+  const running=!!(job.id||job.kind);
+  const isCancel=/已取消|已停止/.test(text);
+  const isErr=!running&&/失败|中断|未保存|超时|没有识别到/.test(text);
+  const isDone=!running&&!isCancel&&!isErr&&/已生成|可导出/.test(text);
+  const note=typeof appState!=='undefined'?appState?.profiles?.find(p=>p.id===job.profileId)?.records?.find(n=>n.id===job.ownerId):null;
+  window.DoNoteTasks.upsert('asr:'+job.profileId+':'+job.fileId,{
+   kind:job.kind==='translation'?'translate':'asr',
+   title:(note?.title?note.title.slice(0,16)+' · ':'')+(job.kind==='translation'?'字幕同步翻译':'视频语音识别'),
+   detail:text,
+   percent:isDone?100:percent,
+   state:running?'running':isCancel?'cancelled':isErr?'error':isDone?'done':'running',
+   onOpen:job.ownerId?()=>{if(typeof openResource==='function')void openResource(job.ownerId)}:null
+  });
+ }
+}
 // 识别时同步翻译：识别出一条英文字幕就立即离线翻译一条，边识别边出中文。
 const VIDEO_AUTO_TRANSLATE_KEY='donote-auto-subtitle-translate';
 function videoAutoTranslateEnabled(){try{return localStorage.getItem(VIDEO_AUTO_TRANSLATE_KEY)!=='off'}catch{return true}}

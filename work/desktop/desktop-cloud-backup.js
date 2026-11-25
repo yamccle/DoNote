@@ -72,6 +72,21 @@
    message.textContent=value;
    if(total>0){progress.max=total;progress.value=Math.min(done||0,total)}
    else progress.removeAttribute('value');
+   if(window.DoNoteTasks&&value&&(operation||/已上传|已写入同步目录|已下载|已取消/.test(value))){
+    const pct=total>0?Math.round((Math.min(done||0,total)/total)*100):(/已上传|已写入同步目录|已下载/.test(value)?100:null);
+    const isCancel=/^已取消/.test(value);
+    const isDone=!operation&&/已上传|已写入同步目录|已下载/.test(value);
+    const isErr=!operation&&!isCancel&&!isDone&&/失败|超时|无效|错误|不足/.test(value);
+    window.DoNoteTasks.upsert('cloud-backup',{
+     kind:'cloud',
+     title:'云端快照备份',
+     detail:value,
+     percent:pct,
+     state:operation?'running':isCancel?'cancelled':isErr?'error':isDone?'done':'done',
+     onCancel:cancellable&&!stopRequested?()=>$('cloudBackupCancel')?.click():null,
+     onOpen:()=>{if(!dialog.open)dialog.showModal();}
+    });
+   }
   }
   function request(action,parameters={},long=false){
    const id=crypto.randomUUID();

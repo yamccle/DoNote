@@ -78,6 +78,7 @@ async function load(){
 }
 function updateIdentity(){
  document.dispatchEvent(new Event('workspace-search-profile'));
+ window.DoNoteUsage?.markTodayActive?.(0);
  discardWorkspaceDialogsForProfile(appState.activeId);
  if(readingSession&&readingSession.profileId!==appState.activeId&&$('reader').open){
   $('reader').close();
@@ -114,6 +115,7 @@ async function put(note,writes=[],deletions=[]){
   saved.webArticle=previous.webArticle;saved.webAnnotations=previous.webAnnotations;saved.webReading=previous.webReading;
  }
  if(saved.type==='resource'&&activeProfile().reading?.[saved.id])saved.readerProgress=activeProfile().reading[saved.id];
+ window.DoNoteSync?.stampRecordMutation?.(saved,previous);
  const next=structuredClone(appState),p=next.profiles.find(p=>p.id===next.activeId);
  addNewTopicTags(p,saved.tags);
  p.records=p.records.filter(n=>n.id!==saved.id).concat(saved);
@@ -356,7 +358,8 @@ async function collectBackup(includeData,{large=false,onProgress}={}){
  for(const note of p.records)for(const a of note.attachments||[])attachmentBytes+=includeData?Math.ceil(a.size/3)*4:a.size;
  if(!large&&attachmentBytes>MAX_BACKUP)throw new Error('当前附件总量（约 '+sizeLabel(attachmentBytes)+'）超过 500 MB 单文件上限，请直接使用上方推荐的「流式备份到文件夹」或「云端版本化备份」。');
  for(const note of p.records){for(const a of note.attachments||[]){const blob=await readBlob(a.id,p.id);if(blob.size!==a.size)throw new Error('附件大小异常：'+a.name);a.annotations=await fileAnnotations(p.id,a);if(fileIsPdf(a)&&typeof readPdfOcrPages==='function'){const ocr=await readPdfOcrPages(a.id,p.id);if(ocr?.pages&&Object.keys(ocr.pages).length)a.ocrPages=ocr.pages;else delete a.ocrPages}if(fileIsVideo(a)){const frames=await fileVideoFrameNotes(p.id,a);if(frames.length)a.videoFrameNotes=frames;else delete a.videoFrameNotes}a.sha256=await fileDigest(blob,(done,total)=>onProgress?.(a.name,done,total));a.path=attachmentPath(p,note,a);if(includeData)a.data=await blobToBase64(blob);files.push({path:a.path,blob})}}
- return {backup:{format:'analog-notes',version:2,exportedAt:new Date().toISOString(),profile:{name:p.name,role:p.role,topics:p.topics,categories:p.categories,journalLayoutVersion:p.journalLayoutVersion,planLayoutVersion:p.planLayoutVersion,navLabels:p.navLabels,navDescriptions:p.navDescriptions||{},reading:p.reading,reminders:p.reminders||[],readingLists:p.readingLists||[],folders:p.folders||[],dashboardWidgets:dashboardWidgetsFor(p),dashboardWidgetLayoutVersion:1},records:p.records},files};
+ const usageExport=window.DoNoteUsage?.exportForBackup?.(p)||{};
+ return {backup:{format:'analog-notes',version:2,exportedAt:new Date().toISOString(),profile:{name:p.name,role:p.role,topics:p.topics,categories:p.categories,journalLayoutVersion:p.journalLayoutVersion,planLayoutVersion:p.planLayoutVersion,navLabels:p.navLabels,navDescriptions:p.navDescriptions||{},reading:p.reading,reminders:p.reminders||[],readingLists:p.readingLists||[],folders:p.folders||[],dashboardWidgets:dashboardWidgetsFor(p),dashboardWidgetLayoutVersion:1,usageDays:usageExport.usageDays,focusMinutes:usageExport.focusMinutes},records:p.records},files};
 }
 function markdown(note){return '# '+note.title+'\n\n'+note.date+' · '+names[note.type]+' · '+note.status+'\n\n标签：'+note.tags.join(' / ')+'\n\n'+(note.reference?note.reference+'\n\n':'')+(note.url?note.url+'\n\n':'')+(note.bodyHtml?noteBodyHtml(note):note.body)+'\n\n'+(note.attachments?.length?'附件：\n'+note.attachments.map(a=>'- '+a.name+' ('+sizeLabel(a.size)+')').join('\n'):'')}
 function offlineIndex(backup){
@@ -508,6 +511,7 @@ function mergeBackupProfile(profile,source,incoming){
  mergeImportedRecordFolders(profile,source.folders,incoming);
  profile.records.push(...incoming);
  mergeImportedReadingLists(profile,source.readingLists);
+ window.DoNoteUsage?.mergeFromBackup?.(profile,source);
  if(wasEmpty&&source.categories)profile.categories=source.categories;
  if(wasEmpty&&source.navLabels)profile.navLabels=source.navLabels;
  if(wasEmpty&&source.navDescriptions)profile.navDescriptions=source.navDescriptions;
@@ -521,7 +525,7 @@ function mergeBackupProfile(profile,source,incoming){
  }
  for(const note of incoming){
   if(note.type==='resource'||profile.categories.some(category=>category.id===note.type))continue;
-  if(note.type==='custom-achievement'&&note.flashcardKind==='analog-v1')continue;
+  if(note.type==='custom-achievement'&&note.flashcardKind)continue;
   const fallback=BASE_CATEGORY_DATA.find(category=>category.id===note.type);
   if(!fallback)throw new Error('备份缺少自定义栏目的配置。');
   profile.categories.push(structuredClone(fallback));

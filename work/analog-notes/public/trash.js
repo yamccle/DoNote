@@ -35,6 +35,7 @@ function stageTrashRecords(p,targetIds,aiTask){
  p.trash??=[];
  for(const note of removed)p.trash.push({id:note.id,deletedAt:now,record:note});
  if(p.trash.length>TRASH_CAP)p.trash=p.trash.slice(-TRASH_CAP);
+ window.DoNoteSync?.recordTombstone?.(p.id,targetIds);
  if(aiTask){p.aiApplied??={};p.aiApplied[aiTask]={recordId:removed[0].id,at:now}}
 }
 function clearTrashRecordCheckpoints(profileId,targetIds){

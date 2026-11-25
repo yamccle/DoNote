@@ -70,7 +70,16 @@ function openLiveWebPage(note) {
     const fastOnly = !!fastCheck?.checked;
     const startedAt = performance.now();
     submit.disabled = true;
-    message.textContent = fastOnly ? '正在极速提取网页正文…' : '正在并发抓取网页正文与配图…';
+    const statusLine = fastOnly ? '正在极速提取网页正文…' : '正在并发抓取网页正文与配图…';
+    message.textContent = statusLine;
+    window.DoNoteTasks?.upsert?.('web-capture', {
+      kind: 'capture',
+      title: '网页离线收藏',
+      detail: statusLine,
+      percent: 25,
+      state: 'running',
+      onOpen: () => { if (!dialog.open) dialog.showModal(); }
+    });
     try {
       const url = canonicalWebArticleUrl(input.value.trim());
       let saved = records.find(note => note.webArticle?.url === url);
@@ -107,9 +116,25 @@ function openLiveWebPage(note) {
         }
       }
       dialog.close();
+      window.DoNoteTasks?.upsert?.('web-capture', {
+        kind: 'capture',
+        title: '网页离线收藏',
+        detail: '已收藏：' + (saved?.title || url),
+        percent: 100,
+        state: 'done',
+        onOpen: saved ? () => openSavedWebpage(saved) : null
+      });
       if (view !== 'resource') switchView('resource'); else render();
       openSavedWebpage(saved);
     } catch (error) {
+      window.DoNoteTasks?.upsert?.('web-capture', {
+        kind: 'capture',
+        title: '网页离线收藏',
+        detail: error.message || '网页收藏失败',
+        percent: null,
+        state: 'error',
+        onOpen: null
+      });
       if (dialog.open) message.textContent = error.message;
     } finally {
       submit.disabled = false;

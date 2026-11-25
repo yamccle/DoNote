@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取当前工作台记录快照、桌面宿主凭证消息与 AI 接入服务返回状态。
+ * [OUTPUT]: 驱动精简版 #aiManager 弹窗，管理本机一键连接、助手令牌授权、MCP 校验与异步任务同步。
+ * [POS]: 外部 AI 助手连接器前端控制层，桌面模式下默认收起高级地址与细粒度权限折叠区。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 let bridgeTaskFilter='recent';
 let bridgeConnection=null,bridgeSyncing=false,bridgeTimer=null,bridgeIndicatorTimer=null,bridgeRestoreRequestedProfile=null;
@@ -220,6 +226,7 @@ function initializeDesktopBridge(){
  updateAiConnectionIndicator(false);
  document.documentElement.classList.add('desktop-host');
  $('bridgeRememberOption').hidden=false;
+ if($('bridgeAdvancedOptions'))$('bridgeAdvancedOptions').open=false;
  $('bridgeCredentialNote').textContent='勾选「记住连接」后，本机连接会自动重启；远程管理令牌会使用当前 Windows 用户的加密存储。断开并忘记后不再自动连接。';
  $('bridgeDisconnect').textContent='断开并忘记';
  const button=$('bridgeDesktopConnect'),manual=$('bridgeConnect');

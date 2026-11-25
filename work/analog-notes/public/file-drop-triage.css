@@ -1,0 +1,333 @@
+/**
+ * [INPUT]: 承接 design-system.css 的色彩与阴影变量。
+ * [OUTPUT]: 定义篮板式全局文件拖拽浮层 #globalDropOverlay 与投递归档分拣台 #dropTriageDialog 样式。
+ * [POS]: 与 file-drop-triage.js 成对工作的独立入库分拣样式表。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+
+.global-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: color-mix(in srgb, var(--bg, #f4f6f9) 76%, rgba(15, 23, 42, 0.28));
+  backdrop-filter: blur(10px);
+  animation: dropFadeIn 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.global-drop-overlay[hidden] {
+  display: none !important;
+}
+
+@keyframes dropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.drop-backboard-card {
+  width: min(540px, 100%);
+  padding: 24px 28px 30px;
+  border-radius: 20px;
+  background: var(--surface, #ffffff);
+  border: 2px dashed color-mix(in srgb, var(--accent, #2e5984) 42%, var(--line, #94a3b8));
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16);
+  text-align: center;
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.global-drop-overlay.is-aiming .drop-backboard-card {
+  transform: scale(1.02);
+  border-style: solid;
+  border-color: var(--accent, #2e5984);
+  box-shadow: 0 28px 70px rgba(37, 84, 138, 0.24);
+}
+
+.drop-backboard-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.drop-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted, #64748b);
+}
+
+.drop-score-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent, #2e5984);
+  background: color-mix(in srgb, var(--accent, #2e5984) 11%, transparent);
+}
+
+.drop-hoop-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 6px auto 12px;
+  color: var(--ink, #1e293b);
+  --drop-rim: #c96442;
+}
+
+.drop-hoop-svg {
+  width: 164px;
+  height: 116px;
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.global-drop-overlay.is-aiming .drop-hoop-svg {
+  transform: translateY(-3px) scale(1.04);
+}
+
+.drop-score-pop {
+  position: absolute;
+  top: 14px;
+  right: calc(50% - 68px);
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #2f855a;
+  box-shadow: 0 8px 18px rgba(47, 133, 90, 0.35);
+}
+
+.drop-score-pop.is-popping {
+  animation: scorePopUp 220ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+}
+
+@keyframes scorePopUp {
+  from { opacity: 0; transform: translateY(10px) scale(0.8); }
+  to { opacity: 1; transform: translateY(-6px) scale(1.06); }
+}
+
+.drop-backboard-card h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+  color: var(--ink, #0f172a);
+}
+
+.drop-backboard-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-soft, #475569);
+}
+
+.drop-triage-dialog {
+  width: min(910px, calc(100vw - 28px));
+}
+
+.drop-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drop-triage-body {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.08fr);
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 780px) {
+  .drop-triage-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.drop-files-pane,
+.drop-org-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drop-org-pane .field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.drop-org-pane select,
+.drop-org-pane input:not([type="checkbox"]) {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.drop-files-pane {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line, rgba(15, 23, 42, 0.09));
+  background: color-mix(in srgb, var(--surface-soft, #f8fafc) 80%, transparent);
+}
+
+.drop-pane-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drop-pane-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drop-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 310px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.drop-empty-hint {
+  padding: 28px 16px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--line, #cbd5e1);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink-soft, #475569);
+  font-size: 12.5px;
+}
+
+.drop-file-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line, rgba(15, 23, 42, 0.07));
+}
+
+.drop-file-ext {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: color-mix(in srgb, var(--accent, #2e5984) 12%, transparent);
+  color: var(--accent, #2e5984);
+}
+
+.drop-file-ext[data-ext="PDF"] { background: rgba(185, 64, 56, 0.12); color: #b94038; }
+.drop-file-ext[data-ext="PPTX"],
+.drop-file-ext[data-ext="PPT"] { background: rgba(196, 104, 42, 0.13); color: #b85d22; }
+.drop-file-ext[data-ext="MP4"],
+.drop-file-ext[data-ext="VIDEO"] { background: rgba(47, 133, 90, 0.13); color: #276f4b; }
+
+.drop-file-title {
+  min-width: 0;
+  padding: 5px 8px !important;
+  font-size: 12.5px !important;
+  border-radius: 7px !important;
+}
+
+.drop-file-size {
+  font-size: 11px;
+  color: var(--ink-muted, #64748b);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.drop-file-remove {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+
+.drop-topic-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.drop-topic-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  border: 1px solid var(--line, #cbd5e1);
+  background: var(--surface, #ffffff);
+  color: var(--ink-soft, #475569);
+  cursor: pointer;
+}
+
+.drop-topic-pill.is-selected {
+  border-color: var(--accent, #2e5984);
+  background: color-mix(in srgb, var(--accent, #2e5984) 12%, var(--surface, #ffffff));
+  color: var(--accent, #2e5984);
+  font-weight: 600;
+}
+
+.drop-inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-soft, #475569);
+  cursor: pointer;
+}
+
+.drop-upload-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent, #2e5984) 26%, transparent);
+  background: color-mix(in srgb, var(--accent, #2e5984) 7%, var(--surface, #ffffff));
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+.drop-upload-card.is-complete {
+  border-color: rgba(47, 133, 90, 0.42);
+  background: rgba(47, 133, 90, 0.1);
+  color: #226644;
+}
+
+.drop-upload-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.drop-upload-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.drop-upload-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent, #2e5984);
+  transition: width 180ms ease;
+}
+
+.drop-upload-card.is-complete .drop-upload-track > span {
+  background: #2f855a;
+}

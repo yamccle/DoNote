@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 接收 HTTP 请求、管理令牌或独立助手令牌，以及本地持久化目录参数。
+ * [OUTPUT]: 暴露 createBridge，提供工作台快照发布、MCP 工具协议、任务队列与 /api/sync/v1 多端同步路由。
+ * [POS]: 本机与自建节点共用的 Node.js 接入与同步网关，衔接 sync-v1.mjs 与 mcp.mjs。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 import http from 'node:http';
 import net from 'node:net';
 import {promises as fs,createWriteStream,createReadStream} from 'node:fs';
@@ -7,6 +13,7 @@ import {Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {fileURLToPath} from 'node:url';
 import {serveMcp} from './mcp.mjs';
+import {createSyncStore,handleSyncV1} from './sync-v1.mjs';
 
 const VERSION='1.3.0',MAX_FILE=100*1024*1024,SCOPES=['records:read','records:create','records:update','records:delete','files:read','files:write','subtitles:read','subtitles:write'];
 const subtitleScopes=['subtitles:read','subtitles:write'];
@@ -53,6 +60,7 @@ function validateRecord(input,profile,operation){
 export async function createBridge({dataDir,adminToken,host='127.0.0.1',port=4318,allowedOrigins=['null']}={}){
  if(!bounded(adminToken,512,true)||adminToken.length<24)throw Error('管理令牌至少需要 24 个字符。');
  const root=path.resolve(dataDir),filesDir=path.join(root,'files'),statePath=path.join(root,'state.json');await fs.mkdir(filesDir,{recursive:true,mode:0o700});
+ const syncStore=await createSyncStore(root);
  let state;try{state=JSON.parse(await fs.readFile(statePath,'utf8'));if(state.version!==1)throw Error('数据版本不支持')}catch(error){if(error.code!=='ENOENT')throw error;state={version:1,profiles:{},agents:[],tasks:[],files:{},audit:[]};await atomicJson(statePath,state)}
  let pending=Promise.resolve();
  const subtitleResults=new Map();
@@ -234,7 +242,7 @@ export async function createBridge({dataDir,adminToken,host='127.0.0.1',port=431
  const originAllowed=origin=>!origin||origin==='https://yams-one.example'||allowedOrigins.includes(origin)||/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
  const server=http.createServer(async(req,res)=>{
   const origin=req.headers.origin;
-  if(origin&&originAllowed(origin)){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');res.setHeader('Access-Control-Allow-Headers','Authorization,Content-Type,X-File-Name,X-Profile-Id,MCP-Protocol-Version,Mcp-Method,Mcp-Name');res.setHeader('Access-Control-Allow-Private-Network','true')}
+  if(origin&&originAllowed(origin)){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,OPTIONS');res.setHeader('Access-Control-Allow-Headers','Authorization,Content-Type,X-File-Name,X-Profile-Id,MCP-Protocol-Version,Mcp-Method,Mcp-Name');res.setHeader('Access-Control-Allow-Private-Network','true')}
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
   const reply=(data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(data))};
   try{
@@ -251,6 +259,7 @@ export async function createBridge({dataDir,adminToken,host='127.0.0.1',port=431
     return await serveMcp(req,res,agent,{version:VERSION,reply,jsonBody,workspaceFor,recordsFor,enqueueTask,taskFor,uploadTextFile,lookupLiterature,listVideos,takeSubtitleRequest});
    }
    const who=identity(req);
+   if(route.startsWith('/api/sync/v1/')&&await handleSyncV1({req,res,url,route,who,owner,fail,identifier,bounded,jsonBody,transact,getState:()=>state,log,syncStore,reply}))return;
    if(route==='/api/admin/profiles'&&req.method==='POST'){
     owner(who);const input=await jsonBody(req);if(!identifier(input.id)||!bounded(input.name,80,true)||!Array.isArray(input.categories)||input.categories.length>30||!Array.isArray(input.records)||input.records.length>100000)throw fail('工作台快照格式无效。');
     if(input.categories.some(c=>!identifier(c.id)||!bounded(c.name,80,true)||!Array.isArray(c.statuses)||c.statuses.some(s=>!bounded(s,30,true))))throw fail('栏目格式无效。');

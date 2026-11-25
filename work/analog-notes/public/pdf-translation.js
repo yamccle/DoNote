@@ -73,7 +73,25 @@ if(window.chrome?.webview){
   }
   if (['pdf2zh-progress', 'pdf2zh-paragraph', 'pdf2zh-output'].includes(data?.type)) {
    pdf2zhPending.get(data.type + ':' + data.id)?.(data);
+   if (data.type === 'pdf2zh-progress' && window.DoNoteTasks) {
+    window.DoNoteTasks.upsert('pdf2zh:' + data.id, {
+     kind: 'translate',
+     title: 'PDF 整页双语翻译',
+     detail: data.message || data.stage || '正在排版与翻译文档…',
+     percent: Number.isFinite(data.percent) ? data.percent : null,
+     state: 'running'
+    });
+   }
    return;
+  }
+  if (data?.type === 'pdf2zh-result' && window.DoNoteTasks) {
+   window.DoNoteTasks.upsert('pdf2zh:' + data.id, {
+    kind: 'translate',
+    title: 'PDF 整页双语翻译',
+    detail: data.error ? ('翻译未完成：' + data.error) : '整页双语对照翻译已完成',
+    percent: data.error ? null : 100,
+    state: data.error ? 'error' : 'done'
+   });
   }
   if (!['pdf2zh-ack', 'pdf2zh-ready', 'pdf2zh-result'].includes(data?.type)) return;
   const resultType = data.type.slice('pdf2zh-'.length);

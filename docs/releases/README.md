@@ -24,6 +24,17 @@ pwsh -File tools/release.ps1 -Revision r139 -Version 26.1139.0085 `
 
 增量包、完整包和发布记录都包含源码提交和运行依赖校验值。发布记录也包含上一版完整包和两个新 ZIP 的 SHA-256。保持检查通过的提交与发行标签对应。Windows 编译器版本和 ZIP 时间戳会影响整个包的字节值，重建以相同源码和依赖为准。
 
+## GitHub 在线自动更新资产规范
+
+自 `r139`（`26.1139.0085`）起，DoNote 桌面端支持在「设置 → 资料与系统 → 检查在线更新」连接 `https://api.github.com/repos/yamccle/DoNote/releases/latest` 自动拉取并安装正式版更新。每次发布 GitHub Release 时须遵循以下标准规范：
+
+1. **标签与发布标记**：Release `tag_name` 使用修订号（如 `r139`），正式版标记为 `Latest`（非草稿、非预发布）。
+2. **三件套标准资产命名**（均由 `tools/release.ps1` 自动生成并校验）：
+   - 发布元数据清单：`DoNote-<tag>-release.json`（含 `version`、`baseVersion` 与 `artifacts[].sha256`）
+   - 相邻版本增量包：`DoNote-Update-<上一版本号>-to-<tag>.zip`（体积小、秒级更新；本机版本恰好等于 `<上一版本号>` 时自动优先选用）
+   - 完整独立安装包：`DoNote-Windows-x64-<tag>.zip`（跨多版本升级或缺少对应增量包时自动回退选用）
+3. **端侧安全校验与回滚**：桌面端下载完成后强制核对 `DoNote-<tag>-release.json`（或 GitHub Release Asset `digest`）中的 SHA-256 摘要，校验通过后暂存于 `UpdateBackups\Downloads\` 并交由独立 `DoNoteUpdater.exe` 备份旧文件、原子替换并重启；任何校验不匹配均拒绝执行，不触碰用户 `Data\` 与 `models\` 目录。
+
 ## 发布记录
 
 | 修订 | 版本 | 标签 / 提交 | 日期 | 备注 |

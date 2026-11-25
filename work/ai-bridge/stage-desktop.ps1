@@ -29,7 +29,7 @@ if (!$ReuseStagedRuntime) {
     Copy-Item -LiteralPath $node -Destination (Join-Path $target 'node.exe') -Force
     Copy-Item -LiteralPath $license -Destination (Join-Path $target 'Node-LICENSE.txt') -Force
 }
-$files = @('server.mjs', 'mcp.mjs', 'openapi.json', 'adapter.py', 'Dockerfile', '.dockerignore', 'Start-Local.cmd')
+$files = @('server.mjs', 'mcp.mjs', 'sync-v1.mjs', 'openapi.json', 'adapter.py', 'Dockerfile', '.dockerignore', 'Start-Local.cmd')
 foreach ($file in $files) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $target -Force
 }

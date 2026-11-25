@@ -1,0 +1,599 @@
+/**
+ * [INPUT]: 承接 design-system.css 与 workspace-bento.css 的色彩与圆角变量。
+ * [OUTPUT]: 定义侧边栏微层次、精简版 AI 管理弹窗、篮板式全局拖拽分拣台、后台任务中心与多端同步设置卡片样式。
+ * [POS]: r139 平台化演进专属样式表，保持全站低饱和学术纸感与统一圆角尺度。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
+
+/* ==========================================================================
+   1. 侧边栏宁缺毋滥微层次 (#workspaceRail)
+   ========================================================================== */
+#workspaceRail .rail-divider {
+  height: 1px;
+  margin: 6px 10px;
+  background: var(--line, rgba(15, 23, 42, 0.08));
+  flex-shrink: 0;
+}
+
+#workspaceRail .rail-section-label {
+  display: none;
+}
+
+#workspaceRail .rail-count {
+  display: none;
+}
+
+#workspaceRail .rail-footprint-card {
+  display: none;
+}
+
+@media (min-width: 1120px) {
+  #workspaceRail .rail-section-label {
+    display: block;
+    padding: 4px 12px 2px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--ink-muted, #64748b);
+    opacity: 0.78;
+    user-select: none;
+  }
+
+  #workspaceRail button[data-rail-view]:not(.rail-avatar) {
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 7px;
+    padding-inline: 8px !important;
+    flex-wrap: nowrap;
+  }
+
+  #workspaceRail button[data-rail-view] .rail-label {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  #workspaceRail button[data-rail-badge]::after {
+    content: attr(data-rail-badge);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4.5px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-muted, #64748b);
+    background: color-mix(in srgb, var(--ink, #0f172a) 4.5%, transparent);
+    flex-shrink: 0;
+  }
+
+  #workspaceRail button[aria-current="page"][data-rail-badge]::after {
+    color: var(--accent, #2e5984);
+    background: color-mix(in srgb, var(--accent, #2e5984) 13%, transparent);
+    font-weight: 600;
+  }
+
+  #workspaceRail .rail-footprint-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: calc(100% - 8px);
+    margin: 0 4px 8px;
+    padding: 7px 10px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--line, #cbd5e1) 75%, transparent);
+    background: color-mix(in srgb, var(--surface-soft, #f8fafc) 82%, transparent);
+    color: var(--ink-soft, #475569);
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+  }
+
+  #workspaceRail .rail-footprint-card:hover {
+    background: color-mix(in srgb, var(--accent, #2e5984) 7%, var(--surface, #ffffff));
+    border-color: color-mix(in srgb, var(--accent, #2e5984) 26%, transparent);
+  }
+
+  #workspaceRail .rail-footprint-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  #workspaceRail .rail-footprint-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #2f855a;
+    box-shadow: 0 0 0 3px rgba(47, 133, 90, 0.16);
+    flex-shrink: 0;
+  }
+
+  #workspaceRail .rail-footprint-hall {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-muted, #64748b);
+    white-space: nowrap;
+  }
+}
+
+/* ==========================================================================
+   2. AI 管理页面精简优化 (#aiManager)
+   ========================================================================== */
+#aiManager {
+  width: min(680px, calc(100vw - 32px));
+}
+
+#aiManager [hidden],
+#aiManager .bridge-token[hidden] {
+  display: none !important;
+}
+
+#aiManager .modalbody.bridge {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px 18px;
+}
+
+#aiManager .bridge-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-soft, #f1f5f9) 88%, transparent);
+  border: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+}
+
+#aiManager .bridge-status-copy {
+  font-size: 12.5px;
+  color: var(--ink-soft, #475569);
+}
+
+#aiManager .bridge-status {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: color-mix(in srgb, var(--accent, #2e5984) 9%, transparent);
+  color: var(--ink, #0f172a);
+}
+
+#aiManager .bridge-status.bridge-error {
+  background: rgba(196, 60, 57, 0.11);
+  color: #b8322f;
+}
+
+#aiManager .bridge-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line, rgba(15, 23, 42, 0.09));
+  background: var(--surface, #ffffff);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#aiManager .bridge-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#aiManager .bridge-card-head h3 {
+  margin: 0;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#aiManager .bridge-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#aiManager .bridge-advanced,
+#aiManager .bridge-scopes-fold {
+  border-top: 1px dashed var(--line, rgba(15, 23, 42, 0.1));
+  padding-top: 8px;
+}
+
+#aiManager .bridge-advanced > summary,
+#aiManager .bridge-scopes-fold > summary {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted, #64748b);
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+}
+
+#aiManager .bridge-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+#aiManager .bridge-create-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#aiManager .bridge-create-bar #bridgeAgentName {
+  flex: 1 1 190px;
+  min-width: 160px;
+}
+
+#aiManager .bridge-preset-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-soft, #f1f5f9);
+  border: 1px solid var(--line, rgba(15, 23, 42, 0.07));
+}
+
+#aiManager .bridge-preset-group button {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 7px;
+  border: 0;
+  background: transparent;
+}
+
+#aiManager .bridge-preset-group button:hover {
+  background: var(--surface, #ffffff);
+}
+
+#aiManager .bridge-scopes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 6px 10px;
+  padding-top: 8px;
+}
+
+#aiManager .bridge-scopes label {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--surface-soft, #f8fafc) 75%, transparent);
+}
+
+#aiManager .bridge-scopes label small {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-muted, #64748b);
+}
+
+#aiManager .bridge-bottom-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#aiManager .bridge-audit {
+  flex: 1 1 320px;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+/* ==========================================================================
+   3. 统一后台任务中心 (#taskCenterTrigger, #readerTaskPill, #taskCenterPopover)
+   ========================================================================== */
+.task-center-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.task-center-trigger.is-active {
+  border-color: color-mix(in srgb, var(--accent, #2e5984) 38%, transparent);
+  background: color-mix(in srgb, var(--accent, #2e5984) 9%, var(--surface, #ffffff));
+  color: var(--accent, #2e5984);
+  font-weight: 600;
+}
+
+.task-idle-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.78;
+}
+
+.task-ring {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  flex-shrink: 0;
+}
+
+.task-ring.is-spinning {
+  animation: taskSpin 850ms linear infinite;
+}
+
+@keyframes taskSpin {
+  to { transform: rotate(360deg); }
+}
+
+.task-trigger-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--accent, #2e5984);
+  color: #ffffff;
+}
+
+.task-trigger-badge.is-muted {
+  background: color-mix(in srgb, var(--ink, #0f172a) 10%, transparent);
+  color: var(--ink-soft, #475569);
+}
+
+.reader-task-pill {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent, #2e5984) 35%, transparent);
+  background: color-mix(in srgb, var(--surface, #ffffff) 94%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+  color: var(--ink, #0f172a);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.task-center-popover {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line, rgba(15, 23, 42, 0.12));
+  border-radius: 14px;
+  background: var(--surface, #ffffff);
+  color: var(--ink, #0f172a);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.2);
+  max-height: min(480px, calc(100vh - 36px));
+  overflow: hidden;
+}
+
+.task-center-popover:popover-open {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-center-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+}
+
+.task-center-head strong {
+  display: block;
+  font-size: 13.5px;
+}
+
+.task-center-head small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ink-muted, #64748b);
+}
+
+.task-center-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-center-clear {
+  padding: 4px 8px;
+  font-size: 11.5px;
+}
+
+.task-center-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.task-center-empty {
+  padding: 22px 12px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-muted, #64748b);
+}
+
+.task-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line, rgba(15, 23, 42, 0.08));
+  background: color-mix(in srgb, var(--surface-soft, #f8fafc) 75%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task-item.is-running {
+  border-color: color-mix(in srgb, var(--accent, #2e5984) 30%, transparent);
+  background: color-mix(in srgb, var(--accent, #2e5984) 5%, var(--surface, #ffffff));
+}
+
+.task-item.is-error {
+  border-color: rgba(196, 60, 57, 0.3);
+}
+
+.task-item-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.task-kind-pill {
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--ink, #0f172a) 7%, transparent);
+  color: var(--ink-soft, #475569);
+  flex-shrink: 0;
+}
+
+.task-item-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-state-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent, #2e5984);
+}
+
+.task-item.is-done .task-state-label { color: #2f855a; }
+.task-item.is-error .task-state-label { color: #c43c39; }
+
+.task-item-detail {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-soft, #475569);
+}
+
+.task-progress-track {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.task-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent, #2e5984);
+  transition: width 200ms ease;
+}
+
+.task-item.is-done .task-progress-fill { background: #2f855a; }
+
+.task-progress-track.is-indeterminate .task-progress-fill {
+  width: 36% !important;
+  animation: taskSlide 1.25s ease-in-out infinite alternate;
+}
+
+@keyframes taskSlide {
+  from { transform: translateX(-10%); }
+  to { transform: translateX(180%); }
+}
+
+.task-item-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.task-item-foot small {
+  font-size: 11px;
+  color: var(--ink-muted, #64748b);
+}
+
+.task-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-mini-btn {
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+  border-radius: 6px !important;
+}
+
+/* ==========================================================================
+   5. 设置页多端在线同步底座卡片 (#settingsSyncFoundationCard)
+   ========================================================================== */
+#desktopSettings .settings-inline-input {
+  width: 148px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #cbd5e1);
+  background: var(--surface, #ffffff);
+  color: var(--ink, #0f172a);
+  font-size: 12px;
+}
+
+#desktopSettings .settings-sync-endpoint-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+#desktopSettings .settings-sync-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+#desktopSettings #settingsSyncEndpoint {
+  flex: 1 1 170px;
+}
+
+#desktopSettings #settingsSyncToken {
+  flex: 1 1 140px;
+}

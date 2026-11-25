@@ -6,6 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { verifyPlatformEvolutionR139 } from './workspace-r139.mjs';
 
 export async function testWebExcerpt(page) {
   const quote = '链上要找回的这一句摘录。';
@@ -683,5 +684,6 @@ async function testPresentationSettingsAndFastWeb(page, closeReader) {
     fullHasImg: true,
     fastSkippedImg: true
   });
+  await verifyPlatformEvolutionR139(page);
   console.log('PASS presentation deck, 3-tab settings center and single-process fast web capture');
 }

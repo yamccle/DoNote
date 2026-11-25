@@ -20,15 +20,27 @@ function moveWorkspaceView(direction){
 }
 $('navBack').onclick=()=>moveWorkspaceView(-1);
 $('navForward').onclick=()=>moveWorkspaceView(1);
+function updateRailFootprintBadge(){
+ const hallNode=document.getElementById('railFootprintHall');
+ if(!hallNode)return;
+ const unlocked=window.DoNoteAchievements?.unlockedCount?.()??(typeof records!=='undefined'?records.filter(n=>n.flashcardKind).length:0);
+ hallNode.textContent='殿宇 '+unlocked+'/10';
+}
+document.addEventListener('donote-achievements-updated',updateRailFootprintBadge);
 function renderWorkspaceRail(items){
  const rail=$('workspaceRail'),focused=document.activeElement?.dataset.railView;
  const profile=activeProfile(),label=profile?.name||'我的工作台';
- const signature=JSON.stringify([label,profile?.role,items.map(([id,icon,count])=>[id,icon,count,names[id]])]);
+ const signature=JSON.stringify([label,profile?.role,items.map(([id,icon,count,badge])=>[id,icon,count,badge||0,names[id]])]);
  if(rail.dataset.signature!==signature){
   hideWorkspaceRailTip();rail.replaceChildren();rail.dataset.signature=signature;
-  for(const [id,icon,count] of items){
+  for(const [id,icon,count,badge] of items){
+   if(id==='resource'){
+    const divider=document.createElement('div');divider.className='rail-divider';divider.setAttribute('role','separator');rail.append(divider);
+    const sectionCap=document.createElement('span');sectionCap.className='rail-section-label';sectionCap.setAttribute('aria-hidden','true');sectionCap.textContent='资料与典藏';rail.append(sectionCap);
+   }
    const button=document.createElement('button');button.type='button';button.className='icon-button';button.dataset.railView=id;button.dataset.nav=id;
    button.setAttribute('aria-label',names[id]);
+   if(badge>0)button.dataset.railBadge=String(badge>999?'999+':badge);
    bindWorkspaceRailTip(button,id,count);
    button.innerHTML=svg(icon);
    const labelNode=document.createElement('span');labelNode.className='rail-label';labelNode.textContent=names[id];
@@ -40,6 +52,12 @@ function renderWorkspaceRail(items){
    rail.append(button);
   }
   const spacer=document.createElement('div');spacer.className='rail-spacer';rail.append(spacer);
+  const footCard=document.createElement('button');footCard.type='button';footCard.className='rail-footprint-card';footCard.id='railFootprintCard';
+  footCard.title='今日打开已自动记录足迹 · 点击前往成就殿宇查看十张里程碑卡牌';
+  footCard.innerHTML='<span class="rail-footprint-left"><span class="rail-footprint-dot" aria-hidden="true"></span>今日已留痕</span><span class="rail-footprint-hall" id="railFootprintHall">殿宇 0/10</span>';
+  footCard.onclick=()=>{if(window.DoNoteAchievements?.openHall)window.DoNoteAchievements.openHall();else{if(view!=='pinned')switchView('pinned');tab='achievements';render()}};
+  rail.append(footCard);
+  updateRailFootprintBadge();
   const avatar=document.createElement('button');avatar.type='button';avatar.className='icon-button rail-avatar';avatar.dataset.railView='account';
   const initial=document.createElement('span');initial.className='rail-initial';initial.textContent=Array.from(label)[0]||'A';
   const metaWrap=document.createElement('span');metaWrap.className='rail-user-meta';

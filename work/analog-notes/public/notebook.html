@@ -6,7 +6,7 @@
  [PROTOCOL]: Update this header on change, then check AGENTS.md
 -->
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="本地优先的跨学科知识精读、文献管理与课题研究工作台"><title>DoNote</title><link rel="icon" href="brand-logo.png">
-<script src="theme.js"></script><link rel="stylesheet" href="katex/katex.min.css"><link rel="stylesheet" href="notebook.css"><link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="design-system.css"><link rel="stylesheet" href="web-reader.css"><link rel="stylesheet" href="reader-panels.css"><link rel="stylesheet" href="reader-toolbar.css"><link rel="stylesheet" href="pdf-page-comparison.css"><link rel="stylesheet" href="presentation-preview.css"><link rel="stylesheet" href="video-subtitles.css"><link rel="stylesheet" href="video-frame-notes.css"><link rel="stylesheet" href="video-player-learning.css"><link rel="stylesheet" href="video-caption-overlay.css"><link rel="stylesheet" href="workspace-layout.css"><link rel="stylesheet" href="record-editor.css"><link rel="stylesheet" href="folder-management.css"><link rel="stylesheet" href="workspace-home.css"><link rel="stylesheet" href="workspace-toolbar.css"><link rel="stylesheet" href="workspace-bento.css"></head><body>
+<script src="theme.js"></script><link rel="stylesheet" href="katex/katex.min.css"><link rel="stylesheet" href="notebook.css"><link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="design-system.css"><link rel="stylesheet" href="web-reader.css"><link rel="stylesheet" href="reader-panels.css"><link rel="stylesheet" href="reader-toolbar.css"><link rel="stylesheet" href="pdf-page-comparison.css"><link rel="stylesheet" href="presentation-preview.css"><link rel="stylesheet" href="video-subtitles.css"><link rel="stylesheet" href="video-frame-notes.css"><link rel="stylesheet" href="video-player-learning.css"><link rel="stylesheet" href="video-caption-overlay.css"><link rel="stylesheet" href="workspace-layout.css"><link rel="stylesheet" href="record-editor.css"><link rel="stylesheet" href="folder-management.css"><link rel="stylesheet" href="workspace-home.css"><link rel="stylesheet" href="workspace-toolbar.css"><link rel="stylesheet" href="workspace-bento.css"><link rel="stylesheet" href="workspace-evolution.css"><link rel="stylesheet" href="file-drop-triage.css"></head><body>
 <nav id="workspaceRail" aria-label="快捷导航"></nav><div id="workspaceRailTip" role="tooltip" hidden></div>
 <header class="topbar"><div class="workspace-top-left"><img class="workspace-brand-mark" src="brand-logo.png" alt="DoNote"><div class="window-navigation" aria-label="栏目导航"><button type="button" id="navBack" class="icon-button" title="返回上一栏目" aria-label="返回上一栏目" disabled>←</button><button type="button" id="navForward" class="icon-button" title="前往下一栏目" aria-label="前往下一栏目" disabled>→</button></div><div class="breadcrumb"><b id="crumb">总览</b></div></div><div class="top-actions"><button class="secondary" type="button" id="openAiManager">AI 管理</button><button type="button" class="secondary" id="themeToggle" data-theme-toggle>☀ 白天</button><button class="secondary user-switch" id="usersBtn" title="添加、修改或切换用户"><span id="activeUser">我的工作台</span> ▾</button><button class="icon-button" id="categoriesBtn" title="管理栏目" aria-label="管理栏目">☷</button><span class="sync" id="sync"><span class="dot"></span>正在连接记录库</span><button type="button" class="icon-button desktop-gear" id="desktopSettingsButton" aria-label="设置" title="设置" aria-controls="desktopSettings" aria-expanded="false" popovertarget="desktopSettings" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3h4l.5 2.5 2 .9 2.2-1.1 2 3.5-1.7 1.6v2.3l1.7 1.6-2 3.5-2.2-1.1-2 .9L14 20h-4l-.5-2.4-2-.9-2.2 1.1-2-3.5L5 12.7v-2.3L3.3 8.8l2-3.5 2.2 1.1 2-.9L10 3Z"/><circle cx="12" cy="11.5" r="3"/></svg></button><button class="icon-button" id="backupBtn" title="备份与资料夹" aria-label="备份与资料夹"><i data-icon="download"></i></button><button class="primary" id="newBtn"><i data-icon="plus"></i>新建记录</button></div></header><div class="shell">
 <main>
@@ -89,65 +89,85 @@
 <dialog id="usersDialog" aria-labelledby="usersTitle"><div class="modalhead"><h2 id="usersTitle">本地用户</h2><button class="icon-button" data-close="usersDialog" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">每个用户拥有各自的记录、研究方向与附件。这里用于本机资料分类，无密码登录，也不提供隐私权限隔离。</p><div id="userList" class="manager-list"></div><section id="profileDeleteConfirm" hidden aria-labelledby="profileDeleteText"><p id="profileDeleteText"></p><div class="right"><button type="button" class="secondary" id="profileDeleteCancel">取消</button><button type="button" class="primary" id="profileDeleteAccept">确认删除用户</button></div><p id="profileDeleteError" class="form-message" role="alert"></p></section><form id="profileForm" class="account-form"><h3 style="font-size:13px" id="profileFormTitle">添加用户</h3><div class="field-row"><div class="field"><label for="profileName">用户名称 *</label><input id="profileName" required maxlength="40" placeholder="例如：我的学习工作台"></div><div class="field"><label for="profileRole">说明 / 研究领域</label><input id="profileRole" maxlength="80" placeholder="例如：课题研究 / 专业学习 / 项目研发"></div></div><div style="display:flex;gap:10px"><button class="primary" id="saveProfile">添加用户</button><button type="button" class="secondary" id="cancelProfileEdit" hidden>取消修改</button></div><div id="userMessage" class="form-message" role="alert"></div></form></div></dialog>
 
 <dialog id="aiManager" aria-labelledby="aiManagerTitle">
- <div class="modalhead"><h2 id="aiManagerTitle">AI 管理</h2><button type="button" class="icon-button" data-close="aiManager" aria-label="关闭">✕</button></div>
+ <div class="modalhead"><h2 id="aiManagerTitle">AI 助手连接器</h2><button type="button" class="icon-button" data-close="aiManager" aria-label="关闭">✕</button></div>
  <div class="modalbody bridge">
-  <div class="bridge-hero">
-   <div><p class="eyebrow">连接器与授权</p><h3>让助手安全地读写这个工作台</h3><p class="section-note">当前用户 <strong id="bridgeCurrentProfile"></strong>。原附件留在本机，只有被授权的助手能读取发布的内容。</p></div>
+  <div class="bridge-status-bar">
+   <span class="bridge-status-copy">当前工作台 <strong id="bridgeCurrentProfile"></strong> · 原文件留在本机，仅授权助手可按范围读写</span>
    <p id="bridgeStatus" class="bridge-status" role="status">尚未连接。</p>
   </div>
   <section class="bridge-card">
-   <header class="bridge-card-head"><h3><span class="bridge-step">1</span>连接服务</h3><div class="bridge-card-actions"><button class="primary" type="button" id="bridgeDesktopConnect" hidden>启动并连接本机服务</button><button class="primary" type="button" id="bridgeConnect">连接并发布快照</button><button class="secondary" type="button" id="bridgeImportConnection">导入连接文件</button><input type="file" id="bridgeConnectionFile" accept=".json" hidden><button class="secondary" type="button" id="bridgeDisconnect">断开</button></div></header>
-   <div class="bridge-fields">
-    <div class="field"><label for="bridgeUrl">服务地址</label><input id="bridgeUrl" type="url" value="http://127.0.0.1:4318" spellcheck="false"></div>
-    <div class="field"><label for="bridgeAdminToken">管理令牌</label><input id="bridgeAdminToken" type="password" autocomplete="off" placeholder="点「启动并连接本机服务」后自动填入"></div>
-   </div>
-   <div class="bridge-options" role="group" aria-label="快照内容">
-    <span class="bridge-options-label">快照包含</span>
-    <label><input type="checkbox" id="bridgeIncludeBody"> 正文</label>
-    <label><input type="checkbox" id="bridgeIncludePdf"> 近期 PDF 文本摘录</label>
-    <label><input type="checkbox" id="bridgeAutoSync" checked> 软件运行时自动同步，无需逐条确认</label>
-    <label id="bridgeRememberOption" hidden><input type="checkbox" id="bridgeRemember" checked> 记住连接，下次打开自动连接</label>
-   </div>
-   <p class="section-note" id="bridgeCredentialNote">默认发布标题、作者、标签、状态与附件清单；网页版连接凭证只在本次打开的页面中使用。</p>
+   <header class="bridge-card-head">
+    <h3><span class="bridge-step">1</span>接入服务</h3>
+    <div class="bridge-card-actions">
+     <button class="primary" type="button" id="bridgeDesktopConnect" hidden>启动并连接本机服务</button>
+     <button class="secondary" type="button" id="bridgePublish">刷新快照</button>
+     <button class="secondary" type="button" id="bridgeDisconnect">断开</button>
+    </div>
+   </header>
+   <details class="bridge-advanced" id="bridgeAdvancedOptions" open>
+    <summary>远程服务地址、令牌与快照同步选项</summary>
+    <div class="bridge-advanced-body">
+     <div class="bridge-fields">
+      <div class="field"><label for="bridgeUrl">服务地址</label><input id="bridgeUrl" type="url" value="http://127.0.0.1:4318" spellcheck="false"></div>
+      <div class="field"><label for="bridgeAdminToken">管理令牌</label><input id="bridgeAdminToken" type="password" autocomplete="off" placeholder="本机启动时自动填入，或导入连接文件"></div>
+     </div>
+     <div class="bridge-card-actions">
+      <button class="primary" type="button" id="bridgeConnect">连接并发布快照</button>
+      <button class="secondary" type="button" id="bridgeImportConnection">导入连接文件</button>
+      <input type="file" id="bridgeConnectionFile" accept=".json" hidden>
+     </div>
+     <div class="bridge-options" role="group" aria-label="快照内容">
+      <span class="bridge-options-label">快照包含</span>
+      <label><input type="checkbox" id="bridgeIncludeBody"> 正文</label>
+      <label><input type="checkbox" id="bridgeIncludePdf"> 近期 PDF 摘录</label>
+      <label><input type="checkbox" id="bridgeAutoSync" checked> 自动同步队列</label>
+      <label id="bridgeRememberOption" hidden><input type="checkbox" id="bridgeRemember" checked> 下次自动重连</label>
+     </div>
+     <p class="section-note" id="bridgeCredentialNote">默认发布标题、作者、标签、状态与附件清单；网页版连接凭证只在本次打开的页面中使用。</p>
+    </div>
+   </details>
   </section>
   <section class="bridge-card">
-   <header class="bridge-card-head"><h3><span class="bridge-step">2</span>助手与权限</h3><p class="section-note">权限只作用于当前工作台，可随时撤销或删除。</p></header>
+   <header class="bridge-card-head"><h3><span class="bridge-step">2</span>助手凭证与权限</h3><span class="tiny">独立令牌随时可撤销</span></header>
    <form id="bridgeAgentForm">
-    <div class="bridge-fields"><div class="field"><label for="bridgeAgentName">助手名称</label><input id="bridgeAgentName" maxlength="60" placeholder="例如 Grok bot" required></div></div>
-    <div class="bridge-scopes" role="group" aria-label="助手权限">
-     <label><input type="checkbox" data-bridge-scope="records:read"> <span>读取快照<small>浏览标题、标签与已发布正文</small></span></label>
-     <label><input type="checkbox" data-bridge-scope="records:create" checked> <span>新增记录<small>创建计划、笔记或整理结果</small></span></label>
-     <label><input type="checkbox" data-bridge-scope="records:update"> <span>更新记录<small>改标签、追加总结（需版本校验）</small></span></label>
-     <label><input type="checkbox" data-bridge-scope="records:delete"> <span>删除记录及附件<small>删除会先进入回收站</small></span></label>
-     <label><input type="checkbox" data-bridge-scope="files:read"> <span>读取服务附件<small>下载已上传的附件</small></span></label>
-     <label><input type="checkbox" data-bridge-scope="files:write"> <span>上传附件<small>把代码或资料存入资料库</small></span></label>
-     <label><input type="checkbox" data-bridge-scope="subtitles:read"> <span>读取视频字幕<small>查找视频并按需读取字幕文本</small></span></label>
-     <label><input type="checkbox" data-bridge-scope="subtitles:write"> <span>写入视频字幕<small>回填中文字幕或追加定时字幕</small></span></label>
+    <div class="bridge-create-bar">
+     <input id="bridgeAgentName" maxlength="60" placeholder="输入助手名称，如 Grok / Claude" aria-label="助手名称" required>
+     <div class="bridge-preset-group" role="group" aria-label="权限预设">
+      <button type="button" data-bridge-preset="read">只读</button>
+      <button type="button" data-bridge-preset="write">可写</button>
+      <button type="button" id="bridgeGrantFull">完整权限</button>
+     </div>
+     <button type="submit" class="primary">生成助手凭证</button>
     </div>
-    <div class="bridge-presets">
-     <span class="bridge-options-label">快速选择</span>
-     <button type="button" class="secondary" data-bridge-preset="read">只读</button>
-     <button type="button" class="secondary" data-bridge-preset="write">可写</button>
-     <button type="button" class="secondary" id="bridgeGrantFull">完整工作台权限</button>
-     <span class="bridge-preset-gap"></span>
-     <button type="submit" class="primary">创建助手凭证</button>
-    </div>
+    <details class="bridge-scopes-fold" id="bridgeScopesFold">
+     <summary>按需微调 8 项细粒度权限</summary>
+     <div class="bridge-scopes" role="group" aria-label="助手权限">
+      <label><input type="checkbox" data-bridge-scope="records:read"> <span>读取快照<small>标题、标签与已发布正文</small></span></label>
+      <label><input type="checkbox" data-bridge-scope="records:create" checked> <span>新增记录<small>创建计划、笔记或整理结果</small></span></label>
+      <label><input type="checkbox" data-bridge-scope="records:update"> <span>更新记录<small>改标签、追加总结</small></span></label>
+      <label><input type="checkbox" data-bridge-scope="records:delete"> <span>删除记录<small>删除会先进入回收站</small></span></label>
+      <label><input type="checkbox" data-bridge-scope="files:read"> <span>读取附件<small>下载已上传的服务附件</small></span></label>
+      <label><input type="checkbox" data-bridge-scope="files:write"> <span>上传附件<small>把代码或资料存入资料库</small></span></label>
+      <label><input type="checkbox" data-bridge-scope="subtitles:read"> <span>读取字幕<small>按需读取视频字幕文本</small></span></label>
+      <label><input type="checkbox" data-bridge-scope="subtitles:write"> <span>写入字幕<small>回填中文字幕或定时轴</small></span></label>
+     </div>
+    </details>
    </form>
    <div class="bridge-token" id="bridgeNewTokenPanel" hidden>
-    <div class="field"><label for="bridgeNewToken">助手令牌 · 仅此处显示</label><textarea id="bridgeNewToken" rows="2" readonly></textarea></div>
-    <div class="field"><label for="bridgeMcpUrl">Grok 连接器地址（MCP）</label><input id="bridgeMcpUrl" type="text" readonly></div>
-    <p class="section-note">Grok 网页版需要公网可访问的 HTTPS 地址；本机地址可用于本地验证。只把这个令牌交给助手，不要提供管理令牌。</p>
-    <div class="bridge-actions"><button class="secondary" type="button" id="bridgeCopyToken">复制令牌</button><button class="secondary" type="button" id="bridgeCopyMcp">复制连接器地址</button><button class="secondary" type="button" id="bridgeTestMcp">验证 MCP 接入</button></div>
+    <div class="field"><label for="bridgeNewToken">助手令牌 · 仅此处显示一次</label><textarea id="bridgeNewToken" rows="2" readonly></textarea></div>
+    <div class="field"><label for="bridgeMcpUrl">MCP 连接器地址</label><input id="bridgeMcpUrl" type="text" readonly></div>
+    <div class="bridge-actions"><button class="secondary" type="button" id="bridgeCopyToken">复制令牌</button><button class="secondary" type="button" id="bridgeCopyMcp">复制 MCP 地址</button><button class="secondary" type="button" id="bridgeTestMcp">验证 MCP 接入</button></div>
     <p class="section-note" id="bridgeMcpStatus" role="status"></p>
    </div>
    <div id="bridgeAgentList" class="bridge-agent-list"></div>
   </section>
   <section class="bridge-card">
-   <header class="bridge-card-head"><h3><span class="bridge-step">3</span>同步队列</h3><div class="bridge-card-actions"><button class="primary" type="button" id="bridgeSync">立即同步</button><button class="secondary" type="button" id="bridgePublish">更新快照</button></div></header>
+   <header class="bridge-card-head"><h3><span class="bridge-step">3</span>同步队列</h3><div class="bridge-card-actions"><button class="primary" type="button" id="bridgeSync">立即同步</button><button class="secondary" type="button" id="bridgeDownloadGuide">接入说明</button></div></header>
    <div id="bridgeTaskList"></div>
+   <div class="bridge-bottom-row">
+    <details class="bridge-audit"><summary>查看近期审计日志</summary><pre id="bridgeAudit"></pre></details>
+   </div>
   </section>
-  <details class="bridge-card bridge-audit"><summary>近期操作</summary><pre id="bridgeAudit"></pre></details>
-  <div class="bridge-foot"><button class="secondary" type="button" id="bridgeDownloadGuide">下载当前助手接入说明</button></div>
  </div>
 </dialog>
 <dialog id="reader" class="attachment-reader" aria-labelledby="readerTitle">
@@ -422,5 +442,5 @@ $('backupBtn').onclick=()=>$('backup').showModal();function download(name,text,t
 <script src="reminders.js"></script><script src="dashboard-widgets.js"></script><script src="record-folders.js"></script><script src="plans.js"></script><script src="ai-subtitles.js"></script><script src="ai-management.js"></script><script src="notebook-v2.js"></script><script src="trash.js"></script><script src="pdf-search.js"></script><script src="pdf-research.js"></script>
 <script src="library-folders.js"></script><script src="reader-tabs.js"></script><script src="workspace-context-menu.js"></script><script src="folder-context-menu.js"></script><script src="folder-manager.js"></script>
 <script src="minisearch.min.js"></script><script src="workspace-search.js"></script>
-<script src="workspace-home.js"></script><script src="workspace-toolbar.js"></script><script src="presentation-handout.js"></script><script src="workspace-motion.js"></script>
+<script src="workspace-home.js"></script><script src="workspace-toolbar.js"></script><script src="presentation-handout.js"></script><script src="achievement-cards.js"></script><script src="task-center.js"></script><script src="sync-foundation.js"></script><script src="file-drop-triage.js"></script><script src="workspace-motion.js"></script>
 </body></html>

@@ -86,27 +86,35 @@ function countdownLabel(days){
 }
 let activityChartMode='bars';
 function widgetActivity(counts,now){
+ const usedDays=window.DoNoteUsage?.collectActiveDays?.(activeProfile())||new Set([today()]);
  const days=[];
  for(let offset=55;offset>=0;offset--){
   const date=today(new Date(now.getFullYear(),now.getMonth(),now.getDate()-offset));
-  days.push([date,counts.get(date)||0]);
+  const recCount=counts.get(date)||0;
+  const visited=usedDays.has(date)||recCount>0;
+  days.push([date,recCount,visited]);
  }
- const recent7=days.slice(-7),max7=Math.max(3,...recent7.map(([,c])=>c));
+ const recent7=days.slice(-7),max7=Math.max(3,...recent7.map(([,c,v])=>c||(v?1:0)));
  const weekNames=['日','一','二','三','四','五','六'];
- const bars='<div class="activity-bars"'+(activityChartMode==='heat'?' hidden':'')+' aria-label="近 7 天活跃柱状图">'+recent7.map(([date,count],idx)=>{
-  const pct=count?Math.max(18,Math.round(count/max7*100)):6;
+ const tipFor=(date,count,visited)=>count>0?(date+' · 已活跃 · '+count+' 条记录'):visited?(date+' · 当日已打开使用工作台'):(date+' · 未打开');
+ const bars='<div class="activity-bars"'+(activityChartMode==='heat'?' hidden':'')+' aria-label="近 7 天活跃柱状图">'+recent7.map(([date,count,visited],idx)=>{
+  const effective=count>0?count:(visited?0.75:0);
+  const pct=effective>0?Math.max(22,Math.round(effective/max7*100)):6;
   const dow=weekNames[new Date(date+'T00:00:00').getDay()];
-  return '<div class="activity-bar-col'+(idx===6?' is-today':'')+'" title="'+date+' · '+count+' 条记录">'
-   +'<span class="activity-bar-track"><i class="activity-bar-fill'+(count?' has-value':'')+'" style="--bar-pct:'+pct+'%"></i></span>'
+  return '<div class="activity-bar-col'+(idx===6?' is-today':'')+'" title="'+tipFor(date,count,visited)+'">'
+   +'<span class="activity-bar-track"><i class="activity-bar-fill'+(visited?' has-value':'')+(visited&&!count?' is-visit-only':'')+'" style="--bar-pct:'+pct+'%"></i></span>'
    +'<small>'+(idx===6?'今':dow)+'</small></div>';
  }).join('')+'</div>';
- const heat='<div class="activity"'+(activityChartMode==='bars'?' hidden':'')+' aria-label="近 8 周记录分布">'+days.map(([date,count])=>'<div class="cell '+(count?'l'+Math.min(count,3):'')
-  +'" title="'+date+' · '+count+' 条记录"></div>').join('')+'</div>';
+ const heat='<div class="activity"'+(activityChartMode==='bars'?' hidden':'')+' aria-label="近 8 周使用与记录足迹">'+days.map(([date,count,visited])=>{
+  const lv=count>=3?'l3':count>=1?'l2':visited?'l1':'';
+  return '<div class="cell '+lv+'" title="'+tipFor(date,count,visited)+'"></div>';
+ }).join('')+'</div>';
  const switcher='<div class="activity-mode-switch" role="group" aria-label="视图切换">'
   +'<button type="button" data-activity-mode="bars" class="'+(activityChartMode==='bars'?'active':'')+'">7天</button>'
   +'<button type="button" data-activity-mode="heat" class="'+(activityChartMode==='heat'?'active':'')+'">8周</button></div>';
+ const activeSpanDays=days.filter(([,,visited])=>visited).length;
  return switcher+bars+heat+'<div class="heat-foot"><span>'
-  +days.filter(([,count])=>count>0).length+' 天有产出</span><span>共 '+days.reduce((s,[,c])=>s+c,0)+' 条</span></div>';
+  +activeSpanDays+' 天留下足迹</span><span>共 '+records.filter(r=>!r.flashcardKind).length+' 条记录</span></div>';
 }
 function widgetPlanLinks(plans){
  return '<div class="widget-plan-list">'+plans.slice(0,3).map(plan=>'<button type="button" data-widget-plan="'+esc(plan.id)+'" title="'+esc(plan.title)+'">'+esc(plan.title)+'</button>').join('')+'</div>';

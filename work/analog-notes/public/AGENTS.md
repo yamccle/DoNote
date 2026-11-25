@@ -47,5 +47,11 @@
 - `video-subtitles.js` 同步播放位置和当前字幕，按用户操作定位字幕；「识别时同步翻译」开关让识别与离线翻译并行，逐条产出中文字幕。
 - `video-subtitles.css` 提供字幕操作、任务进度和当前字幕的状态样式。
 - `video-player-learning.js` 在学习控制栏保留字幕显示开关。
+- `achievement-cards.js` 记录每日打开/使用活跃足迹与专注分钟数 (`DoNoteUsage`)，驱动成就殿宇 10 张里程碑卡牌（保留 01 集成电路溯源卡，涵盖即时入库与跨日长期坚持目标）与 3D 翻面预览。
+- `task-center.js` 提供 `window.DoNoteTasks` 统一后台任务中心，在工作台顶栏与全屏阅读器浮标实时汇总更新下载、语音识别、双语翻译、备份恢复、批量入库、网页收藏与多端同步进度。
+- `file-drop-triage.js` 和 `file-drop-triage.css` 提供篮板式全局拖拽投递浮层与「投递归档分拣台」，支持入库前一键清洗标题、选择栏目或合并附件、即时新建子文件夹与套用研究标签。
+- `sync-foundation.js` 提供 `window.DoNoteSync` 多端同步底座，维护本机设备标识、记录单调版本戳 `syncMeta`、删除墓碑、附件 SHA-256 指纹及 `/api/sync/v1` 增量握手同步。
+- `ai-management.js` 驱动精简版 AI 助手连接器弹窗，桌面端突出一键连接并折叠高级配置与 8 项细粒度权限。
+- `workspace-evolution.css` 定义侧边栏宁缺毋滥微层次、精简版 AI 管理页、后台任务中心与多端同步设置卡片样式。
 
 [PROTOCOL]: Update this header on change, then check AGENTS.md

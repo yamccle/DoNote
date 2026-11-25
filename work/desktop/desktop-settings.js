@@ -58,62 +58,21 @@
 }
 
 {
-  const about = document.getElementById('aboutDoNote'), version = document.getElementById('aboutVersion');
-  const dialog = document.getElementById('analogFlashcard'), flip = document.getElementById('flashcardFlip');
-  const save = document.getElementById('flashcardSave');
-  const panel = document.getElementById('desktopSettings');
-  const cards = [{ kind: 'analog-v1', number: '001', title: '信号路径', image: 'analog-flashcard.png' }];
-  const capacity = 10;
-  let clicks = 0, lastClick = 0, unlocking = false;
-  const collectible = () => records.find(note => note.flashcardKind === 'analog-v1');
-  const unlockedCards = () => cards.filter(card => records.some(note => note.flashcardKind === card.kind)).sort((a, b) => Number(a.number) - Number(b.number));
-  const refresh = () => { save.textContent = collectible() ? '查看成就殿宇' : unlocking ? '正在解锁…' : '重试解锁'; save.disabled = unlocking; };
-  const showHall = () => { if (dialog.open) dialog.close(); switchView('pinned'); tab = 'achievements'; render(); };
-  const unlock = async () => {
-    if (collectible() || unlocking) { refresh(); return; }
-    if (!ready) { toast('资料库尚未就绪，稍后可重试解锁。'); refresh(); return; }
-    unlocking = true; refresh();
-    try {
-      await put({
-        id: crypto.randomUUID(), type: 'custom-achievement', title: '设计闪卡 001 · 信号路径', date: today(),
-        body: '先理解信号路径，再优化每个指标。\n从输入到输出，标出增益、带宽、噪声与反馈。每次改动，都回到这条路径验证。',
-        tags: [], status: '已解锁', pinned: false, attachments: [], flashcardKind: 'analog-v1'
-      });
-      render(); toast('已解锁成就闪卡 001。', { label: '查看殿宇', run: showHall });
-    } catch (error) { toast('解锁失败：' + error.message); }
-    finally { unlocking = false; refresh(); }
-  };
-  const open = () => {
-    if (about.open) about.close();
-    if (panel?.matches(':popover-open')) panel.hidePopover();
-    flip.setAttribute('aria-pressed', 'false');
-    dialog.showModal();
-    refresh();
-    void unlock();
-  };
-  version.addEventListener('selectstart', event => event.preventDefault());
-  flip.addEventListener('dragstart', event => event.preventDefault());
-  version.addEventListener('click', event => {
-    event.stopPropagation();
-    const now = Date.now();
-    clicks = now - lastClick > 4000 ? 1 : clicks + 1;
-    lastClick = now;
-    if (clicks >= 5) { clicks = 0; open(); }
-  });
-  dialog.querySelectorAll('[data-close-flashcard]').forEach(button => button.addEventListener('click', () => dialog.close()));
-  flip.addEventListener('click', () => flip.setAttribute('aria-pressed', String(flip.getAttribute('aria-pressed') !== 'true')));
-  save.addEventListener('click', () => { if (collectible()) showHall(); else void unlock(); });
-  window.openAnalogFlashcard = open;
-  window.renderAchievementHall = () => {
-    const unlocked = unlockedCards();
-    const host = document.getElementById('records');
-    host.classList.toggle('achievement-display', view === 'pinned' && tab === 'achievements');
-    document.querySelector('.searchrow').hidden = view === 'pinned' && tab === 'achievements';
-    if (view !== 'pinned' || tab !== 'achievements') return;
-    document.getElementById('libraryPager').hidden = true;
-    host.innerHTML = '<section class="achievement-hall" aria-label="成就殿宇"><div class="achievement-hall-heading"><div><span>DONOTE · ACHIEVEMENTS</span><h3>成就殿宇</h3><p>每张卡记录一次值得珍藏的发现。</p></div><strong>已解锁 ' + unlocked.length + ' / ' + capacity + '</strong></div><div class="achievement-grid">' + unlocked.map(card => '<button type="button" class="achievement-tile" data-achievement="' + card.kind + '" aria-label="打开成就闪卡 ' + card.number + ' ' + card.title + '"><img src="' + card.image + '" draggable="false" alt=""><span>NO. ' + card.number + '</span><strong>' + card.title + '</strong></button>').join('') + '</div></section>';
-    host.querySelectorAll('[data-achievement]').forEach(button => button.addEventListener('click', open));
-  };
+  const version = document.getElementById('aboutVersion');
+  let clicks = 0, lastClick = 0;
+  if (version) {
+    version.addEventListener('selectstart', event => event.preventDefault());
+    version.addEventListener('click', event => {
+      event.stopPropagation();
+      const now = Date.now();
+      clicks = now - lastClick > 4000 ? 1 : clicks + 1;
+      lastClick = now;
+      if (clicks >= 5) {
+        clicks = 0;
+        window.openAnalogFlashcard?.();
+      }
+    });
+  }
 }
 
 {
@@ -251,7 +210,7 @@
 
     panel.addEventListener('click', event => {
       const button = event.target.closest('button');
-      if (!button || button.disabled || button.hasAttribute('data-settings-group') || button.id === 'desktopSettingsClose' || button.id === 'aboutVersion' || button.id === 'settingsOpenAsrFolder') return;
+      if (!button || button.disabled || button.hasAttribute('data-settings-group') || button.id === 'desktopSettingsClose' || button.id === 'aboutVersion' || button.id === 'settingsOpenAsrFolder' || button.id === 'settingsCheckOnlineUpdate') return;
       const { control, command } = button.dataset;
       if (!control && !command) return;
       if (control === 'themeToggle') {
@@ -309,6 +268,163 @@
     };
     document.getElementById('videoCaptionSettingsForm').onsubmit = event => { event.preventDefault(); saveCaptionFields(); captionDialog.close(); };
     about.querySelectorAll('[data-close-about]').forEach(button => button.addEventListener('click', () => about.close()));
+
+    // GitHub 自动在线更新检查、增量/完整包智能下载与 SHA-256 校验衔接
+    const updDialog = document.getElementById('onlineUpdateDialog');
+    const updStatus = document.getElementById('onlineUpdateStatus');
+    const updRemote = document.getElementById('onlineUpdateRemote');
+    const updStrategy = document.getElementById('onlineUpdateStrategy');
+    const updNotes = document.getElementById('onlineUpdateNotes');
+    const updProg = document.getElementById('onlineUpdateProgress');
+    const updAction = document.getElementById('onlineUpdateActionBtn');
+    const updCancel = document.getElementById('onlineUpdateCancelBtn');
+    const updRecheck = document.getElementById('onlineUpdateRecheck');
+    let updCandidate = null, updState = 'idle', updReqId = '';
+
+    function startOnlineCheck() {
+      updState = 'checking';
+      updCandidate = null;
+      updReqId = crypto.randomUUID();
+      updRemote.textContent = '正在查询…';
+      updStrategy.textContent = '自动优选增量补丁';
+      updStatus.textContent = '正在查询 GitHub Releases 最新正式版本…';
+      updNotes.hidden = true;
+      updProg.hidden = true;
+      updAction.hidden = true;
+      updCancel.hidden = true;
+      updRecheck.disabled = true;
+      host.postMessage({ type: 'online-update', action: 'check', id: updReqId });
+    }
+
+    document.getElementById('settingsCheckOnlineUpdate')?.addEventListener('click', () => {
+      if (panel.matches(':popover-open')) panel.hidePopover();
+      if (!updDialog.open) updDialog.showModal();
+      if (updState !== 'downloading') startOnlineCheck();
+    });
+    updDialog?.querySelectorAll('[data-close-online-update]').forEach(b => b.addEventListener('click', () => updDialog.close()));
+    document.getElementById('onlineUpdateLocalFallback')?.addEventListener('click', () => {
+      updDialog.close();
+      host.postMessage('install-update');
+    });
+    updRecheck?.addEventListener('click', () => { if (updState !== 'downloading') startOnlineCheck(); });
+    updCancel?.addEventListener('click', () => {
+      host.postMessage({ type: 'online-update', action: 'cancel', id: updReqId });
+    });
+    updAction?.addEventListener('click', () => {
+      if (updState === 'ready-download' && updCandidate) {
+        updState = 'downloading';
+        updReqId = crypto.randomUUID();
+        updProg.hidden = false;
+        updProg.value = 0;
+        updAction.disabled = true;
+        updAction.textContent = '正在下载…';
+        updCancel.hidden = false;
+        updRecheck.disabled = true;
+        updStatus.textContent = '正在下载 ' + updCandidate.assetName + '…（可关闭此窗口，在右上角后台任务中心查看进度）';
+        window.DoNoteTasks?.upsert('online-update', {
+          title: '下载软件更新 ' + updCandidate.tag,
+          detail: updCandidate.assetName,
+          percent: 0,
+          state: 'running',
+          onOpen: () => { if (!updDialog.open) updDialog.showModal(); }
+        });
+        host.postMessage({
+          type: 'online-update', action: 'download', id: updReqId,
+          assetUrl: updCandidate.assetUrl, assetName: updCandidate.assetName,
+          assetSize: updCandidate.assetSize, assetSha256: updCandidate.assetSha256 || ''
+        });
+      } else if (updState === 'downloaded') {
+        if (!confirm('更新包已通过 SHA-256 与清单校验。\n请先确认正在编辑的记录已保存；点击确定后将自动备份旧程序、完成升级并重启 DoNote（您的 Data 资料与本地模型完全保留）。')) return;
+        host.postMessage({ type: 'online-update', action: 'apply-downloaded', id: crypto.randomUUID() });
+      }
+    });
+
+    host.addEventListener('message', event => {
+      const msg = event.data;
+      if (msg?.type === 'online-update-progress') {
+        const mbDone = (msg.received / 1048576).toFixed(1), mbTotal = msg.total > 0 ? (msg.total / 1048576).toFixed(1) : '?';
+        updProg.hidden = false;
+        updProg.value = msg.percent || 0;
+        updStatus.textContent = '正在下载 ' + msg.assetName + ' · ' + mbDone + ' / ' + mbTotal + ' MB（' + (msg.percent || 0) + '%）';
+        window.DoNoteTasks?.upsert('online-update', {
+          title: '下载软件更新',
+          detail: mbDone + ' / ' + mbTotal + ' MB（' + (msg.percent || 0) + '%）',
+          percent: msg.percent || 0,
+          state: 'running',
+          onOpen: () => { if (!updDialog.open) updDialog.showModal(); }
+        });
+        return;
+      }
+      if (msg?.type === 'online-update-result') {
+        updRecheck.disabled = false;
+        updCancel.hidden = true;
+        if (msg.cancelled) {
+          updState = updCandidate ? 'ready-download' : 'idle';
+          updProg.hidden = true;
+          updAction.disabled = false;
+          updAction.hidden = !updCandidate;
+          if (updCandidate) updAction.textContent = '下载并验证更新';
+          updStatus.textContent = '已取消下载。';
+          window.DoNoteTasks?.remove('online-update');
+          return;
+        }
+        if (msg.error) {
+          updState = updCandidate ? 'ready-download' : 'idle';
+          updProg.hidden = true;
+          updAction.disabled = false;
+          updAction.hidden = !updCandidate;
+          if (updCandidate) updAction.textContent = '重试下载';
+          updStatus.textContent = msg.error;
+          window.DoNoteTasks?.upsert('online-update', { title: '软件更新未完成', detail: msg.error, state: 'error' });
+          return;
+        }
+        if (msg.downloaded) {
+          updState = 'downloaded';
+          updProg.hidden = false;
+          updProg.value = 100;
+          updAction.hidden = false;
+          updAction.disabled = false;
+          updAction.textContent = '立即重启并安装 ' + msg.targetVersion;
+          updStatus.textContent = '✓ 已下载并通过 SHA-256 与文件清单校验（' + msg.assetName + '），点击右下角按钮即可无损升级。';
+          window.DoNoteTasks?.upsert('online-update', {
+            title: '更新包 ' + msg.targetVersion + ' 已就绪',
+            detail: '校验通过，点击打开安装',
+            percent: 100,
+            state: 'done',
+            onOpen: () => { if (!updDialog.open) updDialog.showModal(); }
+          });
+          toast('DoNote ' + msg.targetVersion + ' 更新包已校验就绪', {
+            label: '立即安装',
+            run: () => { if (!updDialog.open) updDialog.showModal(); }
+          });
+          return;
+        }
+        if (msg.hasUpdate === false) {
+          updState = 'up-to-date';
+          updRemote.textContent = msg.remoteVersion + (msg.tag ? ' (' + msg.tag + ')' : '');
+          updStrategy.textContent = '无需更新';
+          updStatus.textContent = '✓ 当前已是最新正式版本（' + msg.currentVersion + '）。';
+          updAction.hidden = true;
+          return;
+        }
+        if (msg.hasUpdate) {
+          updState = 'ready-download';
+          updCandidate = msg;
+          updRemote.textContent = msg.remoteVersion + ' (' + msg.tag + ')';
+          const sizeStr = msg.assetSize < 1048576 ? (msg.assetSize / 1024).toFixed(0) + ' KB' : (msg.assetSize / 1048576).toFixed(1) + ' MB';
+          updStrategy.textContent = (msg.downloadMode === 'patch' ? '增量极速补丁 · ' : '跨版本完整包 · ') + sizeStr;
+          updStatus.textContent = '发现新版本 ' + msg.remoteVersion + '！系统已自动匹配最适合您当前版本的' + (msg.downloadMode === 'patch' ? '增量更新补丁' : '完整安装包') + '，下载后将自动校验 SHA-256。';
+          if (msg.releaseNotes) {
+            updNotes.textContent = msg.releaseNotes;
+            updNotes.hidden = false;
+          }
+          updAction.hidden = false;
+          updAction.disabled = false;
+          updAction.textContent = '下载并验证更新（' + sizeStr + '）';
+          return;
+        }
+      }
+    });
 
     host.addEventListener('message', event => {
       if (event.data?.type === 'translation-settings') refreshTranslationSummary();

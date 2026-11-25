@@ -77,6 +77,7 @@ internal sealed partial class WorkspaceWindow : Form
             StopBilingualPairProcesses();
             StopNativeBackup(false);
             StopCloudBackupTransfer();
+            StopOnlineUpdateDownload();
             StopMinerUReflow();
             StopPdf2zh();
         };
@@ -319,6 +320,7 @@ internal sealed partial class WorkspaceWindow : Form
             if (await HandleDocumentTranslationMessage(web, objectMessage)) return;
             if (await HandleMinerUReflowMessage(web, objectMessage)) return;
             if (await HandleCloudBackupMessage(web, objectMessage)) return;
+            if (await HandleOnlineUpdateMessage(web, objectMessage)) return;
             if (HandleLargeBackupMessage(web, objectMessage)) return;
             if (HandleAiModelMessage(web, args.WebMessageAsJson)) return;
             if (await HandleAiCredentialMessage(web, args.WebMessageAsJson)) return;

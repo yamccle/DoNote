@@ -122,6 +122,25 @@
       </div>
      </div>
     </div>
+    <div class="settings-card" id="settingsSyncFoundationCard">
+     <h3>多端在线同步底座（跨设备协同）</h3>
+     <div class="settings-row">
+      <span class="settings-row-text"><strong>本机工作台节点</strong><small id="settingsSyncDeviceMeta">设备指纹与增量变更日志已就绪</small></span>
+      <div class="settings-inline-actions">
+       <input id="settingsSyncDeviceName" class="settings-inline-input" maxlength="40" placeholder="本机桌面工作台" aria-label="本机设备名称">
+       <button type="button" class="secondary settings-mini-btn" id="settingsSyncPrepareHashes">补齐指纹</button>
+      </div>
+     </div>
+     <div class="settings-row settings-sync-endpoint-row">
+      <span class="settings-row-text"><strong>远端 / 局域网同步节点</strong><small id="settingsSyncStatusText">填入另一台电脑或自建同步服务的地址与令牌，即可握手同步增量记录与去重附件</small></span>
+      <div class="settings-inline-actions settings-sync-controls">
+       <input id="settingsSyncEndpoint" class="settings-inline-input" type="url" spellcheck="false" placeholder="http://127.0.0.1:4318" aria-label="同步服务地址">
+       <input id="settingsSyncToken" class="settings-inline-input" type="password" autocomplete="off" placeholder="同步管理令牌（本机已连接时可留空）" aria-label="同步管理令牌">
+       <button type="button" class="secondary settings-mini-btn" id="settingsSyncProbeBtn">检测握手</button>
+       <button type="button" class="primary settings-mini-btn" id="settingsSyncNowBtn">立即同步</button>
+      </div>
+     </div>
+    </div>
     <div class="settings-card settings-about-card">
      <div class="settings-about-brand">
       <img src="brand-logo.png" alt="DoNote" width="38" height="38">
@@ -131,7 +150,8 @@
       </div>
      </div>
      <div class="settings-inline-actions">
-      <button type="button" class="secondary settings-mini-btn" data-command="install-update">安装更新包…</button>
+      <button type="button" class="primary settings-mini-btn" id="settingsCheckOnlineUpdate">检查在线更新</button>
+      <button type="button" class="secondary settings-mini-btn" data-command="install-update">本地更新包…</button>
       <button type="button" class="secondary settings-mini-btn is-danger" data-command="exit-desktop">退出软件</button>
      </div>
     </div>
@@ -140,6 +160,30 @@
  </div>
 </section>
 
+<dialog id="onlineUpdateDialog" class="compact-dialog" aria-labelledby="onlineUpdateTitle">
+ <div class="modalhead">
+  <h2 id="onlineUpdateTitle">检查与下载更新</h2>
+  <button type="button" class="icon-button" data-close-online-update aria-label="关闭">✕</button>
+ </div>
+ <div class="modalbody online-update-body">
+  <div class="online-update-summary">
+   <div><small>本机当前版本</small><strong id="onlineUpdateCurrent">{{DONOTE_VERSION}}</strong></div>
+   <div><small>GitHub 最新正式版</small><strong id="onlineUpdateRemote">正在连接…</strong></div>
+   <div><small>匹配更新策略</small><strong id="onlineUpdateStrategy">自动优选增量包</strong></div>
+  </div>
+  <p id="onlineUpdateStatus" class="section-note" role="status">正在连接 GitHub Releases 检查最新版本…</p>
+  <progress id="onlineUpdateProgress" max="100" hidden></progress>
+  <pre id="onlineUpdateNotes" class="online-update-notes" hidden></pre>
+ </div>
+ <div class="modalfoot">
+  <button type="button" class="secondary" id="onlineUpdateLocalFallback">选择本地 ZIP…</button>
+  <div class="right">
+   <button type="button" class="secondary" id="onlineUpdateCancelBtn" hidden>取消下载</button>
+   <button type="button" class="secondary" id="onlineUpdateRecheck">重新检查</button>
+   <button type="button" class="primary" id="onlineUpdateActionBtn" hidden>下载并验证更新</button>
+  </div>
+ </div>
+</dialog>
 <dialog id="aboutDoNote" class="about-donote" aria-labelledby="aboutDoNoteTitle">
  <div class="about-donote-head"><span>关于 DoNote</span><button type="button" data-close-about aria-label="关闭">×</button></div>
  <div class="about-donote-body">
