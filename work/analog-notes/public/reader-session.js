@@ -36,7 +36,7 @@ function loadReadingCheckpoint(profileId, id, durable) {
 
 function legacyReadingAttachment(note, progress) {
   if (!progress) return null;
-  return note?.attachments?.find(progress.kind === 'video' ? fileIsVideo : fileIsPdf);
+  return note?.attachments?.find(progress.kind === 'video' ? fileIsVideo : progress.kind === 'presentation' ? fileIsPresentation : fileIsPdf);
 }
 
 function storeSessionCheckpoint(session, progress) {
@@ -128,7 +128,7 @@ function createReadingSession(file, kind) {
   const checkpoint = attachmentCheckpoint ||
     (!hasAttachmentProgress && legacyReadingAttachment(owner, legacy)?.id === file.id ? legacy : null);
   const hasOtherReadableFile = owner?.attachments.some(attachment =>
-    attachment.id !== file.id && (fileIsPdf(attachment) || fileIsVideo(attachment)));
+    attachment.id !== file.id && (fileIsPdf(attachment) || fileIsVideo(attachment) || fileIsPresentation(attachment)));
   const finished = attachmentCheckpoint && hasOtherReadableFile
     ? attachmentCheckpoint.finished
     : legacy?.finished ?? checkpoint?.finished;
@@ -217,7 +217,7 @@ async function openReadableAttachment(file, blob) {
 
   const dialog = $('reader');
   const isVideo = fileIsVideo(file);
-  dialog.classList.remove('reader-enhanced');
+  dialog.classList.remove('reader-enhanced', 'reader-presentation', 'reader-presentation-expanded');
   dialog.classList.toggle('reader-pdf', !isVideo);
   videoExpandButton.hidden = !isVideo;
   // Videos open directly as a workspace, matching the PDF reader's layout.

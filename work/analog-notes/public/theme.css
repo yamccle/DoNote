@@ -280,25 +280,25 @@ html:has(#reader.reader-video-expanded[open]){overflow:hidden;scrollbar-gutter:a
 #readerExpandVideo[aria-pressed=true] .reader-expand-glyph,
 #readerExpandVideo[aria-pressed=false] .reader-restore-glyph{display:none}
 .reader-download-icon{display:none}
-#reader:is(.reader-pdf,.reader-video-expanded) .reader-chrome{
+#reader:is(.reader-pdf,.reader-video-expanded,.reader-presentation.reader-enhanced) .reader-chrome{
  display:flex;flex:none;align-items:center;min-width:0;
  background:var(--surface-soft);border-bottom:1px solid var(--line);
 }
-#reader:is(.reader-pdf,.reader-video-expanded) .reader-tabs{
+#reader:is(.reader-pdf,.reader-video-expanded,.reader-presentation.reader-enhanced) .reader-tabs{
  order:-1;flex:1;min-width:0;border:0;background:transparent;
 }
-#reader:is(.reader-pdf,.reader-video-expanded) .modalhead{
+#reader:is(.reader-pdf,.reader-video-expanded,.reader-presentation.reader-enhanced) .modalhead{
  position:static;min-height:0;flex:none;gap:4px;padding:3px 8px 3px 0;
  border:0;background:transparent;box-shadow:none;
 }
-#reader:is(.reader-pdf,.reader-video-expanded) :is(#readerTitle,.reader-download-label){display:none}
-#reader:is(.reader-pdf,.reader-video-expanded) :is(#readerThemeToggle,#readerDownload,.dialog-window-actions .icon-button){
+#reader:is(.reader-pdf,.reader-video-expanded,.reader-presentation.reader-enhanced) :is(#readerTitle,.reader-download-label){display:none}
+#reader:is(.reader-pdf,.reader-video-expanded,.reader-presentation.reader-enhanced) :is(#readerThemeToggle,#readerDownload,.dialog-window-actions .icon-button){
  display:grid;place-items:center;flex:none;width:32px;min-width:32px;height:32px;padding:0;
 }
-#reader:is(.reader-pdf,.reader-video-expanded) #readerThemeToggle{margin:0;font-size:0}
-#reader:is(.reader-pdf,.reader-video-expanded) #readerThemeToggle::before{content:'☀';font-size:16px}
-#reader:is(.reader-pdf,.reader-video-expanded) #readerThemeToggle[aria-checked=true]::before{content:'☾'}
-#reader:is(.reader-pdf,.reader-video-expanded) .reader-download-icon{display:block;width:16px;height:16px}
+#reader:is(.reader-pdf,.reader-video-expanded,.reader-presentation.reader-enhanced) #readerThemeToggle{margin:0;font-size:0}
+#reader:is(.reader-pdf,.reader-video-expanded,.reader-presentation.reader-enhanced) #readerThemeToggle::before{content:'☀';font-size:16px}
+#reader:is(.reader-pdf,.reader-video-expanded,.reader-presentation.reader-enhanced) #readerThemeToggle[aria-checked=true]::before{content:'☾'}
+#reader:is(.reader-pdf,.reader-video-expanded,.reader-presentation.reader-enhanced) .reader-download-icon{display:block;width:16px;height:16px}
 #reader.reader-video-expanded #readerContent{
  display:flex;flex-direction:column;flex:1 1 0;min-height:0;overflow:auto;background:var(--reader-bg);
 }

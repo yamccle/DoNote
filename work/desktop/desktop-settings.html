@@ -1,32 +1,143 @@
+<!--
+ [INPUT]: 接收桌面构建时注入的版本号 {{DONOTE_VERSION}} 与工作台设置脚本绑定。
+ [OUTPUT]: 提供「外观与阅读 · AI 与翻译 · 资料与系统」三栏聚合设置中心、成就闪卡与服务配置弹窗结构。
+ [POS]: 由 build.ps1 注入桌面工作台 index.html 尾部，与 desktop-settings.js / desktop-settings.css 协同工作。
+ [PROTOCOL]: Update this header on change, then check AGENTS.md
+-->
 <section id="desktopSettings" popover aria-labelledby="desktopSettingsTitle">
- <header><h2 id="desktopSettingsTitle">设置</h2></header>
- <section aria-labelledby="desktopAppearance"><h3 id="desktopAppearance">外观</h3>
-  <label class="desktop-palette-row" for="desktopPalette"><span>色彩方案</span><select id="desktopPalette" aria-label="色彩方案"><option value="default">默认</option><option value="warm">暖灰</option><option value="mist">雾蓝</option><option value="sage">鼠尾草绿</option><option value="sand">柔沙棕</option></select></label>
-  <label class="desktop-palette-row" for="desktopThemeMode"><span>显示模式</span><select id="desktopThemeMode" aria-label="显示模式"><option value="system">跟随系统</option><option value="light">白天</option><option value="dark">夜间</option></select><span id="desktopThemeValue" hidden></span></label>
-  <button type="button" id="desktopSplashToggle" data-command="toggle-startup" role="switch" aria-checked="false" disabled><span>播放开场动画</span><span class="desktop-switch" aria-hidden="true"></span></button>
-  <button type="button" id="desktopPdfInvertToggle" data-command="toggle-pdf-invert" role="switch" aria-checked="false" title="开启后，暗色模式下 PDF 页面会整页反转" disabled><span>暗色下反转 PDF 页面</span><span class="desktop-switch" aria-hidden="true"></span></button>
-  <button type="button" data-control="openVideoCaptionSettings"><span>视频字幕样式</span><span aria-hidden="true">›</span></button>
- </section>
- <section aria-labelledby="desktopWorkspace"><h3 id="desktopWorkspace">工作台</h3>
-  <button type="button" data-control="usersBtn"><span>用户管理与切换</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-control="categoriesBtn"><span>栏目管理</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-control="openTranslationSettings"><span>翻译服务</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-control="openTranslateLangDialog"><span>翻译语言</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-control="openSpeechModelSettings"><span>语音识别模型</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-control="openAiModelSettings"><span>AI 模型服务</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-control="openAiManager"><span>AI 管理</span><span aria-hidden="true">›</span></button>
- </section>
- <section aria-labelledby="desktopStorage"><h3 id="desktopStorage">资料与备份</h3>
-  <button type="button" data-control="backupBtn"><span>备份与恢复</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-control="openTrash"><span>回收站</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-command="view-data-folder"><span>查看资料目录</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-command="choose-data-folder"><span>更改资料目录</span><span aria-hidden="true">›</span></button>
- </section>
- <footer>
-  <button type="button" data-command="install-update"><span>检查更新包…</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-control="aboutDoNote"><span>关于 DoNote</span><span aria-hidden="true">›</span></button>
-  <button type="button" data-command="exit-desktop">退出软件…</button>
- </footer>
+ <header class="settings-center-head">
+  <div>
+   <h2 id="desktopSettingsTitle">偏好设置</h2>
+   <p class="settings-center-sub">本机优先 · 修改即时生效</p>
+  </div>
+  <button type="button" class="icon-button settings-close-btn" id="desktopSettingsClose" aria-label="关闭设置">✕</button>
+ </header>
+ <div class="settings-center-body">
+  <nav class="settings-nav" role="tablist" aria-label="设置分类">
+   <button type="button" role="tab" data-settings-group="appearance" aria-selected="true" aria-controls="desktopSettingsPage-appearance">外观与阅读</button>
+   <button type="button" role="tab" data-settings-group="services" aria-selected="false" aria-controls="desktopSettingsPage-services">AI 与翻译</button>
+   <button type="button" role="tab" data-settings-group="storage" aria-selected="false" aria-controls="desktopSettingsPage-storage">资料与系统</button>
+  </nav>
+  <div class="settings-panes">
+   <section id="desktopSettingsPage-appearance" data-settings-page="appearance" role="tabpanel" class="settings-pane">
+    <div class="settings-card">
+     <h3>界面主题</h3>
+     <label class="settings-row" for="desktopThemeMode">
+      <span class="settings-row-text"><strong>显示模式</strong><small>白天、夜间或跟随 Windows 系统</small></span>
+      <select id="desktopThemeMode" aria-label="显示模式"><option value="system">跟随系统</option><option value="light">白天</option><option value="dark">夜间</option></select>
+      <span id="desktopThemeValue" hidden></span>
+     </label>
+     <label class="settings-row" for="desktopPalette">
+      <span class="settings-row-text"><strong>色彩方案</strong><small>切换工作台纸面与强调色</small></span>
+      <select id="desktopPalette" aria-label="色彩方案"><option value="default">默认墨绿</option><option value="warm">暖灰</option><option value="mist">雾蓝</option><option value="sage">鼠尾草绿</option><option value="sand">柔沙棕</option></select>
+     </label>
+    </div>
+    <div class="settings-card">
+     <h3>阅读与动效</h3>
+     <button type="button" class="settings-row settings-switch-row" id="desktopPdfInvertToggle" data-command="toggle-pdf-invert" role="switch" aria-checked="false" disabled>
+      <span class="settings-row-text"><strong>夜间模式反转 PDF 纸面</strong><small>默认保持浅色纸面，开启后整页反色护眼</small></span>
+      <span class="desktop-switch" aria-hidden="true"></span>
+     </button>
+     <button type="button" class="settings-row settings-switch-row" id="desktopSplashToggle" data-command="toggle-startup" role="switch" aria-checked="false" disabled>
+      <span class="settings-row-text"><strong>启动时播放开场动画</strong><small>约 2.5 秒手写签名光迹，按 Esc 可跳过</small></span>
+      <span class="desktop-switch" aria-hidden="true"></span>
+     </button>
+     <button type="button" class="settings-row settings-link-row" data-control="openVideoCaptionSettings">
+      <span class="settings-row-text"><strong>视频双语字幕样式</strong><small id="settingsCaptionSummary">调整字幕字号、字体、颜色与不透明度</small></span>
+      <span class="settings-chevron" aria-hidden="true">›</span>
+     </button>
+    </div>
+   </section>
+
+   <section id="desktopSettingsPage-services" data-settings-page="services" role="tabpanel" class="settings-pane" hidden>
+    <div class="settings-card">
+     <h3>文献与选词翻译</h3>
+     <div class="settings-row">
+      <span class="settings-row-text"><strong>默认翻译语向</strong><small>PDF 选中即翻与整页对照默认语言对</small></span>
+      <div class="settings-inline-langs">
+       <select id="settingsSourceLang" aria-label="默认原文语言"><option value="en">英语</option><option value="zh">中文</option><option value="de">德语</option><option value="fr">法语</option></select>
+       <span aria-hidden="true">→</span>
+       <select id="settingsTargetLang" aria-label="默认译文语言"><option value="zh">中文</option><option value="en">英语</option></select>
+      </div>
+     </div>
+     <button type="button" class="settings-row settings-link-row" data-control="openTranslationSettings">
+      <span class="settings-row-text"><strong>翻译服务与本地 GGUF 模型</strong><small id="settingsTranslationSummary">配置本地离线大模型、MyMemory、百度或微软翻译</small></span>
+      <span class="settings-chevron" aria-hidden="true">›</span>
+     </button>
+    </div>
+    <div class="settings-card">
+     <h3>视频语音识别</h3>
+     <div class="settings-row">
+      <span class="settings-row-text"><strong>默认 Whisper 模型</strong><small id="settingsAsrPathHint">保存在 models\asr，未预置时自动走国内镜像下载</small></span>
+      <div class="settings-inline-actions">
+       <select id="settingsSpeechModelSelect" aria-label="默认语音识别模型">
+        <option value="base">base · 148MB</option>
+        <option value="small">small · 486MB</option>
+        <option value="large-v3-turbo">turbo · 1.62GB</option>
+        <option value="large-v3">large-v3 · 3.09GB</option>
+       </select>
+       <button type="button" class="secondary settings-mini-btn" id="settingsOpenAsrFolder">目录</button>
+      </div>
+     </div>
+    </div>
+    <div class="settings-card">
+     <h3>AI 问答与连接器</h3>
+     <button type="button" class="settings-row settings-link-row" data-control="openAiModelSettings">
+      <span class="settings-row-text"><strong>阅读器 AI 问答服务</strong><small>配置 PDF 精读问答的兼容接口地址、模型与密钥</small></span>
+      <span class="settings-chevron" aria-hidden="true">›</span>
+     </button>
+     <button type="button" class="settings-row settings-link-row" data-control="openAiManager">
+      <span class="settings-row-text"><strong>外部 AI 助手连接器（MCP）</strong><small>管理本机桥接令牌、权限范围与同步队列</small></span>
+      <span class="settings-chevron" aria-hidden="true">›</span>
+     </button>
+    </div>
+   </section>
+
+   <section id="desktopSettingsPage-storage" data-settings-page="storage" role="tabpanel" class="settings-pane" hidden>
+    <div class="settings-card">
+     <h3>备份、恢复与回收站</h3>
+     <button type="button" class="settings-row settings-link-row" data-control="backupBtn">
+      <span class="settings-row-text"><strong>备份与恢复（本地 / 云端）</strong><small>导出完整备份、流式大目录备份或配置 Google Drive / WebDAV 快照</small></span>
+      <span class="settings-chevron" aria-hidden="true">›</span>
+     </button>
+     <button type="button" class="settings-row settings-link-row" data-control="openTrash">
+      <span class="settings-row-text"><strong>回收站</strong><small>找回 30 天内删除的记录或彻底清理释放空间</small></span>
+      <span class="settings-chevron" aria-hidden="true">›</span>
+     </button>
+    </div>
+    <div class="settings-card">
+     <h3>存储目录与工作台</h3>
+     <div class="settings-row">
+      <span class="settings-row-text"><strong>本机资料目录</strong><small>存放所有工作台记录、文献附件与本地服务配置</small></span>
+      <div class="settings-inline-actions">
+       <button type="button" class="secondary settings-mini-btn" data-command="view-data-folder">打开目录</button>
+       <button type="button" class="secondary settings-mini-btn" data-command="choose-data-folder">迁移目录…</button>
+      </div>
+     </div>
+     <div class="settings-row">
+      <span class="settings-row-text"><strong>账户与栏目结构</strong><small>切换本地研究账户，或自定义左侧导航栏目名称与顺序</small></span>
+      <div class="settings-inline-actions">
+       <button type="button" class="secondary settings-mini-btn" data-control="usersBtn">切换账户</button>
+       <button type="button" class="secondary settings-mini-btn" data-control="categoriesBtn">管理栏目</button>
+      </div>
+     </div>
+    </div>
+    <div class="settings-card settings-about-card">
+     <div class="settings-about-brand">
+      <img src="brand-logo.png" alt="DoNote" width="38" height="38">
+      <div>
+       <strong>DoNote</strong>
+       <button type="button" id="aboutVersion" class="about-version" aria-label="版本 {{DONOTE_VERSION}}" title="连续点击可查看设计闪卡">版本 {{DONOTE_VERSION}}</button>
+      </div>
+     </div>
+     <div class="settings-inline-actions">
+      <button type="button" class="secondary settings-mini-btn" data-command="install-update">安装更新包…</button>
+      <button type="button" class="secondary settings-mini-btn is-danger" data-command="exit-desktop">退出软件</button>
+     </div>
+    </div>
+   </section>
+  </div>
+ </div>
 </section>
 
 <dialog id="aboutDoNote" class="about-donote" aria-labelledby="aboutDoNoteTitle">
@@ -34,9 +145,8 @@
  <div class="about-donote-body">
   <img src="brand-logo.png" alt="DoNote 图标" width="86" height="86">
   <h2 id="aboutDoNoteTitle">DoNote</h2>
-  <button type="button" id="aboutVersion" class="about-version" aria-label="版本 {{DONOTE_VERSION}}">版本 {{DONOTE_VERSION}}</button>
-  <p>发布于 2026 年 11 月 5 日</p>
-  <p>© PJH</p>
+  <p>版本 {{DONOTE_VERSION}}</p>
+  <p>© PJH · 本地优先工程研究工作台</p>
  </div>
  <div class="about-donote-foot"><button type="button" data-close-about>确定</button></div>
 </dialog>

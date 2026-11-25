@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取已打开的 PDF / PPT 阅读附件列表与当前工作台资料库。
+ * [OUTPUT]: 提供 registerReaderTab、activateReaderTab、closeReaderTab 与多标签选择器。
+ * [POS]: 阅读器顶部多开文档标签栏，支持在论文 PDF 与讲义 PPT 之间原地快速切换。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 // 多开文档：阅读器顶部的标签栏，允许同时保留多份文献并快速切换。
 const readerTabs=[];
@@ -23,7 +29,9 @@ function registerReaderTab(file,blob){
  renderReaderTabStrip();
 }
 async function openReaderTab(tab){
- if(tab)await openReadableAttachment(tab.file,tab.blob);
+ if(!tab)return;
+ if(typeof fileIsPresentation==='function'&&fileIsPresentation(tab.file))await openPresentationAttachment(tab.file,tab.blob);
+ else await openReadableAttachment(tab.file,tab.blob);
 }
 function activateReaderTab(id){
  const tab=readerTabs.find(item=>item.id===id);
@@ -64,11 +72,11 @@ function openReaderTabPicker(){
 function renderReaderTabPicker(){
  const q=($('readerTabSearch').value||'').trim().toLowerCase(),host=$('readerTabList'),rows=[];
  for(const note of records)for(const file of note.attachments||[]){
-  if(!fileIsPdf(file)||requiresExternalReader(file))continue;
+  if((!fileIsPdf(file)&&!(typeof fileIsPresentation==='function'&&fileIsPresentation(file)))||requiresExternalReader(file))continue;
   if(q&&!(note.title+' '+file.name).toLowerCase().includes(q))continue;
   rows.push({note,file});
  }
- host.innerHTML=rows.length?rows.slice(0,100).map(({note,file})=>'<button type="button" class="reader-tab-row" data-tab-open="'+esc(file.id)+'"><span>'+esc(note.title)+'</span><small>'+esc(file.name)+'</small></button>').join(''):'<p class="section-note">没有可打开的 PDF 文档。</p>';
+ host.innerHTML=rows.length?rows.slice(0,100).map(({note,file})=>'<button type="button" class="reader-tab-row" data-tab-open="'+esc(file.id)+'"><span>'+esc(note.title)+'</span><small>'+esc(file.name)+'</small></button>').join(''):'<p class="section-note">没有可多开的 PDF 或 PPT 文档。</p>';
  host.onclick=async event=>{
   const row=event.target.closest('[data-tab-open]');if(!row)return;
   const entry=rows.find(item=>item.file.id===row.dataset.tabOpen);if(!entry)return;
@@ -76,7 +84,10 @@ function renderReaderTabPicker(){
   const profile=appState.activeId,session=readingSession;
   try{
    const blob=await readBlob(entry.file.id,profile);
-   if($('reader').open&&readingSession===session&&appState.activeId===profile)await openReadableAttachment(entry.file,blob);
+   if($('reader').open&&readingSession===session&&appState.activeId===profile){
+    if(typeof fileIsPresentation==='function'&&fileIsPresentation(entry.file))await openPresentationAttachment(entry.file,blob);
+    else await openReadableAttachment(entry.file,blob);
+   }
   }catch(error){toast(error.message)}
  };
 }

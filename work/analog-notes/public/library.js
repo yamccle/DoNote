@@ -1,9 +1,15 @@
+/**
+ * [INPUT]: 读取资料库筛选条件、附件类型与阅读进度记录。
+ * [OUTPUT]: 提供附件类型判断、阅读进度清洗 sanitizeReadingProgress、关联资料选择与批量文件导入。
+ * [POS]: 连接文献与媒体库、编辑器关联资料与阅读器进度标签。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 let selectedResourceLinks=new Set();
 function fileIsVideo(a){return /^video\//.test(a.mime)||/\.(mp4|webm|ogv|ogg|mov|m4v)$/i.test(a.name)}
 function fileIsAudio(a){return /^audio\//.test(a.mime)||/\.mp3$/i.test(a.name)}
 function inferredMime(file){if(file.type)return file.type;const ext=file.name.split('.').pop().toLowerCase();return ({pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',ppt:'application/vnd.ms-powerpoint',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',mp4:'video/mp4',mp3:'audio/mpeg',webm:'video/webm',ogv:'video/ogg',mov:'video/quicktime',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg'})[ext]||'application/octet-stream'}
-function sanitizeReadingProgress(p){const number=(v,max)=>Math.min(max,Math.max(0,Number(v)||0));return {kind:p?.kind==='video'?'video':'pdf',page:Math.max(1,Math.round(number(p?.page,100000))),pages:Math.round(number(p?.pages,100000)),scroll:number(p?.scroll,1),time:number(p?.time,31536000),duration:number(p?.duration,31536000),finished:!!p?.finished,lastOpened:typeof p?.lastOpened==='string'?p.lastOpened:new Date().toISOString()}}
+function sanitizeReadingProgress(p){const number=(v,max)=>Math.min(max,Math.max(0,Number(v)||0));return {kind:p?.kind==='video'?'video':p?.kind==='presentation'?'presentation':'pdf',page:Math.max(1,Math.round(number(p?.page,100000))),pages:Math.round(number(p?.pages,100000)),scroll:number(p?.scroll,1),time:number(p?.time,31536000),duration:number(p?.duration,31536000),finished:!!p?.finished,lastOpened:typeof p?.lastOpened==='string'?p.lastOpened:new Date().toISOString()}}
 function progressLabel(p){if(p.kind==='video')return formatTime(p.time)+(p.duration?' / '+formatTime(p.duration):'');return '第 '+(p.page||1)+' / '+(p.pages||'?')+' 页'}
 function formatTime(t){const seconds=Math.max(0,Math.floor(t||0));return Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')}
 function renderLibraryControls(){

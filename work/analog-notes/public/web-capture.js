@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取网页抓取宿主返回结果、内置 Readability 与安全白名单规则。
+ * [OUTPUT]: 提供 safeCapturedHtml、parseCapturedWebArticle 与 captureWebArticle。
+ * [POS]: 网页离线收藏净化与解析层，支持单进程预取资源直通与按需补齐缺失配图。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 const WEB_CAPTURE_MAX_HTML=100*1024*1024;
@@ -127,7 +133,7 @@ function collectCaptureAssets(template,base){
  return assets;
 }
 
-async function parseCapturedWebArticle(url,html,{cacheAssets=false}={}){
+async function parseCapturedWebArticle(url,html,{cacheAssets=false,preloadedAssets=null}={}){
  const page=webCaptureUrl(url);
  if(!page||typeof html!=='string'||html.length>WEB_CAPTURE_MAX_HTML)throw new Error('网页内容无效或超出收藏大小。');
  const original=captureTemplate(html);
@@ -139,9 +145,10 @@ async function parseCapturedWebArticle(url,html,{cacheAssets=false}={}){
  const fallbackExcerpt=meta('description')||meta('og:description');
  const styles=captureStyles(original.content);
  const requested=cacheAssets?collectCaptureAssets(original,page.href):[];
- let assets={};
- if(requested.length){
-  try{assets=(await fetchCaptureData({kind:'assets',assets:requested})).assets||{}}
+ let assets=preloadedAssets&&typeof preloadedAssets==='object'?{...preloadedAssets}:{};
+ const missingAssets=requested.filter(asset=>!Object.hasOwn(assets,asset.url));
+ if(cacheAssets&&!preloadedAssets&&missingAssets.length){
+  try{assets={...assets,...((await fetchCaptureData({kind:'assets',assets:missingAssets})).assets||{})}}
   catch{}
  }
  const linkedStyles=requested.filter(asset=>asset.kind==='style').map(asset=>assets[asset.url]).filter(value=>typeof value==='string');
@@ -162,9 +169,12 @@ async function parseCapturedWebArticle(url,html,{cacheAssets=false}={}){
   contentHtml:content.innerHTML,snapshotHtml:snapshotDocument(original,[...linkedStyles,...styles],title),
   missingImages:(requested.unselectedImages||0)+requested.filter(asset=>asset.kind==='image'&&!assets[asset.url]).length};
 }
-async function captureWebArticle(url){
+async function captureWebArticle(url,{cacheAssets=true}={}){
  const page=webCaptureUrl(String(url||'').trim());
  if(!page)throw new Error('请输入完整的 HTTP / HTTPS 网页地址。');
- const result=await fetchCaptureData({kind:'page',url:page.href});
- return parseCapturedWebArticle(result.url,result.html,{cacheAssets:true});
+ const result=await fetchCaptureData({kind:'bundle',url:page.href,cacheAssets});
+ return parseCapturedWebArticle(result.url,result.html,{
+  cacheAssets,
+  preloadedAssets:result.assets&&typeof result.assets==='object'?result.assets:null
+ });
 }

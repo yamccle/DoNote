@@ -1,14 +1,27 @@
+/**
+ * [INPUT]: 从标准输入读取网页抓取请求（kind: page | assets | bundle）。
+ * [OUTPUT]: 校验公网 IP 防护 SSRF，复用 TLS Keep-Alive 与 gzip/br 流式限额解压，单进程并发抓取正文与配图样式并输出 JSON。
+ * [POS]: 桌面端网页离线收藏工作进程（ai-bridge/workers/web-fetch.mjs），消除双进程冷启动与慢图队头阻塞。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 import { lookup } from 'node:dns/promises';
 import http from 'node:http';
 import https from 'node:https';
 import { isIP } from 'node:net';
+import zlib from 'node:zlib';
 
 const maxHtmlBytes = 100 * 1024 * 1024;
 const maxImageBytes = 240 * 1024;
 const maxStyleBytes = 90 * 1024;
+const perAssetTimeoutMs = 3200;
+const totalAssetsBudgetMs = 6500;
+const assetConcurrency = 8;
 const localSuffix = /(?:^|\.)(?:localhost|local|internal|lan|test|onion|invalid|home\.arpa)$/i;
+const trackerHostPattern = /(?:^|\.)(?:google-analytics\.com|googletagmanager\.com|doubleclick\.net|hm\.baidu\.com|cnzz\.com|facebook\.net|hotjar\.com|clarity\.ms)$/i;
 const imageType = /^image\/(?:png|jpeg|gif|webp|avif)$/i;
 const addressesByHost = new Map();
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 12, timeout: 10000 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 12, timeout: 10000 });
 
 function publicAddress(value) {
   let url;
@@ -40,10 +53,8 @@ function publicIp(address) {
 
 async function resolvePublicAddresses(host, signal) {
   const entries = await lookup(host, { all: true });
-  // Some local proxies synthesize benchmark-range addresses for every host.
-  // Verify via public DNS and connect to the returned public IP, never the synthetic address.
   if (!entries.length || !entries.every(entry => /^198\.(?:18|19)\./.test(entry.address))) return entries;
-  const dnsSignal = AbortSignal.any([signal, AbortSignal.timeout(4500)]);
+  const dnsSignal = AbortSignal.any([signal, AbortSignal.timeout(4000)]);
   for (const [type, family] of [[1, 4], [28, 6]]) {
     const query = new URLSearchParams({ name: host, type: String(type), edns_client_subnet: '0.0.0.0/0' });
     const response = await fetch('https://dns.google/resolve?' + query, { redirect: 'error', signal: dnsSignal });
@@ -57,10 +68,48 @@ async function resolvePublicAddresses(host, signal) {
   return [];
 }
 
+function decoderStreamFor(encoding) {
+  const normalized = String(encoding || 'identity').trim().toLowerCase();
+  if (!normalized || normalized === 'identity') return null;
+  if (normalized === 'gzip' || normalized === 'x-gzip') return zlib.createGunzip();
+  if (normalized === 'deflate') return zlib.createInflate();
+  if (normalized === 'br') return zlib.createBrotliDecompress();
+  throw new Error('网页服务器返回了无法处理的内容编码。');
+}
+
+async function readBoundedResponse(response, maxBytes, signal) {
+  const decoder = decoderStreamFor(response.headers['content-encoding']);
+  const source = decoder ? response.pipe(decoder) : response;
+  let length = 0;
+  const chunks = [];
+  const onAbort = () => {
+    response.destroy(signal.reason || new Error('Aborted'));
+    decoder?.destroy();
+  };
+  signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    for await (const chunk of source) {
+      length += chunk.length;
+      if (length > maxBytes) {
+        response.destroy();
+        decoder?.destroy();
+        throw new Error('网页内容过大。');
+      }
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks, length);
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
 async function fetchPublic(url, kind, signal, redirects = 0) {
   let addresses = addressesByHost.get(url.hostname);
   if (!addresses) {
-    addresses = resolvePublicAddresses(url.hostname, signal);
+    addresses = resolvePublicAddresses(url.hostname, signal).catch(error => {
+      addressesByHost.delete(url.hostname);
+      throw error;
+    });
     addressesByHost.set(url.hostname, addresses);
   }
   const entries = await addresses;
@@ -68,27 +117,25 @@ async function fetchPublic(url, kind, signal, redirects = 0) {
     throw new Error('网页解析到本机或内网地址，无法收藏。');
   }
   const chosen = entries.find(entry => entry.family === 4) ?? entries[0];
-  const request = url.protocol === 'https:' ? https.request : http.request;
+  const isHttps = url.protocol === 'https:';
+  const request = isHttps ? https.request : http.request;
   const maxBytes = kind === 'page' ? maxHtmlBytes : kind === 'image' ? maxImageBytes : maxStyleBytes;
-  // 许多站点（例如国内的 CSDN、部分 Cloudflare 站点）会拒绝非浏览器 UA，
-  // 带上接近真实浏览器的请求头能显著降低 403 / 521 的概率。
   const browserHeaders = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
     'Accept': kind === 'page'
       ? 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
       : kind === 'image' ? 'image/avif,image/webp,image/*,*/*;q=0.8' : 'text/css,*/*;q=0.1',
     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-    'Accept-Encoding': 'identity',
+    'Accept-Encoding': 'gzip, deflate, br',
     'Cache-Control': 'no-cache',
-    'Pragma': 'no-cache',
     'Upgrade-Insecure-Requests': '1',
     'Sec-Fetch-Dest': kind === 'page' ? 'document' : kind === 'image' ? 'image' : 'style',
-    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Mode': kind === 'page' ? 'navigate' : 'no-cors',
     'Sec-Fetch-Site': 'none',
     'Referer': url.origin + '/',
   };
   const options = {
-    agent: false,
+    agent: isHttps ? httpsAgent : httpAgent,
     autoSelectFamily: false,
     signal,
     lookup: (_host, _options, callback) => callback(null, chosen.address, chosen.family),
@@ -102,39 +149,36 @@ async function fetchPublic(url, kind, signal, redirects = 0) {
   try {
     if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.headers.location) {
       if (redirects >= 5) throw new Error('网页跳转次数过多。');
-      response.destroy();
+      response.resume();
       return fetchPublic(publicAddress(new URL(response.headers.location, url).href), kind, signal, redirects + 1);
     }
     if (response.statusCode !== 200) {
-      const retryable = response.statusCode >= 500;
+      response.resume();
       const error = new Error('网页暂时无法读取（HTTP ' + response.statusCode + '）。');
-      error.retryable = retryable;
+      error.retryable = response.statusCode >= 500;
       error.statusCode = response.statusCode;
       throw error;
     }
     const contentType = response.headers['content-type'] || '';
     const mime = contentType.split(';')[0].trim().toLowerCase();
     if (kind === 'page' && mime === 'application/pdf') {
+      response.destroy();
       throw new Error('这是一个 PDF 文件链接，请用「导入文件」把它加入资料库。');
     }
     if ((kind === 'page' && !['text/html', 'application/xhtml+xml'].includes(mime)) ||
         (kind === 'image' && !imageType.test(mime)) || (kind === 'style' && mime !== 'text/css')) {
+      response.destroy();
       throw new Error('服务器没有返回支持的网页内容。');
     }
-    if (response.headers['content-encoding'] && response.headers['content-encoding'] !== 'identity') {
-      throw new Error('网页服务器返回了无法处理的内容编码。');
+    if (Number(response.headers['content-length']) > maxBytes) {
+      response.destroy();
+      throw new Error('网页内容过大。');
     }
-    if (Number(response.headers['content-length']) > maxBytes) throw new Error('网页内容过大。');
-    let length = 0;
-    const chunks = [];
-    for await (const chunk of response) {
-      length += chunk.length;
-      if (length > maxBytes) throw new Error('网页内容过大。');
-      chunks.push(chunk);
-    }
-    return { url: url.href, mime, contentType, bytes: Buffer.concat(chunks, length) };
-  } finally {
+    const bytes = await readBoundedResponse(response, maxBytes, signal);
+    return { url: url.href, mime, contentType, bytes };
+  } catch (error) {
     response.destroy();
+    throw error;
   }
 }
 
@@ -145,15 +189,79 @@ function decodeText(bytes, contentType) {
   try { return new TextDecoder(encoding).decode(bytes); } catch { return bytes.toString('utf8'); }
 }
 
-// 5xx / 连接抖动是常见瞬时问题（Cloudflare 的 521/503 尤其如此），重试几次即可。
+function decodeHtmlAttr(raw) {
+  return String(raw || '').replace(/&amp;/gi, '&').replace(/&#38;/g, '&').trim();
+}
+
+function extractBundleCandidates(html, baseHref) {
+  const requested = [], seen = new Set();
+  const pushUrl = (raw, kind) => {
+    const cleaned = decodeHtmlAttr(raw);
+    if (!cleaned || cleaned.startsWith('data:') || cleaned.startsWith('javascript:')) return false;
+    try {
+      const resolved = publicAddress(new URL(cleaned, baseHref).href);
+      if (trackerHostPattern.test(resolved.hostname)) return false;
+      if (kind === 'image' && /\.(?:svg|ico)(?:$|\?)/i.test(resolved.pathname)) return false;
+      if (seen.has(resolved.href)) return false;
+      seen.add(resolved.href);
+      requested.push({ url: resolved.href, kind });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  let styles = 0;
+  for (const match of html.matchAll(/<link\b[^>]*>/gi)) {
+    const tag = match[0];
+    if (!/\brel\s*=\s*["']?[^"'>]*\bstylesheet\b/i.test(tag)) continue;
+    const href = /\bhref\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i.exec(tag);
+    if (href && pushUrl(href[1] || href[2] || href[3], 'style') && ++styles >= 3) break;
+  }
+  let images = 0;
+  for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = match[0];
+    const pick = attr => {
+      const m = new RegExp('\\b' + attr + '\\s*=\\s*(?:"([^"]+)"|\'([^\']+)\'|([^\\s>]+))', 'i').exec(tag);
+      return m ? (m[1] || m[2] || m[3] || '') : '';
+    };
+    const srcsetFirst = (pick('srcset') || '').trim().split(/\s|,/)[0];
+    const candidate = pick('data-src') || pick('data-original') || pick('src') || srcsetFirst;
+    if (candidate && pushUrl(candidate, 'image') && ++images >= 24) break;
+  }
+  return requested;
+}
+
+async function fetchAssetsPool(list, budgetMs = totalAssetsBudgetMs) {
+  const assets = {};
+  const queue = list.filter(item => item && (item.kind === 'image' || item.kind === 'style')).slice(0, 27);
+  if (!queue.length) return assets;
+  const budgetSignal = AbortSignal.timeout(budgetMs);
+  let cursor = 0;
+  const workerCount = Math.min(assetConcurrency, queue.length);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (cursor < queue.length && !budgetSignal.aborted) {
+      const item = queue[cursor++];
+      const itemSignal = AbortSignal.any([budgetSignal, AbortSignal.timeout(perAssetTimeoutMs)]);
+      try {
+        const result = await fetchPublic(publicAddress(item.url), item.kind, itemSignal);
+        assets[item.url] = item.kind === 'image'
+          ? 'data:' + result.mime + ';base64,' + result.bytes.toString('base64')
+          : decodeText(result.bytes, result.contentType);
+      } catch {}
+    }
+  }));
+  return assets;
+}
+
 async function fetchPageWithRetry(rawUrl, signal) {
   let lastError;
-  const delays = [0, 450, 1100];
+  const delays = [0, 350, 900];
   for (let attempt = 0; attempt < delays.length; attempt++) {
     if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
     if (signal.aborted) break;
     try {
-      return await fetchPublic(publicAddress(rawUrl), 'page', signal);
+      const attemptSignal = AbortSignal.any([signal, AbortSignal.timeout(12000)]);
+      return await fetchPublic(publicAddress(rawUrl), 'page', attemptSignal);
     } catch (error) {
       lastError = error;
       const transient = error.retryable || ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED', 'EPIPE'].includes(error.code);
@@ -164,26 +272,19 @@ async function fetchPageWithRetry(rawUrl, signal) {
 }
 
 async function run(input) {
-  if (input.kind !== 'assets') {
-    const result = await fetchPageWithRetry(input.url, AbortSignal.timeout(22000));
-    return { url: result.url, html: decodeText(result.bytes, result.contentType) };
+  if (input.kind === 'assets') {
+    const assets = await fetchAssetsPool(input.assets || []);
+    return { assets };
   }
-  const signal = AbortSignal.timeout(18000);
-  const assets = {};
-  const requested = input.assets.slice(0, 27);
-  for (let index = 0; index < requested.length; index += 6) {
-    if (signal.aborted) break;
-    await Promise.all(requested.slice(index, index + 6).map(async asset => {
-      if (asset.kind !== 'image' && asset.kind !== 'style') return;
-      try {
-        const result = await fetchPublic(publicAddress(asset.url), asset.kind, signal);
-        assets[asset.url] = asset.kind === 'image'
-          ? 'data:' + result.mime + ';base64,' + result.bytes.toString('base64')
-          : decodeText(result.bytes, result.contentType);
-      } catch {}
-    }));
+  const result = await fetchPageWithRetry(input.url, AbortSignal.timeout(18000));
+  const html = decodeText(result.bytes, result.contentType);
+  if (input.kind === 'bundle') {
+    const assets = input.cacheAssets === false
+      ? {}
+      : await fetchAssetsPool(extractBundleCandidates(html, result.url));
+    return { url: result.url, html, assets };
   }
-  return { assets };
+  return { url: result.url, html };
 }
 
 let input;
@@ -199,6 +300,8 @@ try {
   const result = await run(input);
   process.stdout.write(JSON.stringify({ type: 'yams-one-web-capture', id: input.id, ...result }));
 } catch (error) {
+  httpAgent.destroy();
+  httpsAgent.destroy();
   const blocked = /HTTP (?:403|429|503|521|522|523)/.exec(error.message || '');
   const message = ['AbortError', 'TimeoutError'].includes(error.name)
     ? '读取网页超时，站点可能较慢，请稍后重试。'
@@ -206,4 +309,7 @@ try {
       ? '站点拒绝了自动抓取（' + blocked[0] + '），通常是防爬或需要登录。可以稍后重试，或在浏览器打开后复制正文。'
       : /[\u4e00-\u9fff]/u.test(error.message) ? error.message : '无法读取此网页，请检查网络及网页访问权限。';
   process.stdout.write(JSON.stringify({ type: 'yams-one-web-capture', id: input?.id, error: message }));
+} finally {
+  httpAgent.destroy();
+  httpsAgent.destroy();
 }

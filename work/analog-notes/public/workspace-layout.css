@@ -1,25 +1,25 @@
 /**
  * [INPUT]: 读取工作台栏目、主题颜色和窗口宽度。
- * [OUTPUT]: 布置标题、侧栏、组件和记录列表。
- * [POS]: 各栏目共用的页面布局。主页与栏目工具栏各自覆盖局部样式。
+ * [OUTPUT]: 布置标题、侧栏导航、统计条、组件卡片、记录卡片与资料库列表。
+ * [POS]: 各栏目共用的页面布局与视觉骨架，确保总览、资料库与记录栏目风格一致。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 .intro {
   align-items: baseline;
   gap: 12px 24px;
-  padding-bottom: 15px;
+  padding-bottom: 14px;
   margin: 0 0 18px;
   border-bottom: 1px solid var(--line);
 }
 .intro h1, .library-mode #pageTitle {
   margin: 0;
-  font-size: clamp(1.5rem, 1.36rem + .45vw, 2rem);
+  font-size: clamp(1.5rem, 1.36rem + .45vw, 1.95rem);
   font-weight: 650;
-  line-height: 1.35;
-  letter-spacing: normal;
+  line-height: 1.32;
+  letter-spacing: -0.015em;
   overflow-wrap: anywhere;
 }
-.intro p {margin-top: 5px; overflow-wrap: anywhere}
+.intro p { margin-top: 5px; overflow-wrap: anywhere; }
 .intro .date-block {
   color: var(--muted);
   font-size: var(--type-label);
@@ -27,49 +27,83 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.intro [hidden], .section-heading[hidden] {display: none}
-.workspace-intro-actions {display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px}
-main:not([data-view="all"]) .workspace-intro-actions {display:none}
-main[data-view]:not([data-view="all"]) {padding-block-start:var(--space-4)}
-main[data-view]:not([data-view="all"]) #workspaceIntro {padding-block-end:9px;margin-block-end:10px}
-main[data-view]:not([data-view="all"]) #pageTitle {font-size:clamp(1.25rem,1.18rem + .36vw,1.55rem)}
-main:not([data-view="all"]) #workspaceAside,#workspaceAside:not(:has(> :not([hidden]))),#pendingBox[hidden] {display:none}
-main:not([data-view="all"]) .workspace,.workspace:not(:has(#workspaceAside > :not([hidden]))) {grid-template-columns:minmax(0,1fr)}
-#dashboardWidgets:has(#dashboardTop:empty) {display:none}
-main[data-view="plan"] .section-heading:not([hidden]) {display: flex}
-.section-heading {margin-bottom: 10px}
-.section-heading h2 {font-size: 1.0625rem}
-#activeFilter:empty {display: none}
-.searchrow {align-items: center; margin-bottom: 14px}
-.searchrow :is(.searchbox, .secondary, .sort) {min-height: 36px}
-.searchrow .searchbox {border: 1px solid var(--field-border); border-radius: var(--radius-control)}
-.searchrow .sort {max-width: 160px}
-.searchrow .secondary {white-space: nowrap}
-.filterrow .tab {padding-inline: 8px}
+.intro [hidden], .section-heading[hidden] { display: none; }
+.workspace-intro-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+main:not([data-view="all"]) .workspace-intro-actions { display: none; }
+main[data-view]:not([data-view="all"]) { padding-block-start: var(--space-4); }
+main[data-view]:not([data-view="all"]) #workspaceIntro { padding-block-end: 10px; margin-block-end: 12px; }
+main[data-view]:not([data-view="all"]) #pageTitle { font-size: clamp(1.3rem, 1.2rem + .36vw, 1.6rem); }
+main:not([data-view="all"]) #workspaceAside, #workspaceAside:not(:has(> :not([hidden]))), #pendingBox[hidden] { display: none; }
+main:not([data-view="all"]) .workspace, .workspace:not(:has(#workspaceAside > :not([hidden]))) { grid-template-columns: minmax(0, 1fr); }
+#dashboardWidgets:has(#dashboardTop:empty) { display: none; }
+main[data-view="plan"] .section-heading:not([hidden]) { display: flex; }
+.section-heading { margin-bottom: 10px; }
+.section-heading h2 { font-size: 1.05rem; font-weight: 650; }
+#activeFilter:empty { display: none; }
+.searchrow { align-items: center; margin-bottom: 14px; }
+.searchrow :is(.searchbox, .secondary, .sort) { min-height: 36px; }
+.searchrow .searchbox {
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background: var(--surface);
+  transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
+}
+.searchrow .searchbox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.searchrow .sort { max-width: 160px; }
+.searchrow .secondary { white-space: nowrap; }
+.filterrow {
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.filterrow .tab {
+  padding: 7px 11px;
+  font-size: var(--type-label);
+}
 
-#workspaceRail {padding-block: 14px 10px}
-#workspaceRail button {border: 1px solid transparent; border-radius: var(--radius-control)}
+/* 左侧主导航栏：消除圆角边框残留弧线，统一左侧指示条 */
+#workspaceRail { padding-block: 14px 10px; }
+#workspaceRail button {
+  position: relative;
+  border: 0;
+  border-radius: 8px;
+}
 #workspaceRail button[aria-current] {
-  background: color-mix(in srgb, var(--accent) 11%, var(--surface-soft));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   color: var(--accent);
   font-weight: 650;
+  box-shadow: none;
 }
-#workspaceRail .rail-label {display: none}
+#workspaceRail button[aria-current]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  border-radius: 99px;
+  background: var(--accent);
+}
+#workspaceRail .rail-label { display: none; }
 #workspaceRail .rail-initial {
   width: 28px;
   height: 28px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--accent) 11%, var(--surface-soft));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
   color: var(--accent);
   font-size: var(--type-label);
   font-weight: 650;
 }
-#workspaceRail .rail-avatar {background: transparent; border-color: transparent}
+#workspaceRail .rail-avatar { background: transparent; }
 @media (min-width: 1120px) {
-  :root {--workspace-rail: 176px}
-  #workspaceRail {align-items: stretch; padding-inline: 10px; gap: 3px}
+  :root { --workspace-rail: 182px; }
+  #workspaceRail { align-items: stretch; padding-inline: 10px; gap: 3px; }
   #workspaceRail button {
     grid-template-columns: 20px minmax(0, 1fr);
     justify-items: start;
@@ -77,15 +111,16 @@ main[data-view="plan"] .section-heading:not([hidden]) {display: flex}
     width: 100%;
     height: auto;
     min-height: 38px;
-    padding: 5px 9px;
+    padding: 6px 10px 6px 14px;
     text-align: start;
   }
-  #workspaceRail button[aria-current] {border-inline-start-color: var(--accent)}
   #workspaceRail button.rail-avatar {
     grid-template-columns: 28px minmax(0, 1fr);
     width: 100%;
     height: auto;
-    border-block-start-color: var(--line);
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
     border-radius: 0;
   }
   #workspaceRail .rail-label {
@@ -98,104 +133,188 @@ main[data-view="plan"] .section-heading:not([hidden]) {display: flex}
   }
 }
 
-#dashboardWidgets {margin-bottom: 22px}
-#dashboardTop {gap: 0; border-bottom: 1px solid var(--line)}
+/* 总览统计栏与右侧组件卡片 */
+#dashboardWidgets { margin-bottom: 20px; }
+#dashboardTop {
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
 #dashboardTop .dashboard-card {
-  flex: 1 1 146px;
+  flex: 1 1 150px;
   width: auto;
   min-width: 0;
   min-height: 0;
   border: 0;
-  border-top: 1px solid var(--line);
   border-radius: 0;
-  padding: 10px 14px;
+  padding: 13px 16px;
   background: transparent;
 }
-#dashboardTop .dashboard-interactive-slot {width: auto; flex: 1 1 min(100%, 270px)}
-#dashboardSide {gap: 0; margin-bottom: 14px}
+#dashboardTop .dashboard-card + .dashboard-card {
+  border-inline-start: 1px solid var(--line);
+}
+#dashboardTop .dashboard-interactive-slot { width: auto; flex: 1 1 min(100%, 270px); }
+#dashboardSide { display: grid; gap: 12px; margin-bottom: 12px; }
 #dashboardSide .dashboard-card, .aside .box, #dashboardTop .dashboard-interactive {
-  background: transparent;
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  padding: 12px 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
   box-shadow: none;
 }
-.widget-label {color: var(--text-soft); font-size: var(--type-label)}
-.widget-label svg {color: var(--muted)}
-.widget-value {font-size: 1.375rem}
-#quickStartWidget .quick {min-height: 36px; padding: 3px 0; border-color: var(--line)}
-#quickStartWidget .quick b {flex: 1; min-width: 0; overflow-wrap: anywhere}
-#quickStartWidget .quickicon {background: transparent !important; color: var(--accent)}
+.aside { display: grid; align-content: start; gap: 12px; }
+.widget-label { color: var(--text-soft); font-size: var(--type-label); }
+.widget-label svg { color: var(--accent); }
+.widget-value { font-size: 1.5rem; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+#quickStartWidget .quick { min-height: 36px; padding: 4px 6px; border-radius: 6px; border-color: var(--line); }
+#quickStartWidget .quick b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#quickStartWidget .quickicon { background: transparent !important; color: var(--accent); }
 
-main[data-view] #records:not(.library-gallery,.achievement-display) .card {
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  padding: 12px 8px;
-  margin: 0;
-  background: transparent;
-  box-shadow: none;
+/* 栏目内嵌计划横幅（工作日志 / 学习日志） */
+#journalPlans:not([hidden]) {
+  margin-bottom: 14px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
 }
-main[data-view] #records:not(.library-gallery,.achievement-display) .card:hover {background: var(--surface-hover)}
-#records .card h3 {font-size: 1rem; font-weight: 650; overflow-wrap: anywhere}
-#records .card :is(.status,.tag) {background: transparent; border: 0; border-radius: 0; padding: 0}
-#records .card .tags {gap: 8px}
-#records .card .card-excerpt {overflow-wrap: anywhere}
-#records .empty {
-  padding: 24px 8px;
-  text-align: start;
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-}
-#records .empty > svg {display: none}
-#records .empty h3 {margin: 0 0 8px}
-#records .empty p {margin: 0 0 12px}
 
-#records.library-gallery {display: block; border-bottom: 1px solid var(--line)}
-#records.library-gallery .card {
+/* 全站记录卡片（总览 / 设计问题 / 工作日志 / 学习日志 / 计划 / 收藏） */
+main[data-view] #records:not(.library-gallery, .achievement-display) {
   display: grid;
-  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 10px;
+}
+main[data-view] #records:not(.library-gallery, .achievement-display) .card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 0;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(20, 28, 22, 0.02);
+}
+main[data-view] #records:not(.library-gallery, .achievement-display) .card:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+}
+#records .card .card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-bottom: 7px;
+}
+#records .card h3 {
+  margin: 0 0 6px;
+  font-size: 1.03rem;
+  font-weight: 650;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+#records .card .card-excerpt {
+  margin: 0 0 10px;
+  color: var(--text-soft);
+  font-size: 13.5px;
+  line-height: 1.62;
+  overflow-wrap: anywhere;
+}
+#records .card .card-excerpt:empty { display: none; }
+#records .card .card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+#records .card .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+#records .card .tag {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+#records .card .status,
+.library-card-foot [data-status] {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 11%, var(--surface-soft));
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+#records .empty {
+  padding: 32px 20px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+#records .empty > svg { display: none; }
+#records .empty h3 { margin: 0 0 6px; font-size: 15px; }
+#records .empty p { margin: 0 0 14px; font-size: 13px; }
+
+/* 文献与媒体库卡片列表 */
+#records.library-gallery {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  border-bottom: 0;
+}
+#records.library-gallery .card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
   align-items: center;
   gap: 14px;
   margin: 0;
-  padding: 10px 12px;
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   overflow: visible;
-  background: transparent;
-  box-shadow: none;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(20, 28, 22, 0.02);
 }
-#records.library-gallery .card:hover {transform: none; background: var(--surface-hover)}
+#records.library-gallery .card:hover {
+  transform: none;
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+}
 #records.library-gallery .card.library-selected {
   outline: none;
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-  box-shadow: inset 2px 0 var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 .library-gallery .library-cover {
-  width: 66px;
-  height: 68px;
+  width: 78px;
+  height: 62px;
   padding: 0;
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
+  overflow: hidden;
   background: var(--cover);
 }
-.library-gallery .library-cover > img {width: 100%; height: 100%; border-radius: 0; object-fit: cover}
-.library-gallery .cover-placeholder {color: var(--muted)}
-.library-gallery .cover-placeholder svg {width: 24px; height: 24px}
-.library-gallery .cover-progress {height: 3px}
-.library-gallery .cover-progress i {background: var(--accent)}
-.library-gallery .gallery-select {inset: 6px auto auto 6px}
+.library-gallery .library-cover > img { width: 100%; height: 100%; border-radius: 0; object-fit: cover; }
+.library-gallery .cover-placeholder { color: var(--muted); }
+.library-gallery .cover-placeholder svg { width: 22px; height: 22px; }
+.library-gallery .cover-progress { height: 3px; }
+.library-gallery .cover-progress i { background: var(--accent); }
+.library-gallery .gallery-select { inset: 6px auto auto 6px; }
 .library-card-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 2px 18px;
+  gap: 3px 18px;
   min-width: 0;
   padding: 0;
 }
@@ -204,49 +323,85 @@ main[data-view] #records:not(.library-gallery,.achievement-display) .card:hover 
   min-height: 0;
   margin: 0;
   display: block;
-  line-height: 1.45;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.42;
 }
 .library-item-meta, .library-card-tags {
   grid-column: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 10px;
+  align-items: center;
+  gap: 4px 8px;
   min-width: 0;
   min-height: 0;
   color: var(--muted);
   font-size: var(--type-caption);
   overflow-wrap: anywhere;
 }
-.library-item-meta span + span::before {content: "·"; padding-inline-end: 8px}
-.library-item-meta .library-subtitle-status {color: var(--accent)}
-.library-card-tags span {padding: 0; background: transparent; color: var(--text-soft)}
+.library-item-meta span:first-child {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  color: var(--text-soft);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+.library-item-meta span:nth-child(n+3)::before { content: "·"; padding-inline-end: 6px; }
+.library-item-meta .library-subtitle-status { color: var(--accent); font-weight: 600; }
+.library-card-tags span {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  font-size: 11px;
+}
 .library-card-foot {
   grid-column: 2;
   grid-row: 1 / span 3;
   display: grid;
   justify-items: end;
-  gap: 3px;
+  gap: 5px;
   margin: 0;
   text-align: end;
 }
-.gallery-card-actions {gap: 5px}
-.gallery-card-actions button {padding: 5px 7px; border-radius: var(--radius-control)}
-.library-folder-card {border-radius: var(--radius-card); box-shadow: none}
-.library-toolbar-popup {border-radius: var(--radius-float); box-shadow: var(--shadow-float)}
+.gallery-card-actions { gap: 4px; }
+.gallery-card-actions button,
+.library-card-foot .gallery-details {
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+.gallery-card-actions button:hover,
+.library-card-foot .gallery-details:hover {
+  border-color: var(--line);
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+.library-folder-card { border-radius: 9px; box-shadow: none; }
+.library-toolbar-popup { border-radius: var(--radius-float); box-shadow: var(--shadow-float); }
 
 @media (max-width: 720px) {
-  .intro {flex-wrap: wrap; padding-bottom: 10px}
-  #dashboardTop .dashboard-card {flex-basis: 120px; padding-inline: 8px}
-  #records.library-gallery .card {grid-template-columns: 45px minmax(0, 1fr); gap: 9px; padding-inline: 4px}
-  .library-gallery .library-cover {width: 45px; height: 51px}
-  .library-card-body {display: flex; flex-direction: column; align-items: flex-start}
-  .library-card-foot {display: flex; justify-content: space-between; gap: 5px; width: 100%; text-align: start}
+  .intro { flex-wrap: wrap; padding-bottom: 10px; }
+  #dashboardTop { flex-wrap: wrap; }
+  #dashboardTop .dashboard-card { flex-basis: 45%; padding-inline: 12px; border-top: 1px solid var(--line); }
+  #records.library-gallery .card { grid-template-columns: 56px minmax(0, 1fr); gap: 10px; padding-inline: 10px; }
+  .library-gallery .library-cover { width: 56px; height: 50px; }
+  .library-card-body { display: flex; flex-direction: column; align-items: flex-start; }
+  .library-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; width: 100%; text-align: start; margin-top: 4px; }
 }
 @media (max-width: 600px) {
-  .searchrow .searchbox {flex-basis: 100%}
-  .searchrow #resultCount {order: 1; flex-basis: 100%}
+  .searchrow .searchbox { flex-basis: 100%; }
+  .searchrow #resultCount { order: 1; flex-basis: 100%; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  #workspaceRail button, #records .card {transition: background-color var(--motion-fast) var(--ease-standard)}
+  #workspaceRail button, #records .card {
+    transition: background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+  }
 }

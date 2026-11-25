@@ -25,10 +25,10 @@
 - `build.ps1` 将开场脚本、样式和画面放入安装包的 `workspace` 目录。
 - `开始使用.md` 记录开场设置、键盘操作和减少动态效果的行为。
 
-## 设置浮层
+## 设置中心与网页收藏
 
-- `desktop-settings.js` 将设置浮层挂到当前窗口。子菜单在可见控件之间移动焦点。退出设置时恢复原控件焦点。
-- `desktop-settings.css` 使用工作台主题和动画变量。系统减少动态效果时，设置浮层直接显示。
+- `desktop-settings.html`、`desktop-settings.js` 和 `desktop-settings.css` 提供「外观与阅读 · AI 与翻译 · 资料与系统」三栏聚合设置中心，内联默认翻译语向、Whisper 模型选择、资料目录操作与版本更新入口，消除多级悬停子菜单与碎片弹窗。
+- `web-fetch.mjs` 执行公网 IP 校验防 SSRF，复用 TLS Keep-Alive 连接与 `gzip/deflate/br` 流式限额解压，单进程 8 路并发限时抓取网页正文与配图样式。
 
 ## 云端备份
 

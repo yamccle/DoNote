@@ -59,10 +59,10 @@ body {line-height: 1.6}
 a {color: var(--accent)}
 :focus-visible {outline: 2px solid var(--accent); outline-offset: 2px}
 :is(#workspaceRail button[aria-current], .nav.active) {
-  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   color: var(--accent);
 }
-#workspaceRail button[aria-current] {box-shadow: inset 2px 0 var(--accent)}
+#workspaceRail button[aria-current] {box-shadow: inset 3px 0 0 var(--accent)}
 :is(.tab.active, .side-tags button.active) {border-color: var(--accent)}
 .side-tags button.active {color: var(--accent)}
 .library-mode .filterrow .tab.active::after {background: var(--accent)}
@@ -145,20 +145,7 @@ main {padding: var(--space-6)}
 .library-pager-jump {display: inline-flex; align-items: center; gap: 5px}
 .library-pager-jump input {width: 58px; padding: 4px 6px; text-align: center}
 
-/* Record layout */
-main[data-view="journal"] #records {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-main[data-view="journal"] #records .card {min-width:0;margin:0;padding:20px;display:flex;flex-direction:column}
-main[data-view="journal"] #records .card h3 {font-size:18px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-main[data-view="journal"] #records .card-meta {flex-wrap:wrap;gap:6px}
-main[data-view="journal"] #records .card-date {margin-left:0}
-main[data-view="journal"] #records .card-excerpt {display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-main[data-view="journal"] #records .card-bottom {margin-top:auto;gap:8px;flex-wrap:wrap}
-main[data-view="journal"] #records .tags {flex-wrap:wrap;min-width:0}
-main[data-view="journal"] #records .tag {max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-main[data-view="journal"] #records .empty {grid-column:1/-1}
-@media(max-width:1400px){main[data-view="journal"] #records{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:1050px){main[data-view="journal"] #records{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:650px){main[data-view="journal"] #records{grid-template-columns:1fr}}
+/* Record layout: unified full-width card rhythm across all record columns */
 #resultCount {align-self: center; white-space: nowrap; font-variant-numeric: tabular-nums}
 
 /* 9 · toast actions (撤销) and the recycle bin rows */
@@ -452,7 +439,8 @@ dialog .modalfoot button {white-space:normal}
   #editor .editor-head-actions {margin-inline:0}
   #editor.document-page :is(.rich-toolbar,.image-tools) {position:static}
 }
-#reader.reader-presentation[open] {display:flex;flex-direction:column;height:92dvh;max-height:92dvh;overflow:hidden}
+#reader.reader-presentation:not(.reader-enhanced)[open] {display:flex;flex-direction:column;height:92dvh;max-height:92dvh;overflow:hidden}
+#reader.reader-presentation.reader-enhanced[open] {inset:0;width:100%;max-width:none;height:100dvh;max-height:none;margin:0;border:0;border-radius:0}
 #reader.reader-presentation #readerContent {display:flex;flex-direction:column;flex:1;min-height:0}
 #reader.reader-presentation .reader-statusbar {flex:none;flex-wrap:wrap;gap:8px}
 #reader.reader-presentation .presentation-stage {flex:1;min-height:0;height:auto;overflow:hidden;cursor:pointer}

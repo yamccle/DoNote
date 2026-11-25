@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 接收已打开的工作台 Playwright page、closeReader 辅助函数与 3 页测试 PDF 路径。
- * [OUTPUT]: 提供 testWebExcerpt、testAppendPdfExcerpt 与 testPdfBacklinksAndScannedOcr（含备份恢复演练及翻译/批注/AI 问答三面板回归）。
- * [POS]: 由 test-workspace.mjs 调用，专职验证阅读摘录双向回跳、扫描页离线识字入索引、完整备份恢复与右侧三面板核心交互。
+ * [OUTPUT]: 提供 testWebExcerpt、testAppendPdfExcerpt 与 testPdfBacklinksAndScannedOcr（含备份恢复、PDF 三面板、PPT 知识库、三栏设置与单进程网页抓取回归）。
+ * [POS]: 由 test-workspace.mjs 调用，专职验证阅读摘录双向回跳、扫描页离线识字入索引、完整备份恢复、PDF/PPT 阅读器与设置中心核心交互。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 import assert from 'node:assert/strict';
@@ -472,4 +472,141 @@ async function testPdfReaderPanels(page, closeReader) {
   }
   await closeReader(page);
   console.log('PASS pdf reader panels: translation glossary & swap, compact annotations & current-page filter, streaming KaTeX AI Q&A & note save');
+
+  await testPresentationSettingsAndFastWeb(page, closeReader);
+}
+
+async function testPresentationSettingsAndFastWeb(page, closeReader) {
+  // 1. PPT 资料库级预览：首页封面缩略图、讲义提取、逐页批注、网格总览、仅已批注筛选、存为研究笔记与反向跳回对应幻灯片
+  const pptInfo = await page.evaluate(async () => {
+    const x = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/><Override PartName="/ppt/slides/slide2.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/><Override PartName="/ppt/slides/slide3.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/><Override PartName="/ppt/notesSlides/notesSlide2.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/></Types>');
+    zip.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>');
+    zip.file('ppt/presentation.xml', '<?xml version="1.0" encoding="UTF-8"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId2"/><p:sldId id="258" r:id="rId3"/></p:sldIdLst><p:sldSz cx="9144000" cy="5143500"/></p:presentation>');
+    zip.file('ppt/_rels/presentation.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide3.xml"/></Relationships>');
+    zip.file('ppt/slides/_rels/slide2.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide2.xml"/></Relationships>');
+    const slideXml = title => `<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="F4F7F4"/></a:solidFill></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="600000" y="900000"/><a:ext cx="7800000" cy="1200000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr sz="2800" b="1"><a:solidFill><a:srgbClr val="1F3A2E"/></a:solidFill></a:rPr><a:t>${x(title)}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>`;
+    zip.file('ppt/slides/slide1.xml', slideXml('Slide 01 · Noise Transfer Function'));
+    zip.file('ppt/slides/slide2.xml', slideXml('Slide 02 · Kickback Neutralization'));
+    zip.file('ppt/slides/slide3.xml', slideXml('Slide 03 · Silicon Measurement'));
+    zip.file('ppt/notesSlides/notesSlide2.xml', '<?xml version="1.0" encoding="UTF-8"?><p:notes xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="2" name="Notes"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:txBody><a:bodyPr/><a:p><a:r><a:t>讲义备注：中和电容需兼顾寄生电容温度漂移。</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>');
+    const pptBlob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    const pptFile = { id: crypto.randomUUID(), name: 'comparator-lecture.pptx', mime: pptBlob.type, size: pptBlob.size, addedAt: new Date().toISOString() };
+    const ownerId = crypto.randomUUID();
+    await put({
+      id: ownerId, type: 'resource', title: '比较器电路讲义 PPTX', author: 'Dr. Razavi', reference: '', url: '',
+      body: '', date: today(), tags: ['讲义'], status: '待读', pinned: false, attachments: [pptFile]
+    }, [{ key: fileKey(appState.activeId, pptFile.id), blob: pptBlob }]);
+    $('search').value = '';
+    $('libraryKind').value = '';
+    $('libraryStatus').value = '';
+    topic = '';
+    switchView('resource');
+    revealFolderLocation('resource', FOLDER_ALL);
+    render();
+    document.querySelector(`#records .card[data-id="${ownerId}"]`)?.scrollIntoView({ block: 'center' });
+    return { ownerId, fileId: pptFile.id };
+  });
+
+  await page.waitForFunction(ownerId => {
+    const img = document.querySelector(`.library-gallery .card[data-id="${ownerId}"] .library-cover img`);
+    return img && img.complete && img.naturalWidth > 100;
+  }, pptInfo.ownerId);
+
+  await page.evaluate(async fileId => {
+    const file = records.flatMap(n => n.attachments || []).find(a => a.id === fileId);
+    await openAttachment(file);
+  }, pptInfo.fileId);
+  await page.locator('#pptFilmstripList .ppt-thumb-card').nth(2).waitFor();
+  assert.equal(await page.locator('#pptFilmstripList .ppt-thumb-card').count(), 3);
+
+  await page.locator('#pptFilmstripList .ppt-thumb-card').nth(1).click();
+  await page.waitForFunction(() => document.getElementById('pptPageNumber')?.value === '2');
+  assert.match(await page.locator('#pptCurrentSlideTitle').innerText(), /Kickback Neutralization/);
+  assert.match(await page.locator('#pptSpeakerText').innerText(), /中和电容需兼顾寄生电容温度漂移/);
+
+  await page.locator('#pptSlideNoteInput').fill('第 2 页复盘：补充抽取后仿 Cgd 偏置曲线');
+  await page.waitForFunction(() => document.getElementById('pptToggleNotes')?.textContent === '批注 1');
+
+  await page.locator('#pptGridToggle').click();
+  assert.equal(await page.locator('#pptGridView').isVisible(), true);
+  await page.locator('#pptFilterNoted').click();
+  assert.equal(await page.locator('#pptGridView .ppt-thumb-card').count(), 1);
+  await page.locator('#pptFilterNoted').click();
+  await page.locator('#pptGridToggle').click();
+
+  const beforePaperCount = await page.evaluate(() => records.filter(n => n.type === 'paper').length);
+  await page.locator('#pptSaveAsNote').click();
+  await page.waitForFunction(prev => records.filter(n => n.type === 'paper').length === prev + 1, beforePaperCount);
+  const slideNoteId = await page.evaluate(fileId => {
+    const note = records.find(n => n.type === 'paper' && n.pdfSource?.fileId === fileId && n.pdfSource?.page === 2);
+    if (!note || !note.attachments?.some(a => a.mime === 'image/png')) throw new Error('PPT slide note missing screenshot or source');
+    return note.id;
+  }, pptInfo.fileId);
+  await closeReader(page);
+
+  await page.evaluate(() => switchView('all'));
+  assert.match(await page.locator('#homeResume').innerText(), /PPT · 第 2 \/ 3 页/);
+
+  await page.evaluate(id => showDetail(id), slideNoteId);
+  await page.locator('#detailContent button', { hasText: '打开 comparator-lecture.pptx · 第 2 页' }).click();
+  await page.waitForFunction(() =>
+    document.getElementById('reader').open &&
+    document.getElementById('pptPageNumber')?.value === '2' &&
+    document.getElementById('pptSlideNoteInput')?.value.includes('补充抽取后仿 Cgd 偏置曲线'));
+  await closeReader(page);
+
+  // 2. 三栏聚合设置中心：单窗标签切换与内联语音模型 / 默认语向即时同步
+  await page.evaluate(() => document.getElementById('desktopSettingsButton').click());
+  await page.locator('#desktopSettings:popover-open').waitFor();
+  assert.equal(await page.locator('#desktopSettings [data-settings-group]').count(), 3);
+  await page.locator('#desktopSettings [data-settings-group="services"]').click();
+  await page.locator('#settingsSpeechModelSelect').selectOption('large-v3-turbo');
+  await page.locator('#settingsSourceLang').selectOption('de');
+  const syncedSettings = await page.evaluate(() => ({
+    asr: localStorage.getItem('donote-asr-model'),
+    lang: storedTranslateLanguage()
+  }));
+  assert.equal(syncedSettings.asr, 'large-v3-turbo');
+  assert.equal(syncedSettings.lang.source, 'de');
+  await page.locator('#settingsSourceLang').selectOption('en');
+  await page.locator('#desktopSettingsClose').click();
+
+  // 3. 单进程快速收藏网页（bundle 直通与极速纯正文模式）
+  const captureCalls = await page.evaluate(async () => {
+    const calls = [];
+    const origPost = window.chrome.webview.postMessage;
+    window.chrome.webview.postMessage = msg => {
+      if (msg?.type === 'capture-web-article') {
+        calls.push({ kind: msg.kind, cacheAssets: msg.cacheAssets });
+        const pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        queueMicrotask(() => window.qaRelease.post({
+          type: 'yams-one-web-capture',
+          id: msg.id,
+          url: msg.url,
+          html: '<!doctype html><html><head><title>高速 ADC 架构笔记</title></head><body><article><h1>TI-SAR 时间交织校准综述</h1><p>' + '时间交织通道间增益与采样时刻失配校准方法详述。'.repeat(15) + '</p><img src="https://cdn.example.com/fig1.png" alt="图1"></article></body></html>',
+          assets: msg.cacheAssets === false ? {} : { 'https://cdn.example.com/fig1.png': pixel }
+        }));
+        return;
+      }
+      return origPost(msg);
+    };
+    try {
+      const full = await captureWebArticle('https://example.com/ti-sar-full');
+      const fast = await captureWebArticle('https://example.com/ti-sar-fast', { cacheAssets: false });
+      return { calls, fullHasImg: full.contentHtml.includes('data:image/png;base64,'), fastSkippedImg: !fast.contentHtml.includes('data:image/png;base64,') };
+    } finally {
+      window.chrome.webview.postMessage = origPost;
+    }
+  });
+  assert.deepEqual(captureCalls, {
+    calls: [
+      { kind: 'bundle', cacheAssets: true },
+      { kind: 'bundle', cacheAssets: false }
+    ],
+    fullHasImg: true,
+    fastSkippedImg: true
+  });
+  console.log('PASS presentation deck, 3-tab settings center and single-process fast web capture');
 }

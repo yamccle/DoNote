@@ -4,11 +4,11 @@
 
 - `notebook.html` 装配主页、栏目工具栏与记录编辑器。
 - `workspace-home.js` 从保存的附件位置和计划生成主页首屏。
-- `reader-session.js` 从附件检查点恢复阅读位置。多附件资料使用该附件的阅读完成状态。
+- `reader-session.js` 和 `reader-tabs.js` 从附件检查点恢复 PDF / PPT / 视频阅读位置，并支持在论文 PDF 与讲义 PPT 多标签之间原地切换。
 - `workspace-home.css` 布置继续阅读、近期计划和主页组件。
 - `workspace-toolbar.js` 重用搜索、栏目筛选和菜单动作，按当前栏目排列。
 - `workspace-toolbar.css` 布置栏目的主操作和响应式菜单。
-- `workspace-layout.css` 布置标题、主页侧栏及记录列表。
+- `workspace-layout.css` 布置标题、左侧导航栏、统计条、主页侧栏、全站记录卡片及资料库列表。
 - `categories.js` 为导航和编辑器同步当前工作台的栏目与类型名称。
 - `record-editor.js` 按当前栏目选择新建路径。编辑器切换类型时保留已填写的正文与计划日期。
 - `plans.js` 提供计划日期和周期字段，切换类型时由编辑器决定是否初始化日期。
@@ -40,7 +40,8 @@
 - `pdf-annotations.js`、`pdf-annotation-export.js` 和 `pdf-reflow.js` 提供紧凑批注卡片、页签计数、仅当前页过滤、渐进式批注展开、圆点换色、闪烁回跳与排版重流控制。
 - `reader-ai.js` 提供工程精读快捷提问、SSE 流式回答、Markdown + KaTeX 公式防转义排版、可点击页码胶囊回跳与沉淀笔记。
 - `reader-toolbar.css` 和 `reader-panels.css` 统一布局工具菜单、右侧四页签面板、双栏翻译卡、紧凑批注卡与公式级 AI 问答界面。
-- `web-reader.js` 阅读已保存网页。选中正文或已有标注可保存为研究笔记，笔记经 `webSource` 打开原文并定位摘录。
+- `presentation-preview.js` 和 `presentation-preview.css` 提供 PPT / PPTX 资料库级工作台：左侧幻灯片胶片导航、网格总览、沉浸全屏放映、原片讲义自动提取、逐页批注防抖保存、一键沉淀研究笔记或追加记录，以及资料库首页封面缩略图生成。
+- `web-capture.js`、`web-library.js` 和 `web-reader.js` 衔接单进程并发网页抓取、极速纯正文模式与离线网页阅读；选中正文或已有标注可保存为研究笔记并经 `webSource` 回跳定位。
 - `video-subtitles.js` 同步播放位置和当前字幕，按用户操作定位字幕；「识别时同步翻译」开关让识别与离线翻译并行，逐条产出中文字幕。
 - `video-subtitles.css` 提供字幕操作、任务进度和当前字幕的状态样式。
 - `video-player-learning.js` 在学习控制栏保留字幕显示开关。

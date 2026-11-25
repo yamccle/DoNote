@@ -1,9 +1,15 @@
+/**
+ * [INPUT]: 读取资料库筛选结果、附件字节与缩略图缓存。
+ * [OUTPUT]: 提供分页条、PDF/PPT/网页/图片/视频封面缩略图懒加载与资料库列表渲染。
+ * [POS]: 文献与媒体库视图核心渲染层，在视口可见时按需生成并缓存首页封面图。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 let galleryEpoch=0,galleryObserver,galleryQueue=[],galleryWorkers=0;
 const galleryUrls=new Set();
 const selectedLibraryIds=new Set();
 let librarySelectionMode=false,librarySelectionProfile=null,visibleLibraryIds=[],libraryDeleting=false;
-function libraryPageSize(){return view==='journal'?12:20}
+function libraryPageSize(){return 20}
 let libraryPage=1,libraryPageSignature='';
 function libraryFilterSignature(){
  const value=id=>{const node=$(id);if(!node)return '';return node.type==='checkbox'?String(node.checked):String(node.value)};
@@ -86,6 +92,10 @@ async function thumbnail(file,profileId,snapshot){
   try{doc=await task.promise;const page=await doc.getPage(1),base=page.getViewport({scale:1}),viewport=page.getViewport({scale:320/base.width}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.min(700,Math.ceil(viewport.height));await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;blob=await new Promise(r=>canvas.toBlob(r,'image/png'))}finally{await task.destroy().catch(()=>{})}
  }else if(fileIsImage(file)){
   const bitmap=await createImageBitmap(original);try{const canvas=document.createElement('canvas');canvas.width=Math.min(400,bitmap.width);canvas.height=Math.max(1,Math.round(bitmap.height*canvas.width/bitmap.width));const bounded=Math.min(canvas.height,700);canvas.height=bounded;canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,bitmap.height*canvas.width/bitmap.width);blob=await new Promise(r=>canvas.toBlob(r,'image/png'))}finally{bitmap.close()}
+ }else if(typeof fileIsPresentation==='function'&&fileIsPresentation(file)){
+  if(original.size<=MAX_DOCUMENT_PREVIEW&&typeof renderFirstPresentationSlideBlob==='function'){
+   blob=await renderFirstPresentationSlideBlob(original);
+  }
  }else if(fileIsVideo(file)){
   const url=URL.createObjectURL(original),video=document.createElement('video');video.muted=true;video.preload='auto';video.src=url;
   try{blob=await new Promise(resolve=>{const timer=setTimeout(()=>resolve(null),6000);video.onerror=()=>{clearTimeout(timer);resolve(null)};video.onloadeddata=()=>{video.currentTime=Math.min(.5,Number.isFinite(video.duration)?video.duration/3:0)};video.onseeked=()=>{const canvas=document.createElement('canvas');canvas.width=320;canvas.height=Math.max(1,Math.round((video.videoHeight||180)*320/(video.videoWidth||320)));canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);canvas.toBlob(result=>{clearTimeout(timer);resolve(result)},'image/png')}})}finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url)}
@@ -173,7 +183,7 @@ function renderLibraryGallery(list,allIds){
   card.onclick=activate;card.onkeydown=e=>{if(e.target===card&&(e.key==='Enter'||e.key===' ')){e.preventDefault();activate()}};
   details.onclick=e=>{e.stopPropagation();showDetail(n.id)};
   remove.onclick=e=>{e.stopPropagation();deleteLibraryItems([n.id])};
-  if(!web&&file&&!fileIsPresentation(file))galleryObserver.observe(cover);
+  if(!web&&file)galleryObserver.observe(cover);
  }
  updateLibrarySelection();
 }

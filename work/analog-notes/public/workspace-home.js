@@ -26,14 +26,15 @@ function latestHomeReading(profile){
    }
    continue;
   }
-  const files=(record.attachments||[]).filter(file=>fileIsPdf(file)||fileIsVideo(file));
+  const files=(record.attachments||[]).filter(file=>fileIsPdf(file)||fileIsVideo(file)||fileIsPresentation(file));
   if(!files.length||(finished&&files.length===1))continue;
   const legacy=loadReadingCheckpoint(profile.id,record.id,reading[record.id]||record.readerProgress);
   const legacyFile=finished||record.attachments.some(file=>reading[file.id])?null:legacyReadingAttachment(record,legacy);
   for(const file of files){
    const saved=loadReadingCheckpoint(profile.id,file.id,reading[file.id])||(legacyFile?.id===file.id?legacy:null);
    if(!saved||saved.finished)continue;
-   const label=[saved.kind==='video'?'视频':'PDF',files.length>1?file.name:'',progressLabel(saved)].filter(Boolean).join(' · ');
+   const kindLabel=saved.kind==='video'?'视频':saved.kind==='presentation'||fileIsPresentation(file)?'PPT':'PDF';
+   const label=[kindLabel,files.length>1?file.name:'',progressLabel(saved)].filter(Boolean).join(' · ');
    consider(record,file,saved.lastOpened,label);
   }
  }
