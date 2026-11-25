@@ -2,10 +2,10 @@
 
 DoNote 是本地优先的跨学科知识精读、文献管理与课题研究工作台。桌面端使用 C# WinForms、WebView2 和本地工作台。
 
-- `work/desktop/` 提供 Windows 宿主、文件接口、GitHub 在线自动更新、本地更新器和离线服务入口。
-- `work/analog-notes/public/` 提供工作台、篮板式拖拽分拣入库、后台任务中心、十张成就殿宇卡牌、编辑器、PDF、PPT 和视频界面。
+- `work/desktop/` 提供 Windows 宿主、四栏自适应设置中心、GitHub 静默检查与在线自动更新、本地更新器和离线服务入口。
+- `work/analog-notes/public/` 提供工作台、篮板式拖拽分拣入库、后台任务中心、十张成就殿宇卡牌、研究方向降噪治理、编辑器、PDF、PPT 及视频双语字幕与多模态 AI 助教问答界面。
 - `work/analog-notes/scripts/` 构建桌面工作台和便携 HTML。
-- `work/ai-bridge/` 提供外部助手 MCP 接口、本机授权与 `/api/sync/v1` 多端内容寻址增量同步服务。
+- `work/ai-bridge/` 提供外部助手 MCP 接口、本机授权与 `/api/sync/v1` 多端零信任端到端加密（E2EE）、批注级 CRDT 合并及 SSE 实时推送同步服务。
 - `work/video-runtime-build/` 只纳入两个已修改的翻译源码目录。运行依赖按发布锁定文件读取。
 - `tools/release.ps1` 从 Git 提交构建并核验发布包。
 - `tools/tests/` 使用隔离资料和合成附件检查关键流程。

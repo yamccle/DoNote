@@ -324,13 +324,16 @@ async function openPresentationAttachment(file, blob) {
     const trimmed = text.trim();
     const existing = slideNoteRecord(slideNumber);
     const meta = slideMetas[slideNumber - 1];
+    const nowIso = new Date().toISOString();
     if (!trimmed) {
       if (!existing) return;
+      window.DoNoteSyncCrypto?.recordMarkTombstones?.(session.profileId, file.id, [existing.id], nowIso);
       session.annotations = session.annotations.filter(item => item !== existing);
     } else if (existing) {
       if (existing.note === text && existing.quote === (meta?.title || '')) return;
       existing.note = text.slice(0, 29000);
       existing.quote = (meta?.title || '').slice(0, 500);
+      existing.updatedAt = nowIso;
     } else {
       session.annotations.push({
         id: crypto.randomUUID(),
@@ -341,7 +344,8 @@ async function openPresentationAttachment(file, blob) {
         color: colorDot.dataset.color || MARK_COLORS[0],
         rects: [],
         points: [],
-        createdAt: new Date().toISOString()
+        createdAt: nowIso,
+        updatedAt: nowIso
       });
     }
     savePdfMarks(session);

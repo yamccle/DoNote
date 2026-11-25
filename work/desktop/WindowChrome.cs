@@ -25,6 +25,9 @@ internal sealed partial class WorkspaceWindow
     private Bitmap captionWordmarkDark;
     private Panel chromeAiBadge;
     private Button chromeAiStatus;
+    private Button chromeSettingsButton;
+    private ToolTip chromeToolTip;
+    private bool updateAvailableIndicator;
     private Action adaptChromeLayout;
     private Button maximizeButton;
     private const int StandardDpi = 96;
@@ -162,9 +165,17 @@ internal sealed partial class WorkspaceWindow
         brand.Controls.Add(logo);
         logo.Disposed += (sender, args) => { captionWordmarkLight.Dispose(); captionWordmarkDark.Dispose(); };
         chromeSection = new Label { Text = "总览", TextAlign = ContentAlignment.MiddleCenter, AutoEllipsis = true };
-        var settings = CaptionButton("设置", "设置", async delegate { await InvokeWorkspaceControl("desktopSettingsButton"); }, false);
+        var settings = chromeSettingsButton = CaptionButton("设置", "设置", async delegate { await InvokeWorkspaceControl("desktopSettingsButton"); }, false);
         settings.Dock = DockStyle.Left;
         settings.Width = 62;
+        settings.Paint += (sender, args) =>
+        {
+            if (!updateAvailableIndicator) return;
+            int dotSize = ScaleChrome(6);
+            args.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (var ink = new SolidBrush(Color.FromArgb(217, 119, 6)))
+                args.Graphics.FillEllipse(ink, settings.Width - ScaleChrome(11), ScaleChrome(8), dotSize, dotSize);
+        };
         chromeNew = CaptionButton("＋ 新建记录", "新建记录", async delegate { await InvokeWorkspaceControl("newBtn"); }, false);
         chromeNew.Dock = DockStyle.Left;
         chromeAiBadge = new Panel { Dock = DockStyle.Left, Width = 42, BackColor = chromeBackground, Visible = false };
@@ -177,7 +188,8 @@ internal sealed partial class WorkspaceWindow
                 args.Graphics.FillEllipse(ink, chromeAiStatus.Width - ScaleChrome(7), ScaleChrome(4), dotSize, dotSize);
         };
         chromeAiBadge.Controls.Add(chromeAiStatus);
-        var hint = new ToolTip();
+        var hint = chromeToolTip = new ToolTip();
+        hint.SetToolTip(settings, "偏好设置");
         hint.SetToolTip(chromeAiStatus, "AI 已连接 · 打开 AI 管理");
         hint.SetToolTip(chromeNew, "新建记录 (Ctrl+N)");
         titleBar.Disposed += (sender, args) => hint.Dispose();
@@ -403,6 +415,17 @@ internal sealed partial class WorkspaceWindow
         if (command == "ai-indicator:on" || command == "ai-indicator:off")
         {
             SetAiConnectionIndicator(command == "ai-indicator:on");
+            return true;
+        }
+        if (command == "update-indicator:on" || command == "update-indicator:off")
+        {
+            updateAvailableIndicator = command == "update-indicator:on";
+            if (chromeSettingsButton != null)
+            {
+                if (chromeToolTip != null)
+                    chromeToolTip.SetToolTip(chromeSettingsButton, updateAvailableIndicator ? "偏好设置 · 发现新版本可更新" : "偏好设置");
+                chromeSettingsButton.Invalidate();
+            }
             return true;
         }
         const string prefix = "chrome:";

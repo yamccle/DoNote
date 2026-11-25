@@ -32,13 +32,28 @@ function renderLibraryPager(total){
  const pages=Math.max(1,Math.ceil(total/libraryPageSize()));
  if(total<=libraryPageSize()){pager.hidden=true;pager.replaceChildren();return}
  const from=(libraryPage-1)*libraryPageSize()+1,to=Math.min(total,libraryPage*libraryPageSize());
+ const pageNums=[];
+ const addNum=n=>{if(n>=1&&n<=pages&&!pageNums.includes(n))pageNums.push(n)};
+ addNum(1);
+ for(let n=libraryPage-1;n<=libraryPage+1;n++)addNum(n);
+ addNum(pages);
+ pageNums.sort((a,b)=>a-b);
+ let numButtons='',prev=0;
+ for(const n of pageNums){
+  if(prev&&n-prev>1)numButtons+='<span class="pager-ellipsis" aria-hidden="true">…</span>';
+  numButtons+='<button type="button" class="pager-num'+(n===libraryPage?' is-current':'')+'" data-page="'+n+'"'+(n===libraryPage?' aria-current="page"':'')+'>'+n+'</button>';
+  prev=n;
+ }
  pager.hidden=false;
- pager.innerHTML='<button type="button" class="secondary" data-page="1" aria-label="第一页"'+(libraryPage===1?' disabled':'')+'>«</button>'
-  +'<button type="button" class="secondary" data-page="'+(libraryPage-1)+'"'+(libraryPage===1?' disabled':'')+'>上一页</button>'
-  +'<span class="library-pager-info">'+from+'–'+to+' / 共 '+total+' 条</span>'
-  +'<label class="library-pager-jump">第 <input id="libraryPageInput" type="number" min="1" max="'+pages+'" value="'+libraryPage+'" inputmode="numeric" aria-label="跳转到第几页"> / '+pages+' 页</label>'
-  +'<button type="button" class="secondary" data-page="'+(libraryPage+1)+'"'+(libraryPage===pages?' disabled':'')+'>下一页</button>'
-  +'<button type="button" class="secondary" data-page="'+pages+'" aria-label="最后一页"'+(libraryPage===pages?' disabled':'')+'>»</button>';
+ pager.innerHTML='<span class="library-pager-info">显示 <strong>'+from+'–'+to+'</strong> / 共 '+total+' 条</span>'
+  +'<div class="library-pager-nav">'
+  +'<button type="button" class="secondary pager-step" data-page="1" aria-label="第一页" title="第一页"'+(libraryPage===1?' disabled':'')+'>«</button>'
+  +'<button type="button" class="secondary pager-step" data-page="'+(libraryPage-1)+'"'+(libraryPage===1?' disabled':'')+'>‹ 上一页</button>'
+  +'<div class="pager-nums">'+numButtons+'</div>'
+  +'<button type="button" class="secondary pager-step" data-page="'+(libraryPage+1)+'"'+(libraryPage===pages?' disabled':'')+'>下一页 ›</button>'
+  +'<button type="button" class="secondary pager-step" data-page="'+pages+'" aria-label="最后一页" title="最后一页"'+(libraryPage===pages?' disabled':'')+'>»</button>'
+  +'</div>'
+  +'<label class="library-pager-jump"><span>跳至</span><input id="libraryPageInput" type="number" min="1" max="'+pages+'" value="'+libraryPage+'" inputmode="numeric" aria-label="跳转到第几页"><span>/ '+pages+' 页</span></label>';
  pager.querySelectorAll('[data-page]').forEach(button=>{button.onclick=()=>setLibraryPage(button.dataset.page)});
  const input=$('libraryPageInput');
  const jump=()=>{const value=Math.round(Number(input.value));if(Number.isFinite(value)&&value>0)setLibraryPage(value);else input.value=libraryPage};

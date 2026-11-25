@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { verifyPlatformEvolutionR139 } from './workspace-r139.mjs';
+import { verifyRefinementsAndSyncProR140 } from './workspace-r140.mjs';
 
 export async function testWebExcerpt(page) {
   const quote = '链上要找回的这一句摘录。';
@@ -633,10 +634,10 @@ async function testPresentationSettingsAndFastWeb(page, closeReader) {
   assert.equal(await page.locator('#restoreFolderSlot #restoreLargeBackupFolder').count(), 1);
   await page.locator('#backup [data-close="backup"]').click();
 
-  // 2. 三栏聚合设置中心：单窗标签切换与内联语音模型 / 默认语向即时同步
+  // 2. 四栏自适应设置中心：单窗标签切换与内联语音模型 / 默认语向即时同步
   await page.evaluate(() => document.getElementById('desktopSettingsButton').click());
   await page.locator('#desktopSettings:popover-open').waitFor();
-  assert.equal(await page.locator('#desktopSettings [data-settings-group]').count(), 3);
+  assert.equal(await page.locator('#desktopSettings [data-settings-group]').count(), 4);
   await page.locator('#desktopSettings [data-settings-group="services"]').click();
   await page.locator('#settingsSpeechModelSelect').selectOption('large-v3-turbo');
   await page.locator('#settingsSourceLang').selectOption('de');
@@ -685,5 +686,6 @@ async function testPresentationSettingsAndFastWeb(page, closeReader) {
     fastSkippedImg: true
   });
   await verifyPlatformEvolutionR139(page);
-  console.log('PASS presentation deck, 3-tab settings center and single-process fast web capture');
+  await verifyRefinementsAndSyncProR140(page);
+  console.log('PASS presentation deck, 4-tab adaptive settings center and single-process fast web capture');
 }

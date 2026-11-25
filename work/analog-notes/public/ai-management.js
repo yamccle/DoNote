@@ -70,7 +70,7 @@ async function publishBridgeSnapshot({onlyIfChanged=false}={}){
 async function refreshBridgeLists(){
  const profileId=appState.activeId,[agents,tasks,audit]=await Promise.all([bridgeApi('/api/admin/agents'),bridgeApi('/api/admin/tasks?profileId='+encodeURIComponent(profileId)),bridgeApi('/api/admin/audit')]);
  if(appState.activeId!==profileId)return;
- $('bridgeAgentList').innerHTML=agents.agents.filter(a=>a.profileId===profileId).map(a=>'<div class="manager-row"><span><b>'+esc(a.name)+'</b><small class="profile-meta">'+a.scopes.map(s=>esc(bridgeScopeLabels[s]||s)).join(' · ')+' · '+(a.revoked?'已撤销':'已启用')+'</small></span><button class="secondary" data-subtitle-agent="'+a.id+'" '+(a.revoked?'disabled':'')+'>'+(a.scopes.includes('subtitles:read')&&a.scopes.includes('subtitles:write')?'关闭字幕权限':'启用字幕翻译')+'</button><button class="secondary" data-revoke-agent="'+a.id+'" '+(a.revoked?'disabled':'')+'>撤销凭证</button></div>').join('')||'<p class="section-note">当前用户还没有接入助手。</p>';
+ $('bridgeAgentList').innerHTML=agents.agents.filter(a=>a.profileId===profileId&&!a.revoked).map(a=>'<div class="manager-row"><span><b>'+esc(a.name)+'</b><small class="profile-meta">'+a.scopes.map(s=>esc(bridgeScopeLabels[s]||s)).join(' · ')+'</small></span><button class="secondary" data-subtitle-agent="'+a.id+'">'+(a.scopes.includes('subtitles:read')&&a.scopes.includes('subtitles:write')?'关闭字幕权限':'启用字幕翻译')+'</button><button class="danger" data-revoke-agent="'+a.id+'">删除凭证</button></div>').join('')||'<p class="section-note">当前用户还没有接入助手。</p>';
  for(const button of $('bridgeAgentList').querySelectorAll('[data-subtitle-agent]')){
   button.onclick=async()=>{
    const agent=agents.agents.find(item=>item.id===button.dataset.subtitleAgent);
@@ -87,7 +87,7 @@ async function refreshBridgeLists(){
    finally{button.disabled=false;}
   };
  }
- $('bridgeAgentList').querySelectorAll('[data-revoke-agent]').forEach(button=>button.onclick=async()=>{if(!confirm('撤销此助手凭证？之后的新请求会被拒绝，尚未同步的任务会被拒绝；已经完成的记录会保留。'))return;try{await bridgeApi('/api/admin/agents/'+button.dataset.revokeAgent+'/revoke',{method:'POST',body:{}});await refreshBridgeLists()}catch(e){bridgeStatus(e.message,true)}});
+ $('bridgeAgentList').querySelectorAll('[data-revoke-agent]').forEach(button=>button.onclick=async()=>{if(!confirm('撤销并删除此助手凭证？删除后令牌立即失效且从列表移除，尚未同步的任务会被拒绝；已经写入的记录会保留。'))return;try{await bridgeApi('/api/admin/agents/'+button.dataset.revokeAgent+'/revoke',{method:'POST',body:{}});await refreshBridgeLists();bridgeStatus('助手凭证已撤销并删除。')}catch(e){bridgeStatus(e.message,true)}});
  const stateNames={pending:'待同步',applied:'已写入',rejected:'未写入'};
  const ordered=[...tasks.tasks].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')),pending=ordered.filter(t=>t.state==='pending').length,rejected=ordered.filter(t=>t.state==='rejected').length;
  const shown=(bridgeTaskFilter==='recent'?ordered:ordered.filter(t=>t.state===bridgeTaskFilter)).slice(0,5);

@@ -71,10 +71,11 @@ function libraryFolderToolbar(filter,folders){
 
 function libraryFolderCard(folder,total,subfolders){
  const label=total?total+' 份文件':(subfolders?'暂无文件':'空文件夹');
+ const meta=label+(subfolders?' · '+subfolders+' 个子文件夹':'');
  const title=esc(folder.name),id=esc(folder.id);
  return '<div class="library-folder-item"><button type="button" class="library-folder-card" data-folder-open="'+id+
-  '" title="打开 '+title+'"><span class="folder-glyph">'+FOLDER_ICON+'</span><span class="folder-name">'+title+'</span><small>'+
-  label+(subfolders?' · '+subfolders+' 个子文件夹':'')+'</small></button>'+
+  '" title="打开 '+title+'（'+esc(meta)+'）"><span class="folder-glyph">'+FOLDER_ICON+'</span><span class="folder-name">'+title+'</span><small>'+
+  meta+'</small></button>'+
   '<button type="button" class="icon-button library-folder-more" data-folder-more="'+id+'" aria-haspopup="menu" aria-label="文件夹操作：'+title+
   '" title="文件夹操作">⋯</button></div>';
 }
@@ -93,7 +94,7 @@ function renderLibraryFolders(){
   }
   if(!filter){
    const loose=records.filter(note=>libraryNote(note)&&!note.folderId).length;
-   if(loose)cards.push('<button type="button" class="library-folder-card loose" data-folder-open="'+FOLDER_ROOT+'" title="查看未归档资料"><span class="folder-glyph">'+FOLDER_ICON+'</span><span class="folder-name">未归档</span><small>'+loose+' 份文件</small></button>');
+   if(loose)cards.push('<div class="library-folder-item"><button type="button" class="library-folder-card loose" data-folder-open="'+FOLDER_ROOT+'" title="查看未归档资料（'+loose+' 份文件）"><span class="folder-glyph">'+FOLDER_ICON+'</span><span class="folder-name">未归档</span><small>'+loose+' 份文件</small></button></div>');
   }
  }
  host.innerHTML=libraryFolderToolbar(filter,byId)+(cards.length?'<div class="library-folder-grid">'+cards.join('')+'</div>':'');

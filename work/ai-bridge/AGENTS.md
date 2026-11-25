@@ -3,9 +3,9 @@
 > L2 | Parent: /AGENTS.md
 
 Member list
-- `server.mjs`: HTTP 接入主服务，提供工作台快照管理、助手令牌鉴权、异步任务队列与 CORS 安全边界。
+- `server.mjs`: HTTP 接入主服务，提供工作台快照管理、助手令牌鉴权（撤销即彻底清除不留冗余记录）、异步任务队列与 CORS 安全边界。
 - `mcp.mjs`: Model Context Protocol (MCP) 协议层，向已授权外部 AI 助手暴露文献检索、记录读写与字幕翻译工具。
-- `sync-v1.mjs`: 多端在线同步协议层 (`/api/sync/v1/*`)，维护 SHA-256 内容寻址去重附件块存储与单调游标增量记录合并。
+- `sync-v1.mjs`: 多端在线同步协议层 (`/api/sync/v1/*`)，支持 SHA-256 内容寻址去重块存储、PDF/PPT 批注级细粒度合并、SSE 实时变更广播 (`/events`) 与零信任端到端加密密文信封。
 - `openapi.json`: REST 接口规范定义。
 - `adapter.py`: Python 侧本地与远程调用适配器示例。
 - `AI接入指南.md`: 面向用户与外部助手的接入与权限说明文档。

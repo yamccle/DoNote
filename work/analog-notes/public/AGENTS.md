@@ -3,8 +3,8 @@
 > L2 | 项目规则来自工作区 AGENTS.md。
 
 - `notebook.html` 装配主页、栏目工具栏与记录编辑器。
-- `workspace-home.js` 和 `workspace-home.css` 从保存的附件位置和计划生成总览问候语、紧凑克制的继续阅读进度环网格与近期计划列表。
-- `dashboard-widgets.js` 提供紧凑可点击跳转的栏目统计条、近 7 天动态柱状活跃图与近 8 周热力图切换，以及里程碑倒计时编排。
+- `workspace-home.js` 和 `workspace-home.css` 从保存的附件位置和计划生成总览问候语、低饱和莫兰迪类型色相继续阅读卡片与近期计划列表。
+- `dashboard-widgets.js` 提供行动导向的栏目统计条（进行中计划、剩余未解决问题、近 7 天新增文献与记录）、近 7 天柱状活跃图与近 8 周足迹热力图切换，以及里程碑倒计时编排。
 - `workspace-motion.js` 和 `workspace-bento.css` 提供全站常驻显眼 `快捷指令 Ctrl+K` 启动条与聚光灯面板、资料库画廊/列表双视图切换、问题与计划多列拖拽看板及备份恢复中心样式。
 - `reader-session.js` 和 `reader-tabs.js` 从附件检查点恢复 PDF / PPT / 视频阅读位置，并支持在论文 PDF 与讲义 PPT 多标签之间原地切换。
 - `workspace-toolbar.js` 重用搜索、栏目筛选和菜单动作，按当前栏目排列。
@@ -46,12 +46,15 @@
 - `web-capture.js`、`web-library.js` 和 `web-reader.js` 衔接单进程并发网页抓取、极速纯正文模式与离线网页阅读；选中正文或已有标注可保存为研究笔记并经 `webSource` 回跳定位。
 - `video-subtitles.js` 同步播放位置和当前字幕，按用户操作定位字幕；「识别时同步翻译」开关让识别与离线翻译并行，逐条产出中文字幕。
 - `video-subtitles.css` 提供字幕操作、任务进度和当前字幕的状态样式。
+- `video-frame-notes.js`、`video-ai.js` 和 `video-frame-notes.css` 提供视频右侧「定格批注 / AI 助教问答」双页签面板，支持当前帧视觉快照 + 双语字幕上下文多模态问答、公式渲染、`[MM:SS]` 时间码跳播与一键沉淀定格批注或研究笔记。
 - `video-player-learning.js` 在学习控制栏保留字幕显示开关。
-- `achievement-cards.js` 记录每日打开/使用活跃足迹与专注分钟数 (`DoNoteUsage`)，驱动成就殿宇 10 张里程碑卡牌（保留 01 集成电路溯源卡，涵盖即时入库与跨日长期坚持目标）与 3D 翻面预览。
+- `topic-curation.js` 拦截日期串、附件文件名与组会周报标签污染研究方向，并在「管理研究方向」弹窗提供搜索分类筛选、一键无损收纳杂项（保留原记录标签）与空方向清理。
+- `achievement-cards.js` 记录每日打开/使用活跃足迹与专注分钟数 (`DoNoteUsage`)，驱动成就殿宇 10 张里程碑卡牌、3D 翻面预览及设置页显隐开关 (`isEnabled` / `setEnabled`)。
 - `task-center.js` 提供 `window.DoNoteTasks` 统一后台任务中心，在工作台顶栏与全屏阅读器浮标实时汇总更新下载、语音识别、双语翻译、备份恢复、批量入库、网页收藏与多端同步进度。
 - `file-drop-triage.js` 和 `file-drop-triage.css` 提供篮板式全局拖拽投递浮层与「投递归档分拣台」，支持入库前一键清洗标题、选择栏目或合并附件、即时新建子文件夹与套用研究标签。
-- `sync-foundation.js` 提供 `window.DoNoteSync` 多端同步底座，维护本机设备标识、记录单调版本戳 `syncMeta`、删除墓碑、附件 SHA-256 指纹及 `/api/sync/v1` 增量握手同步。
-- `ai-management.js` 驱动精简版 AI 助手连接器弹窗，桌面端突出一键连接并折叠高级配置与 8 项细粒度权限。
-- `workspace-evolution.css` 定义侧边栏宁缺毋滥微层次、精简版 AI 管理页、后台任务中心与多端同步设置卡片样式。
+- `sync-crypto.js` 提供 `window.DoNoteSyncCrypto`，实现 PDF / PPT 批注元素级无冲突 CRDT 合并（含同页幻灯片离线并发批注无损归并）与 `PBKDF2-HKDF-AES256GCM` 端到端加解密。
+- `sync-foundation.js` 和 `sync-realtime.js` 提供 `window.DoNoteSync` 多端同步编排与 SSE 实时推送长连接，维护稳定设备标识、记录与批注增量同步、设置面板双向绑定及零信任端到端加密传输。
+- `ai-management.js` 驱动精简版 AI 助手连接器弹窗，撤销助手凭证时立即彻底移除不再累积陈旧条目。
+- `workspace-evolution.css` 和 `workspace-polish.css` 定义侧边栏微层次、精简版 AI 管理页、后台任务中心、胶囊分页器、研究方向治理弹窗及全站低饱和莫兰迪类型色相样式。
 
 [PROTOCOL]: Update this header on change, then check AGENTS.md

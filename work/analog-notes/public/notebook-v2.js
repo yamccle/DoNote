@@ -88,11 +88,13 @@ function updateIdentity(){
  syncCategoryConfig();const p=activeProfile();$('activeUser').textContent=p.name;
  if(typeof requestStoredBridge==='function')requestStoredBridge();
 }
-function addNewTopicTags(profile,tags){
- const candidates=[...new Set(tags.map(tag=>tag.trim()))].filter(tag=>tag&&tag.length<=MAX_TOPIC_LENGTH&&!profile.topics.includes(tag));
+function addNewTopicTags(profile,tags,note=null){
+ if(note&&typeof weeklyJournal==='function'&&weeklyJournal(note))return;
+ const allow=typeof window.shouldAutoPromoteTopicTag==='function'?window.shouldAutoPromoteTopicTag:()=>true;
+ const candidates=[...new Set(tags.map(tag=>tag.trim()))].filter(tag=>tag&&tag.length<=MAX_TOPIC_LENGTH&&!profile.topics.includes(tag)&&allow(tag));
  if(!candidates.length||profile.topics.length>=MAX_TOPICS)return;
  // Existing tags that are absent from the sidebar can stay hidden when an entry is saved again.
- const existing=new Set(profile.records.flatMap(note=>note.tags));
+ const existing=new Set(profile.records.flatMap(entry=>entry.tags));
  profile.topics.push(...candidates.filter(tag=>!existing.has(tag)).slice(0,MAX_TOPICS-profile.topics.length));
 }
 async function put(note,writes=[],deletions=[]){
@@ -117,7 +119,7 @@ async function put(note,writes=[],deletions=[]){
  if(saved.type==='resource'&&activeProfile().reading?.[saved.id])saved.readerProgress=activeProfile().reading[saved.id];
  window.DoNoteSync?.stampRecordMutation?.(saved,previous);
  const next=structuredClone(appState),p=next.profiles.find(p=>p.id===next.activeId);
- addNewTopicTags(p,saved.tags);
+ addNewTopicTags(p,saved.tags,saved);
  p.records=p.records.filter(n=>n.id!==saved.id).concat(saved);
  addCompletedPlanLog(p,saved);
  const unreferenced=deletions.filter(key=>!p.records.some(n=>n.attachments?.some(a=>fileKey(p.id,a.id)===key)));

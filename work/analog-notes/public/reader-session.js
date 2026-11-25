@@ -132,7 +132,14 @@ function createReadingSession(file, kind) {
   const finished = attachmentCheckpoint && hasOtherReadableFile
     ? attachmentCheckpoint.finished
     : legacy?.finished ?? checkpoint?.finished;
-  const progress = sanitizeReadingProgress({ ...checkpoint, kind, finished });
+  const progress = sanitizeReadingProgress({
+    ...checkpoint,
+    kind,
+    finished,
+    lastOpened: new Date().toISOString()
+  });
+  storeReadingCheckpoint(profileId, file.id, progress);
+  if (owner?.id) storeReadingCheckpoint(profileId, owner.id, progress);
   return {
     file,
     ownerId: owner?.id,

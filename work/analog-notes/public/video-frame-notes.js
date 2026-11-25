@@ -308,4 +308,30 @@ function mountVideoFrameNotes(session, video, hint, content) {
     });
   }
   drawList();
+
+  window.mountVideoAiAssistant?.(session, video, panel, async (timeSec, aiText) => {
+    if (notes.length >= VIDEO_FRAME_NOTE_LIMIT) throw new Error('此视频定格批注已满。');
+    let shot;
+    try {
+      shot = captureVideoFrame(video);
+    } catch {
+      const c = document.createElement('canvas');
+      c.width = 320;
+      c.height = 180;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, 0, 320, 180);
+      shot = {
+        id: crypto.randomUUID(),
+        time: Math.max(0, Number(timeSec) || 0),
+        image: c.toDataURL('image/jpeg', 0.8),
+        focus: null,
+        text: '',
+        createdAt: new Date().toISOString()
+      };
+    }
+    shot.time = Math.max(0, Number.isFinite(timeSec) ? timeSec : shot.time);
+    shot.text = String(aiText || '').trim().slice(0, 4000);
+    await persist([...notes, shot], 'AI 解析已存入定格批注');
+  });
 }

@@ -61,7 +61,7 @@ export async function createBridge({dataDir,adminToken,host='127.0.0.1',port=431
  if(!bounded(adminToken,512,true)||adminToken.length<24)throw Error('管理令牌至少需要 24 个字符。');
  const root=path.resolve(dataDir),filesDir=path.join(root,'files'),statePath=path.join(root,'state.json');await fs.mkdir(filesDir,{recursive:true,mode:0o700});
  const syncStore=await createSyncStore(root);
- let state;try{state=JSON.parse(await fs.readFile(statePath,'utf8'));if(state.version!==1)throw Error('数据版本不支持')}catch(error){if(error.code!=='ENOENT')throw error;state={version:1,profiles:{},agents:[],tasks:[],files:{},audit:[]};await atomicJson(statePath,state)}
+ let state;try{state=JSON.parse(await fs.readFile(statePath,'utf8'));if(state.version!==1)throw Error('数据版本不支持');if(Array.isArray(state.agents)&&state.agents.some(a=>a.revoked)){state.agents=state.agents.filter(a=>!a.revoked);await atomicJson(statePath,state)}}catch(error){if(error.code!=='ENOENT')throw error;state={version:1,profiles:{},agents:[],tasks:[],files:{},audit:[]};await atomicJson(statePath,state)}
  let pending=Promise.resolve();
  const subtitleResults=new Map();
  const subtitleResultTimer=setInterval(()=>{
@@ -268,7 +268,7 @@ export async function createBridge({dataDir,adminToken,host='127.0.0.1',port=431
     await transact(s=>{s.profiles[input.id]=profile;log(s,'owner','snapshot',{profileId:input.id,count:records.length,includeBody:profile.includeBody})});return reply({ok:true,profileId:input.id,count:records.length});
    }
    if(route==='/api/admin/profiles'&&req.method==='GET'){owner(who);return reply({profiles:Object.values(state.profiles).map(p=>({id:p.id,name:p.name,count:p.records.length,syncedAt:p.syncedAt,includeBody:p.includeBody}))})}
-   if(route==='/api/admin/agents'&&req.method==='GET'){owner(who);return reply({agents:state.agents.map(publicAgent)})}
+   if(route==='/api/admin/agents'&&req.method==='GET'){owner(who);return reply({agents:state.agents.filter(a=>!a.revoked).map(publicAgent)})}
    if(route==='/api/admin/agents'&&req.method==='POST'){
     owner(who);const input=await jsonBody(req,65536);if(!identifier(input.profileId)||!state.profiles[input.profileId]||!bounded(input.name,60,true)||!Array.isArray(input.scopes)||!input.scopes.length||input.scopes.some(s=>!SCOPES.includes(s)))throw fail('请检查助手名称、工作台及权限。');
     const token='an_agent_'+crypto.randomBytes(32).toString('base64url'),agent={id:crypto.randomUUID(),name:input.name.trim(),profileId:input.profileId,scopes:[...new Set(input.scopes)],tokenHash:digest(token),createdAt:new Date().toISOString(),revoked:false};
@@ -355,7 +355,7 @@ export async function createBridge({dataDir,adminToken,host='127.0.0.1',port=431
     return reply(updated);
    }
    const revoke=route.match(/^\/api\/admin\/agents\/([a-zA-Z0-9-]+)\/revoke$/);
-   if(revoke&&req.method==='POST'){owner(who);await transact(s=>{const a=s.agents.find(a=>a.id===revoke[1]);if(!a)throw fail('助手不存在。',404);a.revoked=true;for(const task of s.tasks)if(task.agentId===a.id&&task.state==='pending'){task.state='rejected';task.error='助手凭证已撤销。';task.finishedAt=new Date().toISOString()}log(s,'owner','agent-revoked',{agentId:a.id})});return reply({ok:true})}
+   if(revoke&&req.method==='POST'){owner(who);await transact(s=>{const a=s.agents.find(a=>a.id===revoke[1]);if(!a)throw fail('助手不存在。',404);s.agents=s.agents.filter(item=>item.id!==a.id&&!item.revoked);for(const task of s.tasks)if(task.agentId===a.id&&task.state==='pending'){task.state='rejected';task.error='助手凭证已撤销并删除。';task.finishedAt=new Date().toISOString()}log(s,'owner','agent-deleted',{agentId:a.id,name:a.name})});return reply({ok:true,deleted:true})}
    if(route==='/api/admin/tasks'&&req.method==='GET'){owner(who);const profileId=url.searchParams.get('profileId'),tasks=state.tasks.filter(t=>!profileId||t.profileId===profileId);return reply({tasks:[...tasks.filter(t=>t.state!=='pending').slice(-100),...tasks.filter(t=>t.state==='pending')]})}
    const manifest=route.match(/^\/api\/admin\/tasks\/([a-zA-Z0-9-]+)\/files\/([a-zA-Z0-9-]+)$/);
    if(manifest&&req.method==='GET'){

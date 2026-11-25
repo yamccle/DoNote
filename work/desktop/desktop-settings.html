@@ -1,6 +1,6 @@
 <!--
  [INPUT]: 接收桌面构建时注入的版本号 {{DONOTE_VERSION}} 与工作台设置脚本绑定。
- [OUTPUT]: 提供「外观与阅读 · AI 与翻译 · 资料与系统」三栏聚合设置中心、成就闪卡与服务配置弹窗结构。
+ [OUTPUT]: 提供「外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统」四栏自适应设置中心、成就殿宇开关、静默更新与多端同步加密面板。
  [POS]: 由 build.ps1 注入桌面工作台 index.html 尾部，与 desktop-settings.js / desktop-settings.css 协同工作。
  [PROTOCOL]: Update this header on change, then check AGENTS.md
 -->
@@ -8,7 +8,7 @@
  <header class="settings-center-head">
   <div>
    <h2 id="desktopSettingsTitle">偏好设置</h2>
-   <p class="settings-center-sub">本机优先 · 修改即时生效</p>
+   <p class="settings-center-sub">本机优先 · 自适应布局 · 修改即时生效</p>
   </div>
   <button type="button" class="icon-button settings-close-btn" id="desktopSettingsClose" aria-label="关闭设置">✕</button>
  </header>
@@ -16,6 +16,7 @@
   <nav class="settings-nav" role="tablist" aria-label="设置分类">
    <button type="button" role="tab" data-settings-group="appearance" aria-selected="true" aria-controls="desktopSettingsPage-appearance">外观与阅读</button>
    <button type="button" role="tab" data-settings-group="services" aria-selected="false" aria-controls="desktopSettingsPage-services">AI 与翻译</button>
+   <button type="button" role="tab" data-settings-group="sync" aria-selected="false" aria-controls="desktopSettingsPage-sync">多端协同</button>
    <button type="button" role="tab" data-settings-group="storage" aria-selected="false" aria-controls="desktopSettingsPage-storage">资料与系统</button>
   </nav>
   <div class="settings-panes">
@@ -33,13 +34,17 @@
      </label>
     </div>
     <div class="settings-card">
-     <h3>阅读与动效</h3>
+     <h3>阅读、殿宇与动效</h3>
      <button type="button" class="settings-row settings-switch-row" id="desktopPdfInvertToggle" data-command="toggle-pdf-invert" role="switch" aria-checked="false" disabled>
       <span class="settings-row-text"><strong>夜间模式反转 PDF 纸面</strong><small>默认保持浅色纸面，开启后整页反色护眼</small></span>
       <span class="desktop-switch" aria-hidden="true"></span>
      </button>
      <button type="button" class="settings-row settings-switch-row" id="desktopSplashToggle" data-command="toggle-startup" role="switch" aria-checked="false" disabled>
       <span class="settings-row-text"><strong>启动时播放开场动画</strong><small>约 2.5 秒手写签名光迹，按 Esc 可跳过</small></span>
+      <span class="desktop-switch" aria-hidden="true"></span>
+     </button>
+     <button type="button" class="settings-row settings-switch-row" id="desktopAchievementToggle" role="switch" aria-checked="true">
+      <span class="settings-row-text"><strong>显示成就殿宇与里程碑提示</strong><small>关闭后隐藏「置顶收藏 → 成就殿宇」入口与解锁提示，已获卡牌安全保留</small></span>
       <span class="desktop-switch" aria-hidden="true"></span>
      </button>
      <button type="button" class="settings-row settings-link-row" data-control="openVideoCaptionSettings">
@@ -83,13 +88,64 @@
     <div class="settings-card">
      <h3>AI 问答与连接器</h3>
      <button type="button" class="settings-row settings-link-row" data-control="openAiModelSettings">
-      <span class="settings-row-text"><strong>阅读器 AI 问答服务</strong><small>配置 PDF 精读问答的兼容接口地址、模型与密钥</small></span>
+      <span class="settings-row-text"><strong>阅读器 AI 问答服务（PDF / 视频助教共用）</strong><small>配置 PDF 精读与视频多模态助教问答的兼容接口地址、模型与密钥</small></span>
       <span class="settings-chevron" aria-hidden="true">›</span>
      </button>
      <button type="button" class="settings-row settings-link-row" data-control="openAiManager">
-      <span class="settings-row-text"><strong>外部 AI 助手连接器（MCP）</strong><small>管理本机桥接令牌、权限范围与同步队列</small></span>
+      <span class="settings-row-text"><strong>外部 AI 助手连接器（MCP）</strong><small>管理本机桥接令牌、权限范围与同步队列（撤销凭证即刻彻底清除）</small></span>
       <span class="settings-chevron" aria-hidden="true">›</span>
      </button>
+    </div>
+   </section>
+
+   <section id="desktopSettingsPage-sync" data-settings-page="sync" role="tabpanel" class="settings-pane" hidden>
+    <div class="settings-card" id="settingsSyncFoundationCard">
+     <h3>本机节点与批注细粒度合并</h3>
+     <div class="settings-row">
+      <span class="settings-row-text"><strong>本机工作台节点</strong><small id="settingsSyncDeviceMeta">设备指纹与增量变更日志已就绪</small></span>
+      <div class="settings-inline-actions">
+       <input id="settingsSyncDeviceName" class="settings-inline-input" maxlength="40" placeholder="本机桌面工作台" aria-label="本机设备名称">
+       <button type="button" class="secondary settings-mini-btn" id="settingsSyncPrepareHashes">补齐指纹</button>
+      </div>
+     </div>
+     <div class="settings-row">
+      <span class="settings-row-text"><strong>PDF / PPT 批注级跨设备细粒度合并</strong><small id="settingsSyncCrdtMeta">按单条高亮、手绘笔迹与幻灯片页批注 ID 独立 CRDT 合并，双端同读互不覆盖</small></span>
+      <span class="settings-status-pill">无冲突合并已启用</span>
+     </div>
+    </div>
+
+    <div class="settings-card">
+     <h3>远端 / 局域网同步节点与实时推送</h3>
+     <div class="settings-row settings-sync-endpoint-row">
+      <span class="settings-row-text"><strong>同步服务地址与管理令牌</strong><small id="settingsSyncStatusText">填入另一台电脑或自建同步服务的地址与管理令牌，即可握手同步增量记录、批注与去重附件</small></span>
+      <div class="settings-sync-field-grid">
+       <input id="settingsSyncEndpoint" class="settings-inline-input" type="url" spellcheck="false" placeholder="同步服务地址，例如 http://127.0.0.1:4318" aria-label="同步服务地址">
+       <input id="settingsSyncToken" class="settings-inline-input" type="password" autocomplete="off" placeholder="同步管理令牌（本机桥接已连接时可留空）" aria-label="同步管理令牌">
+      </div>
+      <div class="settings-sync-action-bar">
+       <button type="button" class="secondary settings-mini-btn" id="settingsSyncProbeBtn">检测握手</button>
+       <button type="button" class="primary settings-mini-btn" id="settingsSyncNowBtn">立即同步</button>
+      </div>
+     </div>
+     <button type="button" class="settings-row settings-switch-row" id="settingsSyncRealtimeToggle" role="switch" aria-checked="false">
+      <span class="settings-row-text"><strong>实时变更推送（SSE 自动增量拉取）</strong><small id="settingsSyncRealtimeMeta">开启后保持轻量事件流连接，其他设备推送更新时本机在数秒内自动同步</small></span>
+      <span class="desktop-switch" aria-hidden="true"></span>
+     </button>
+    </div>
+
+    <div class="settings-card">
+     <h3>端到端加密（E2EE · 零信任同步）</h3>
+     <div class="settings-row settings-sync-endpoint-row">
+      <span class="settings-row-text">
+       <strong>同步加密口令（PBKDF2 + AES-256-GCM）<em class="settings-e2ee-badge" id="settingsSyncE2eeBadge">未开启</em></strong>
+       <small id="settingsSyncE2eeHint">口令仅在本机派生 256 位密钥，记录、批注与附件均在上传前加密，同步服务端仅存密文；留空则保持局域网明文同步</small>
+      </span>
+      <div class="settings-sync-action-bar">
+       <input id="settingsSyncE2eePass" class="settings-inline-input settings-e2ee-input" type="password" autocomplete="new-password" placeholder="输入多端一致的端到端加密口令…" aria-label="端到端加密口令">
+       <button type="button" class="secondary settings-mini-btn" id="settingsSyncSaveE2ee">应用加密口令</button>
+       <button type="button" class="secondary settings-mini-btn is-danger" id="settingsSyncClearE2ee" hidden>关闭加密</button>
+      </div>
+     </div>
     </div>
    </section>
 
@@ -122,37 +178,25 @@
       </div>
      </div>
     </div>
-    <div class="settings-card" id="settingsSyncFoundationCard">
-     <h3>多端在线同步底座（跨设备协同）</h3>
-     <div class="settings-row">
-      <span class="settings-row-text"><strong>本机工作台节点</strong><small id="settingsSyncDeviceMeta">设备指纹与增量变更日志已就绪</small></span>
+    <div class="settings-card">
+     <h3>版本与在线更新</h3>
+     <button type="button" class="settings-row settings-switch-row" id="desktopSilentUpdateToggle" role="switch" aria-checked="true">
+      <span class="settings-row-text"><strong>启动后静默检查新版本</strong><small>发现 GitHub 新正式版时仅在「设置」入口亮起温和圆点，不弹窗打断工作</small></span>
+      <span class="desktop-switch" aria-hidden="true"></span>
+     </button>
+     <div class="settings-row settings-about-card">
+      <div class="settings-about-brand">
+       <img src="brand-logo.png" alt="DoNote" width="38" height="38">
+       <div>
+        <strong>DoNote</strong>
+        <button type="button" id="aboutVersion" class="about-version" aria-label="版本 {{DONOTE_VERSION}}" title="连续点击可查看设计闪卡">版本 {{DONOTE_VERSION}}</button>
+       </div>
+      </div>
       <div class="settings-inline-actions">
-       <input id="settingsSyncDeviceName" class="settings-inline-input" maxlength="40" placeholder="本机桌面工作台" aria-label="本机设备名称">
-       <button type="button" class="secondary settings-mini-btn" id="settingsSyncPrepareHashes">补齐指纹</button>
+       <button type="button" class="primary settings-mini-btn" id="settingsCheckOnlineUpdate">检查在线更新</button>
+       <button type="button" class="secondary settings-mini-btn" data-command="install-update">本地更新包…</button>
+       <button type="button" class="secondary settings-mini-btn is-danger" data-command="exit-desktop">退出软件</button>
       </div>
-     </div>
-     <div class="settings-row settings-sync-endpoint-row">
-      <span class="settings-row-text"><strong>远端 / 局域网同步节点</strong><small id="settingsSyncStatusText">填入另一台电脑或自建同步服务的地址与令牌，即可握手同步增量记录与去重附件</small></span>
-      <div class="settings-inline-actions settings-sync-controls">
-       <input id="settingsSyncEndpoint" class="settings-inline-input" type="url" spellcheck="false" placeholder="http://127.0.0.1:4318" aria-label="同步服务地址">
-       <input id="settingsSyncToken" class="settings-inline-input" type="password" autocomplete="off" placeholder="同步管理令牌（本机已连接时可留空）" aria-label="同步管理令牌">
-       <button type="button" class="secondary settings-mini-btn" id="settingsSyncProbeBtn">检测握手</button>
-       <button type="button" class="primary settings-mini-btn" id="settingsSyncNowBtn">立即同步</button>
-      </div>
-     </div>
-    </div>
-    <div class="settings-card settings-about-card">
-     <div class="settings-about-brand">
-      <img src="brand-logo.png" alt="DoNote" width="38" height="38">
-      <div>
-       <strong>DoNote</strong>
-       <button type="button" id="aboutVersion" class="about-version" aria-label="版本 {{DONOTE_VERSION}}" title="连续点击可查看设计闪卡">版本 {{DONOTE_VERSION}}</button>
-      </div>
-     </div>
-     <div class="settings-inline-actions">
-      <button type="button" class="primary settings-mini-btn" id="settingsCheckOnlineUpdate">检查在线更新</button>
-      <button type="button" class="secondary settings-mini-btn" data-command="install-update">本地更新包…</button>
-      <button type="button" class="secondary settings-mini-btn is-danger" data-command="exit-desktop">退出软件</button>
      </div>
     </div>
    </section>
@@ -190,7 +234,7 @@
   <img src="brand-logo.png" alt="DoNote 图标" width="86" height="86">
   <h2 id="aboutDoNoteTitle">DoNote</h2>
   <p>版本 {{DONOTE_VERSION}}</p>
-  <p>© PJH · 本地优先工程研究工作台</p>
+  <p>© PJH · 本地优先跨学科知识与课题研究工作台</p>
  </div>
  <div class="about-donote-foot"><button type="button" data-close-about>确定</button></div>
 </dialog>

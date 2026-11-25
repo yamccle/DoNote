@@ -279,6 +279,19 @@
   let evaluating = false;
   let evalTimer = null;
   let currentPreviewKind = 'analog-v1';
+  const ACHIEVEMENTS_ENABLED_KEY = 'donote-achievements-enabled';
+
+  function isAchievementsEnabled() {
+    try { return localStorage.getItem(ACHIEVEMENTS_ENABLED_KEY) !== 'off'; } catch { return true; }
+  }
+
+  function setAchievementsEnabled(enabled) {
+    try { localStorage.setItem(ACHIEVEMENTS_ENABLED_KEY, enabled ? 'on' : 'off'); } catch {}
+    if (!enabled && view === 'pinned' && tab === 'achievements') {
+      tab = 'all';
+    }
+    if (typeof render === 'function' && ready) render();
+  }
 
   function unlockedSet(profile) {
     const set = new Set();
@@ -314,7 +327,7 @@
         updatedAt: new Date().toISOString()
       });
       await commitState(next);
-      if (!silent) {
+      if (!silent && isAchievementsEnabled()) {
         toast('已解锁典藏卡牌 NO.' + card.number + '「' + card.title + '」', {
           label: '前往成就殿宇',
           run: () => openAchievementHall()
@@ -362,11 +375,13 @@
         });
       }
       await commitState(next);
-      const first = newlyEarned[0];
-      const msg = newlyEarned.length === 1
-        ? '已解锁典藏卡牌 NO.' + first.number + '「' + first.title + '」'
-        : '已解锁「' + first.title + '」等 ' + newlyEarned.length + ' 张典藏卡牌';
-      toast(msg, { label: '查看殿宇', run: () => openAchievementHall() });
+      if (isAchievementsEnabled()) {
+        const first = newlyEarned[0];
+        const msg = newlyEarned.length === 1
+          ? '已解锁典藏卡牌 NO.' + first.number + '「' + first.title + '」'
+          : '已解锁「' + first.title + '」等 ' + newlyEarned.length + ' 张典藏卡牌';
+        toast(msg, { label: '查看殿宇', run: () => openAchievementHall() });
+      }
       if (view === 'pinned' && tab === 'achievements') render();
       window.dispatchEvent(new CustomEvent('donote-achievements-updated'));
       document.dispatchEvent(new CustomEvent('donote-achievements-updated'));
@@ -474,9 +489,14 @@
 
   window.DoNoteAchievements = {
     cards: ACHIEVEMENT_CARDS,
+    isEnabled: isAchievementsEnabled,
+    setEnabled: setAchievementsEnabled,
     unlockedCount: () => unlockedSet(activeProfile()).size,
     totalCount: ACHIEVEMENT_CARDS.length,
-    openHall: openAchievementHall,
+    openHall: () => {
+      if (!isAchievementsEnabled()) setAchievementsEnabled(true);
+      openAchievementHall();
+    },
     openCard: openCardPreview,
     evaluate: evaluateAchievements
   };

@@ -1,6 +1,6 @@
 /**
- * [INPUT]: 读取桌面设置控件、宿主偏好消息、默认翻译语向与语音识别配置。
- * [OUTPUT]: 管理三栏聚合设置中心标签切换、内联快捷设置同步、成就闪卡彩蛋与宿主命令分发。
+ * [INPUT]: 读取桌面设置控件、宿主偏好消息、默认翻译语向、语音识别与成就/更新偏好。
+ * [OUTPUT]: 管理四栏自适应设置中心标签切换、成就殿宇显隐开关、启动静默更新圆点提示与宿主命令分发。
  * [POS]: 桌面设置控制器，消除旧版多级悬停子菜单与碎片弹窗，可在任意阅读浮窗上方呼出。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -54,6 +54,25 @@
   if (palette && window.DoNoteAppearance) {
     palette.value = document.documentElement.dataset.palette || 'default';
     palette.onchange = () => window.DoNoteAppearance.applyPalette(palette.value, true);
+  }
+
+  const achToggle = document.getElementById('desktopAchievementToggle');
+  const syncAchievementToggle = () => {
+    if (!achToggle || !window.DoNoteAchievements) return;
+    achToggle.setAttribute('aria-checked', String(window.DoNoteAchievements.isEnabled()));
+  };
+  if (achToggle) {
+    syncAchievementToggle();
+    achToggle.addEventListener('click', event => {
+      event.stopPropagation();
+      if (!window.DoNoteAchievements) return;
+      const next = !window.DoNoteAchievements.isEnabled();
+      window.DoNoteAchievements.setEnabled(next);
+      syncAchievementToggle();
+      if (typeof toast === 'function') toast(next ? '已开启成就殿宇与里程碑提示' : '已隐藏成就殿宇（已收集卡牌保留）');
+    });
+    window.addEventListener('donote-achievements-visibility', syncAchievementToggle);
+    setTimeout(syncAchievementToggle, 120);
   }
 }
 
@@ -269,7 +288,11 @@
     document.getElementById('videoCaptionSettingsForm').onsubmit = event => { event.preventDefault(); saveCaptionFields(); captionDialog.close(); };
     about.querySelectorAll('[data-close-about]').forEach(button => button.addEventListener('click', () => about.close()));
 
-    // GitHub 自动在线更新检查、增量/完整包智能下载与 SHA-256 校验衔接
+    // GitHub 自动在线更新检查、启动静默检测圆点提示、增量/完整包智能下载与 SHA-256 校验衔接
+    const SILENT_UPDATE_KEY = 'donote-silent-update-check';
+    const silentToggle = document.getElementById('desktopSilentUpdateToggle');
+    const storageTabBtn = panel.querySelector('[data-settings-group="storage"]');
+    const checkBtn = document.getElementById('settingsCheckOnlineUpdate');
     const updDialog = document.getElementById('onlineUpdateDialog');
     const updStatus = document.getElementById('onlineUpdateStatus');
     const updRemote = document.getElementById('onlineUpdateRemote');
@@ -279,7 +302,39 @@
     const updAction = document.getElementById('onlineUpdateActionBtn');
     const updCancel = document.getElementById('onlineUpdateCancelBtn');
     const updRecheck = document.getElementById('onlineUpdateRecheck');
-    let updCandidate = null, updState = 'idle', updReqId = '';
+    let updCandidate = null, updState = 'idle', updReqId = '', silentReqId = '';
+
+    const isSilentUpdateEnabled = () => {
+      try { return localStorage.getItem(SILENT_UPDATE_KEY) !== 'off'; } catch { return true; }
+    };
+    const syncSilentToggle = () => {
+      silentToggle?.setAttribute('aria-checked', String(isSilentUpdateEnabled()));
+    };
+    const setUpdateIndicator = (active, tag = '') => {
+      const on = !!active;
+      gear?.classList.toggle('has-update-dot', on);
+      storageTabBtn?.classList.toggle('has-update-dot', on);
+      if (checkBtn) checkBtn.textContent = on && tag ? '发现新版本 ' + tag : '检查在线更新';
+      try { host.postMessage(on ? 'update-indicator:on' : 'update-indicator:off'); } catch {}
+    };
+    syncSilentToggle();
+    silentToggle?.addEventListener('click', event => {
+      event.stopPropagation();
+      const next = !isSilentUpdateEnabled();
+      try { localStorage.setItem(SILENT_UPDATE_KEY, next ? 'on' : 'off'); } catch {}
+      syncSilentToggle();
+      if (!next) setUpdateIndicator(false);
+      else runSilentUpdateCheck();
+    });
+
+    function runSilentUpdateCheck() {
+      if (!isSilentUpdateEnabled() || updState === 'downloading') return '';
+      silentReqId = 'silent-' + crypto.randomUUID();
+      host.postMessage({ type: 'online-update', action: 'check', id: silentReqId });
+      return silentReqId;
+    }
+    window.DoNoteSilentUpdate = { checkNow: runSilentUpdateCheck, setIndicator: setUpdateIndicator, isEnabled: isSilentUpdateEnabled };
+    setTimeout(() => { if (isSilentUpdateEnabled()) runSilentUpdateCheck(); }, 3500);
 
     function startOnlineCheck() {
       updState = 'checking';
@@ -296,10 +351,10 @@
       host.postMessage({ type: 'online-update', action: 'check', id: updReqId });
     }
 
-    document.getElementById('settingsCheckOnlineUpdate')?.addEventListener('click', () => {
+    checkBtn?.addEventListener('click', () => {
       if (panel.matches(':popover-open')) panel.hidePopover();
       if (!updDialog.open) updDialog.showModal();
-      if (updState !== 'downloading') startOnlineCheck();
+      if (updState !== 'downloading' && updState !== 'ready-download') startOnlineCheck();
     });
     updDialog?.querySelectorAll('[data-close-online-update]').forEach(b => b.addEventListener('click', () => updDialog.close()));
     document.getElementById('onlineUpdateLocalFallback')?.addEventListener('click', () => {
@@ -356,6 +411,27 @@
         return;
       }
       if (msg?.type === 'online-update-result') {
+        const isSilent = !!silentReqId && msg.id === silentReqId;
+        if (isSilent) {
+          silentReqId = '';
+          if (msg.error || msg.cancelled) return;
+          if (msg.hasUpdate) {
+            updState = 'ready-download';
+            updCandidate = msg;
+            updRemote.textContent = msg.remoteVersion + ' (' + msg.tag + ')';
+            const sizeStr = msg.assetSize < 1048576 ? (msg.assetSize / 1024).toFixed(0) + ' KB' : (msg.assetSize / 1048576).toFixed(1) + ' MB';
+            updStrategy.textContent = (msg.downloadMode === 'patch' ? '增量极速补丁 · ' : '跨版本完整包 · ') + sizeStr;
+            updStatus.textContent = '发现新版本 ' + msg.remoteVersion + '！系统已自动匹配最适合您当前版本的' + (msg.downloadMode === 'patch' ? '增量更新补丁' : '完整安装包') + '，下载后将自动校验 SHA-256。';
+            if (msg.releaseNotes) { updNotes.textContent = msg.releaseNotes; updNotes.hidden = false; }
+            updAction.hidden = false;
+            updAction.disabled = false;
+            updAction.textContent = '下载并验证更新（' + sizeStr + '）';
+            setUpdateIndicator(true, msg.tag || msg.remoteVersion);
+          } else if (msg.hasUpdate === false) {
+            setUpdateIndicator(false);
+          }
+          return;
+        }
         updRecheck.disabled = false;
         updCancel.hidden = true;
         if (msg.cancelled) {
@@ -380,6 +456,7 @@
         }
         if (msg.downloaded) {
           updState = 'downloaded';
+          setUpdateIndicator(true, msg.targetVersion);
           updProg.hidden = false;
           updProg.value = 100;
           updAction.hidden = false;
@@ -401,6 +478,7 @@
         }
         if (msg.hasUpdate === false) {
           updState = 'up-to-date';
+          setUpdateIndicator(false);
           updRemote.textContent = msg.remoteVersion + (msg.tag ? ' (' + msg.tag + ')' : '');
           updStrategy.textContent = '无需更新';
           updStatus.textContent = '✓ 当前已是最新正式版本（' + msg.currentVersion + '）。';
@@ -410,6 +488,7 @@
         if (msg.hasUpdate) {
           updState = 'ready-download';
           updCandidate = msg;
+          setUpdateIndicator(true, msg.tag || msg.remoteVersion);
           updRemote.textContent = msg.remoteVersion + ' (' + msg.tag + ')';
           const sizeStr = msg.assetSize < 1048576 ? (msg.assetSize / 1024).toFixed(0) + ' KB' : (msg.assetSize / 1048576).toFixed(1) + ' MB';
           updStrategy.textContent = (msg.downloadMode === 'patch' ? '增量极速补丁 · ' : '跨版本完整包 · ') + sizeStr;

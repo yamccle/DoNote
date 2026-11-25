@@ -1,6 +1,6 @@
 .video-review-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(260px, 26%, 350px);
+  grid-template-columns: minmax(0, 1fr) clamp(310px, 29%, 400px);
   align-items: start;
   gap: 16px;
   width: min(100% - 36px, 1800px);
@@ -17,15 +17,94 @@
 .video-frame-notes {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  max-height: min(74vh, 800px);
-  overflow: auto;
-  padding: 14px;
+  max-height: min(78vh, 840px);
+  overflow: hidden;
+  padding: 12px 14px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
+}
+.video-side-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  flex: none;
+}
+.video-side-tabs button {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+}
+.video-side-tabs button.is-active {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 650;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+.video-side-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.video-side-pane.is-ai {
+  overflow: hidden;
+}
+.video-ai-head, .video-ai-context-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.video-ai-context-row select {
+  flex: 1 1 130px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+  border-radius: 7px;
+}
+.video-ai-scroll {
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+.video-ai-composer {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.video-ai-composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 52px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--field-border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
 }
 .video-frame-heading,.video-frame-editor-bar,.video-frame-actions {
   display: flex;

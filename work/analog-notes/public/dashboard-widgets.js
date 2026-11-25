@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 读取工作台记录、计划日期与用户自定义的总览组件布局。
- * [OUTPUT]: 渲染紧凑可跳转的栏目统计条、动态柱状活跃图/热力图切换与组件编排弹窗。
- * [POS]: 总览仪表盘数据与快捷导航层，点击任意栏目指标卡片即可直接进入对应视图。
+ * [OUTPUT]: 渲染行动导向的栏目统计条（进行中计划/未解决问题/近7天新增文献）、动态足迹图与组件编排弹窗。
+ * [POS]: 总览仪表盘数据与快捷导航层，摒弃冗余历史总数，聚焦当下待办与近期增量。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 'use strict';
@@ -113,8 +113,9 @@ function widgetActivity(counts,now){
   +'<button type="button" data-activity-mode="bars" class="'+(activityChartMode==='bars'?'active':'')+'">7天</button>'
   +'<button type="button" data-activity-mode="heat" class="'+(activityChartMode==='heat'?'active':'')+'">8周</button></div>';
  const activeSpanDays=days.filter(([,,visited])=>visited).length;
+ const recent7Active=recent7.filter(([,,visited])=>visited).length;
  return switcher+bars+heat+'<div class="heat-foot"><span>'
-  +activeSpanDays+' 天留下足迹</span><span>共 '+records.filter(r=>!r.flashcardKind).length+' 条记录</span></div>';
+  +activeSpanDays+' 天留下足迹</span><span>近 7 天活跃 '+recent7Active+' 天</span></div>';
 }
 function widgetPlanLinks(plans){
  return '<div class="widget-plan-list">'+plans.slice(0,3).map(plan=>'<button type="button" data-widget-plan="'+esc(plan.id)+'" title="'+esc(plan.title)+'">'+esc(plan.title)+'</button>').join('')+'</div>';
@@ -127,6 +128,8 @@ function renderDashboardWidgets(){
  const activeRecords=records.filter(r=>!r.flashcardKind);
  for(const {date} of activeRecords)counts.set(date,(counts.get(date)||0)+1);
  const addedDay=record=>(record.createdAt||record.attachments?.[0]?.addedAt||record.date||'').slice(0,10);
+ const sevenDaysAgo=today(new Date(now.getFullYear(),now.getMonth(),now.getDate()-6));
+ const recent7Records=activeRecords.filter(record=>addedDay(record)>=sevenDaysAgo&&addedDay(record)<=day);
  const currentWeek=getWeekKey(day),thisWeek=activeRecords.filter(record=>addedDay(record)<=day&&getWeekKey(addedDay(record))===currentWeek);
  const plans=activeRecords.filter(record=>record.type==='plan'&&validPlanDates(record.planStart,record.planEnd))
   .sort((a,b)=>a.planEnd.localeCompare(b.planEnd)||a.planStart.localeCompare(b.planStart));
@@ -157,16 +160,25 @@ function renderDashboardWidgets(){
    const next=incomplete.find(plan=>plan.planEnd>=day)||incomplete.at(-1);
    body=next?renderCompact(countdownLabel(countdownDays(next.planEnd)),esc(next.planEnd),'data-countdown="'+next.planEnd+'"',widgetPlanLinks([next])):renderCompact('—','暂无未完成计划');
   }else if(kind==='unread')body=renderCompact(activeRecords.filter(record=>record.type==='resource'&&record.status==='待读').length,'份待读资料');
-  else if(kind==='pending')body=renderCompact(activeRecords.filter(record=>record.type==='issue'&&record.status==='待排查').length,'项待推进');
+  else if(kind==='pending')body=renderCompact(activeRecords.filter(record=>record.type==='issue'&&record.status!=='已解决').length,'项剩余未解决');
   else if(kind==='pinned')body=renderCompact(activeRecords.filter(record=>record.pinned).length,'条置顶收藏');
-  else{
-   const matchType=record=>record.type===kind||(kind==='paper'&&(record.type==='resource'||record.type==='paper'));
-   const total=activeRecords.filter(matchType).length;
-   const weekAdded=thisWeek.filter(matchType).length;
-   body=renderCompact(total,weekAdded?'本周新增 +'+weekAdded:'共 '+total+' 条 · 点击进入');
+  else if(kind==='paper'){
+   const recentDocs=recent7Records.filter(record=>record.type==='resource'||record.type==='paper');
+   const inReading=activeRecords.filter(record=>(record.type==='resource'||record.type==='paper')&&record.status==='在读').length;
+   body=renderCompact(recentDocs.length,'近 7 天新增'+(inReading?' · '+inReading+' 份在读':' · 点击进入'));
+  }else if(kind==='issue'){
+   const unresolved=activeRecords.filter(record=>record.type==='issue'&&record.status!=='已解决');
+   body=renderCompact(unresolved.length,unresolved.length?'项剩余未解决 · 点击进入':'全部问题已解决');
+  }else if(kind==='plan'){
+   const running=activeRecords.filter(record=>record.type==='plan'&&record.status==='进行中');
+   body=renderCompact(running.length,running.length?'项正在进行 · 点击进入':'暂无进行中计划');
+  }else{
+   const recentEntries=recent7Records.filter(record=>record.type===kind);
+   body=renderCompact(recentEntries.length,'近 7 天记录 · 点击进入');
   }
+  const statTone=kind==='paper'||kind==='unread'?'pdf':kind==='issue'||kind==='pending'?'issue':kind==='journal'?'journal':kind==='study'?'study':['week','plan','plansActive','plansWeek','planDeadline'].includes(kind)?'plan':'neutral';
   const navAttrs=canJump?' data-widget-nav="'+esc(kind)+'" role="button" tabindex="0" title="点击前往：'+titleText+'"':'';
-  return '<article class="dashboard-card'+(canJump?' is-clickable':'')+'" data-widget="'+esc(widget.id)+'" data-widget-kind="'+esc(kind)+'"'+navAttrs+'>'+body+'</article>';
+  return '<article class="dashboard-card'+(canJump?' is-clickable':'')+'" data-stat-tone="'+statTone+'" data-widget="'+esc(widget.id)+'" data-widget-kind="'+esc(kind)+'"'+navAttrs+'>'+body+'</article>';
  }
  const key=JSON.stringify(widgets.map(({id,kind,zone})=>[id,kind,zone]));
  if(dashboardLayoutKey!==key){

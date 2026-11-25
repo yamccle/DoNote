@@ -36,12 +36,17 @@ main[data-view="all"] #workspaceIntro h1 {
   line-height: 1.24;
 }
 main[data-view="all"] #workspaceIntro .date-block {
-  padding: 5px 10px;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 13px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-soft) 78%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
 }
 main[data-view="all"] #dashboardCustomize {
@@ -115,6 +120,7 @@ main[data-view="all"] #dashboardCustomize:hover {
   grid-template-columns: minmax(0, 1fr);
 }
 .bento-study-card {
+  --resume-tint: #366399;
   position: relative;
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr) 34px;
@@ -124,15 +130,19 @@ main[data-view="all"] #dashboardCustomize:hover {
   min-height: 60px;
   padding: 9px 11px;
   margin: 0;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--surface-soft);
+  border: 1px solid color-mix(in srgb, var(--resume-tint) 18%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--resume-tint) 5.5%, var(--surface));
   color: var(--ink);
   text-align: start;
 }
+.bento-study-card[data-bento-tone="pdf"] { --resume-tint: #35639c; }
+.bento-study-card[data-bento-tone="ppt"] { --resume-tint: #b8622e; }
+.bento-study-card[data-bento-tone="video"] { --resume-tint: #28785a; }
+.bento-study-card[data-bento-tone="web"] { --resume-tint: #6d529e; }
 .bento-study-card:hover {
-  background: var(--surface);
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: color-mix(in srgb, var(--resume-tint) 9%, var(--surface));
+  border-color: color-mix(in srgb, var(--resume-tint) 38%, var(--line));
   box-shadow: var(--shadow-card-hover);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -147,17 +157,16 @@ main[data-view="all"] #dashboardCustomize:hover {
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--line));
-  color: var(--accent);
+  background: color-mix(in srgb, var(--resume-tint) 13%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--resume-tint) 22%, var(--line));
+  color: var(--resume-tint);
 }
-.bento-study-card[data-bento-tone="ppt"] .bento-kind-badge {
-  background: color-mix(in srgb, #b4691e 10%, var(--surface));
-  border-color: color-mix(in srgb, #b4691e 18%, var(--line));
-  color: var(--warn);
+.bento-study-card .bento-ring-fill {
+  stroke: var(--resume-tint) !important;
 }
-.bento-study-card[data-bento-tone="video"] .bento-kind-badge {
-  background: color-mix(in srgb, #267359 10%, var(--surface));
+.bento-study-card .bento-ring b {
+  color: color-mix(in srgb, var(--resume-tint) 75%, var(--ink));
+}
   border-color: color-mix(in srgb, #267359 18%, var(--line));
   color: var(--ok);
 }

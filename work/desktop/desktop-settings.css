@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 读取桌面设置中心结构、成就闪卡与工作台主题。
- * [OUTPUT]: 提供双栏聚合设置中心、开关胶囊、关于卡片、成就闪卡与云备份弹窗样式。
- * [POS]: 桌面设置样式层，取代旧版多级悬停子菜单，统一明暗主题视觉质感。
+ * [OUTPUT]: 提供四栏自适应舒展设置中心、静默更新圆点、多端同步加密卡片与成就闪卡样式。
+ * [POS]: 桌面设置样式层，按视口比例自适应宽高，彻底消除输入框截断与卡片拥挤。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 .desktop-host {
@@ -13,17 +13,35 @@
 }
 .desktop-host .top-actions .sync { display: flex; margin-inline-end: 0; }
 .desktop-host .desktop-gear:not([hidden]) {
+  position: relative;
   width: 34px; height: 34px; flex: none; border-radius: var(--radius-control); color: var(--ink);
 }
 .desktop-host .desktop-gear:is(:hover, [aria-expanded="true"]) { background: var(--desktop-hover); }
+.desktop-gear.has-update-dot::after,
+.settings-nav button.has-update-dot::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d97706;
+  box-shadow: 0 0 0 2px var(--surface);
+  flex: none;
+}
+.desktop-gear.has-update-dot::after {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
 @media (max-width: 850px) { .desktop-host .top-actions .sync { display: none; } }
 
 #desktopSettings {
   position: fixed;
   inset: 0;
   margin: auto;
-  width: min(680px, calc(100vw - 24px));
-  max-height: min(580px, calc(100dvh - 32px));
+  width: clamp(740px, 66vw, 900px);
+  max-width: calc(100vw - 28px);
+  height: auto;
+  max-height: min(840px, calc(100dvh - 40px));
   padding: 0;
   color: var(--ink);
   background: var(--surface);
@@ -48,21 +66,21 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 13px 18px 12px;
+  padding: 15px 22px 14px;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--paper) 55%, var(--surface));
   flex: none;
 }
 .settings-center-head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 650;
   line-height: 1.3;
 }
 .settings-center-sub {
   margin: 2px 0 0;
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .settings-close-btn {
   width: 30px;
@@ -79,25 +97,29 @@
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: 154px minmax(0, 1fr);
+  grid-template-columns: 172px minmax(0, 1fr);
   overflow: hidden;
 }
 .settings-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 10px;
+  gap: 5px;
+  padding: 16px 12px;
   border-right: 1px solid var(--line);
   background: color-mix(in srgb, var(--paper) 45%, var(--surface));
 }
 .settings-nav button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
-  padding: 8px 11px;
+  padding: 9px 12px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-soft);
-  font: 500 13px/1.35 var(--font-ui);
+  font: 500 13.5px/1.35 var(--font-ui);
   text-align: left;
   cursor: pointer;
 }
@@ -115,27 +137,27 @@
 .settings-panes {
   min-height: 0;
   overflow-y: auto;
-  padding: 14px 16px 18px;
+  padding: 18px 22px 22px;
   scrollbar-width: thin;
 }
 .settings-pane {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   align-content: start;
 }
 .settings-card {
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--surface);
   overflow: hidden;
 }
 .settings-card h3 {
   margin: 0;
-  padding: 9px 13px 7px;
+  padding: 10px 16px 8px;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface-soft) 55%, var(--surface));
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.02em;
 }
@@ -143,9 +165,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
-  padding: 10px 13px;
+  padding: 12px 16px;
   margin: 0;
   border: 0;
   border-radius: 0;
@@ -248,9 +270,58 @@ button.settings-row:disabled {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px 13px;
+  gap: 12px;
+  padding: 12px 16px;
   background: color-mix(in srgb, var(--surface-soft) 50%, var(--surface));
+}
+.settings-status-pill,
+.settings-e2ee-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: normal;
+  color: #28785a;
+  background: color-mix(in srgb, #28785a 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, #28785a 24%, transparent);
+  white-space: nowrap;
+}
+.settings-e2ee-badge {
+  margin-left: 6px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border-color: var(--line);
+}
+.settings-e2ee-badge.is-enabled {
+  color: #28785a;
+  background: color-mix(in srgb, #28785a 12%, var(--surface));
+  border-color: color-mix(in srgb, #28785a 26%, transparent);
+}
+.settings-sync-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.settings-sync-field-grid .settings-inline-input {
+  width: 100% !important;
+  height: 34px !important;
+  padding: 0 11px !important;
+}
+.settings-sync-action-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+.settings-e2ee-input {
+  flex: 1 1 240px !important;
+  min-width: 200px !important;
+  height: 34px !important;
+  padding: 0 11px !important;
 }
 .settings-about-brand {
   display: flex;

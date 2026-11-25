@@ -60,7 +60,7 @@ export async function verifyPlatformEvolutionR139(page) {
   assert.equal(achievementResult.hasThirtyDayLocked, true);
   assert.ok(achievementResult.afterSevenDays > achievementResult.beforeSevenDays);
 
-  // 4. 侧边栏宁缺毋滥微层次与「今日已留痕 · 殿宇 X/10」一键直达成就殿宇
+  // 4. 侧边栏宁缺毋滥微层次（左下不展示成就殿宇浮块）与成就殿宇展示验证
   const railCheck = await page.evaluate(() => {
     const libBtn = document.querySelector('#workspaceRail button[data-rail-view="resource"]');
     return {
@@ -72,11 +72,11 @@ export async function verifyPlatformEvolutionR139(page) {
   });
   assert.deepEqual(railCheck, {
     hasDivider: true,
-    hasFootCard: true,
+    hasFootCard: false,
     cleanLabelText: true,
     hasBadgeAttr: true
   });
-  await page.evaluate(() => document.getElementById('railFootprintCard').click());
+  await page.evaluate(() => window.DoNoteAchievements.openHall());
   await page.waitForFunction(() => view === 'pinned' && tab === 'achievements');
   assert.equal(await page.locator('#records .achievement-tile').count(), 10);
   assert.ok(await page.locator('#records .achievement-tile.is-locked').count() >= 1);

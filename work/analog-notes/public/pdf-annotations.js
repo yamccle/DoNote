@@ -34,7 +34,7 @@ function checkedAnnotations(value) {
  if (!Array.isArray(value) || value.length > 5000) throw new Error('批注数据无效或过多。');
  return value.map(annotation => {
   if (!annotation) throw new Error('批注格式无效。');
-  const {id, kind, page, quote, note, color, rects, points, createdAt} = annotation;
+  const {id, kind, page, quote, note, color, rects, points, createdAt, updatedAt} = annotation;
   if (typeof id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(id) ||
       typeof kind !== 'string' || !Object.hasOwn(PDF_ANNOTATION_LABELS, kind) ||
       !Number.isInteger(page) || page < 1 || page > 100000 ||
@@ -44,9 +44,11 @@ function checkedAnnotations(value) {
       !validPdfCoordinates(rects, 4, 500) || !validPdfCoordinates(points, 2, 3000)) {
    throw new Error('批注格式无效。');
   }
+  const cleanCreated = typeof createdAt === 'string' ? createdAt : '';
   return {
    id, kind, page, quote, note, color, rects, points,
-   createdAt: typeof createdAt === 'string' ? createdAt : '',
+   createdAt: cleanCreated,
+   updatedAt: typeof updatedAt === 'string' && updatedAt ? updatedAt : cleanCreated,
    ...(kind === 'text' ? pdfTextStyle(annotation) : {})
   };
  });
@@ -126,12 +128,14 @@ function addPdfMark(session,kind,options={}){
   if(!picked.rects.length){toast('请在 PDF 正文中重新选择文字。');return}
   const existing=new Set(matchingPdfTextMarks(session,kind,picked));
   if(existing.size){
+   window.DoNoteSyncCrypto?.recordMarkTombstones?.(session.profileId,session.file.id,[...existing].map(mark=>mark.id));
    session.annotations=session.annotations.filter(mark=>!existing.has(mark));
    savePdfMarks(session);renderPdfSidebar(session);renderPdfMarks(session);return;
   }
  }
  if(session.annotations.length>=5000){toast('当前文档批注已达到上限，请先导出整理。');return}
- const a={id:crypto.randomUUID(),kind,page:requires?(picked?.page??session.page):session.page,quote:requires?(picked?.quote??''):'',note:options.note??$('pdfComment').value,color:session.markColor||MARK_COLORS[0],rects:requires?(picked?.rects??[]):[],points:[],createdAt:new Date().toISOString(),...options};
+ const nowIso=new Date().toISOString();
+ const a={id:crypto.randomUUID(),kind,page:requires?(picked?.page??session.page):session.page,quote:requires?(picked?.quote??''):'',note:options.note??$('pdfComment').value,color:session.markColor||MARK_COLORS[0],rects:requires?(picked?.rects??[]):[],points:[],createdAt:nowIso,updatedAt:nowIso,...options};
  a.quote=String(a.quote).slice(0,20000);a.note=String(a.note).slice(0,30000);session.annotations.push(a);savePdfMarks(session);renderPdfSidebar(session);renderPdfMarks(session);return a;
 }
 function renderPdfMarks(session,box=session.pageBox,pageNumber=session.page){
@@ -182,7 +186,7 @@ function installPdfTextBox(session,box,mark,element){
   element.addEventListener('lostpointercapture',cancel,{signal});
   element.addEventListener('pointerup',e=>{
    move(e);controller.abort();
-   if(moved&&readingSession===session){mark.rects=[rect];savePdfMarks(session)}
+   if(moved&&readingSession===session){mark.rects=[rect];mark.updatedAt=new Date().toISOString();savePdfMarks(session)}
   },{signal});
  };
 }
@@ -319,6 +323,7 @@ function startPdfDrawing(event,session,pad,pageNumber){
   session.activatePage?.(pageNumber);
   if(mode==='pen'&&points.length>1)addPdfMark(session,'pen',{points,page:pageNumber,color,note:''});
   if(mode==='erase'&&erased.size){
+   window.DoNoteSyncCrypto?.recordMarkTombstones?.(session.profileId,session.file.id,[...erased.keys()]);
    session.annotations=session.annotations.filter(mark=>!erased.has(mark.id));
    savePdfMarks(session);renderPdfSidebar(session);renderPdfMarks(session,box,pageNumber);
   }
@@ -396,6 +401,7 @@ function renderPdfSidebar(session){
   swatch.onclick=()=>{
    const idx=MARK_COLORS.indexOf(a.color);
    a.color=MARK_COLORS[(idx+1)%MARK_COLORS.length];
+   a.updatedAt=new Date().toISOString();
    savePdfMarks(session);redrawPdfAnnotationPage(session,a.page);renderPdfSidebar(session);
   };
   const head=document.createElement('button');head.type='button';head.className='pdf-note-link';
@@ -424,6 +430,7 @@ function renderPdfSidebar(session){
   }
   tools.append(makeTool('删除','删除这条批注',()=>{
    expanded.delete(a.id);
+   window.DoNoteSyncCrypto?.recordMarkTombstones?.(session.profileId,session.file.id,[a.id]);
    session.annotations=session.annotations.filter(n=>n.id!==a.id);
    savePdfMarks(session);redrawPdfAnnotationPage(session,a.page);renderPdfSidebar(session);
   },true));
@@ -438,7 +445,7 @@ function renderPdfSidebar(session){
     clearTimeout(saveTimer);saveTimer=0;
     const nextNote=body.value.slice(0,30000);
     if(a.note===nextNote)return;
-    a.note=nextNote;savePdfMarks(session);redrawPdfAnnotationPage(session,a.page);
+    a.note=nextNote;a.updatedAt=new Date().toISOString();savePdfMarks(session);redrawPdfAnnotationPage(session,a.page);
    };
    body.oninput=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(commit,450)};
    body.onchange=commit;
@@ -459,7 +466,7 @@ function renderPdfSidebar(session){
    for(const [value,label] of Object.entries({system:'无衬线',serif:'衬线',mono:'等宽'}))font.add(new Option(label,value));
    font.value=style.fontFamily;size.type='number';size.min='8';size.max='72';size.value=style.fontSize;size.setAttribute('aria-label','文字框字号');
    font.onchange=size.onchange=()=>{
-    const next=pdfTextStyle({fontFamily:font.value,fontSize:size.valueAsNumber});Object.assign(a,next);size.value=next.fontSize;
+    const next=pdfTextStyle({fontFamily:font.value,fontSize:size.valueAsNumber});Object.assign(a,next,{updatedAt:new Date().toISOString()});size.value=next.fontSize;
     savePdfMarks(session);redrawPdfAnnotationPage(session,a.page);
    };
    settings.append('字体 ',font,' 字号 ',size);card.append(settings);

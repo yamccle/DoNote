@@ -92,21 +92,28 @@ function renderCategoryNavigation(){
  const cats=categoryList(),cutoff=Date.now()-14*24*60*60*1000;
  const recent=n=>{const added=Date.parse(n.createdAt||n.date+'T00:00:00');return Number.isFinite(added)&&added>=cutoff};
  const count=id=>records.filter(n=>!n.flashcardKind&&n.type===id&&(id==='plan'?!archivedPlan(n):recent(n))).length;
- const totalFor=id=>records.filter(n=>!n.flashcardKind&&(id==='plan'?n.type==='plan'&&!archivedPlan(n):id==='issue'?n.type==='issue'&&n.status!=='已解决':n.type===id)).length;
+ const cutoff7d=Date.now()-7*24*60*60*1000;
+ const recent7=n=>{const added=Date.parse(n.createdAt||n.attachments?.[0]?.addedAt||(n.date+'T00:00:00'));return Number.isFinite(added)&&added>=cutoff7d};
+ const railBadgeFor=id=>{
+  if(id==='plan')return records.filter(n=>!n.flashcardKind&&n.type==='plan'&&!archivedPlan(n)&&n.status==='进行中').length;
+  if(id==='issue')return records.filter(n=>!n.flashcardKind&&n.type==='issue'&&n.status!=='已解决').length;
+  if(id==='resource')return records.filter(n=>!n.flashcardKind&&(n.type==='resource'||n.type==='paper')&&recent7(n)).length;
+  return 0;
+ };
  $('crumb').textContent=names[view]||'总览';$('listTitle').textContent=view==='all'?'最近记录':names[view]||'记录';$('pageTitle').textContent=names[view]||'记录';
  $('listTitle').closest('.section-heading').hidden=view!=='all';
  const description=activeProfile().navDescriptions?.[view]||'';
  $('pageSub').textContent=description;$('pageSub').hidden=!description;
- const libTotal=records.filter(n=>!n.flashcardKind&&(n.type==='resource'||n.type==='paper')).length;
- const pinTotal=records.filter(n=>!n.flashcardKind&&n.pinned).length;
  const railItems=[
   ['all','navOverview',0,0],
-  ...cats.filter(c=>c.id!=='paper').map(c=>[c.id,categoryIcon(c),count(c.id),totalFor(c.id)]),
-  ['resource','navLibrary',count('resource')+count('paper'),libTotal],
-  ['pinned','navPinned',records.filter(n=>!n.flashcardKind&&n.pinned&&recent(n)).length,pinTotal]
+  ...cats.filter(c=>c.id!=='paper').map(c=>[c.id,categoryIcon(c),count(c.id),railBadgeFor(c.id)]),
+  ['resource','navLibrary',count('resource')+count('paper'),railBadgeFor('resource')],
+  ['pinned','navPinned',records.filter(n=>!n.flashcardKind&&n.pinned&&recent(n)).length,0]
  ];
  renderWorkspaceRail(railItems);
- $('tabs').innerHTML='<button class="tab '+(tab==='all'?'active':'')+'" data-tab="all">全部记录</button>'+cats.filter(c=>c.id!=='paper').map(c=>'<button class="tab '+(tab===c.id?'active':'')+'" data-tab="'+c.id+'">'+esc(c.name)+'</button>').join('')+'<button class="tab '+(tab==='resource'?'active':'')+'" data-tab="resource">'+esc(names.resource)+'</button>'+(view==='pinned'?'<button id="achievementTab" class="tab '+(tab==='achievements'?'active':'')+'" data-tab="achievements">成就殿宇</button>':'');
+ const showAchievements=view==='pinned'&&(window.DoNoteAchievements?.isEnabled?.()!==false);
+ if(tab==='achievements'&&!showAchievements)tab='all';
+ $('tabs').innerHTML='<button class="tab '+(tab==='all'?'active':'')+'" data-tab="all">全部记录</button>'+cats.filter(c=>c.id!=='paper').map(c=>'<button class="tab '+(tab===c.id?'active':'')+'" data-tab="'+c.id+'">'+esc(c.name)+'</button>').join('')+'<button class="tab '+(tab==='resource'?'active':'')+'" data-tab="resource">'+esc(names.resource)+'</button>'+(showAchievements?'<button id="achievementTab" class="tab '+(tab==='achievements'?'active':'')+'" data-tab="achievements">成就殿宇</button>':'');
  const type=$('type').value;
  $('type').replaceChildren(...[...cats.map(c=>c.id),'resource'].map(id=>new Option(recordTypeName(id),id)));
  $('type').value=statusOptions[type]?type:defaultRecordType();

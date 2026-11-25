@@ -28,7 +28,7 @@
 
 ## 设置中心与网页收藏
 
-- `desktop-settings.html`、`desktop-settings.js` 和 `desktop-settings.css` 提供「外观与阅读 · AI 与翻译 · 资料与系统」三栏聚合设置中心，内联默认翻译语向、Whisper 模型选择、资料目录操作与版本更新入口，消除多级悬停子菜单与碎片弹窗。
+- `desktop-settings.html`、`desktop-settings.js`、`desktop-settings.css` 和 `WindowChrome.cs` 提供「外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统」四栏自适应舒展设置中心，支持成就殿宇显隐开关、多端实时推送/端到端加密配置，以及启动后静默检查新版本并在原生标题栏与设置图标亮起温和圆点提示。
 - `web-fetch.mjs` 执行公网 IP 校验防 SSRF，复用 TLS Keep-Alive 连接与 `gzip/deflate/br` 流式限额解压，单进程 8 路并发限时抓取网页正文与配图样式。
 
 ## 云端备份

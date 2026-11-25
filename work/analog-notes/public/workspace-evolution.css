@@ -23,10 +23,6 @@
   display: none;
 }
 
-#workspaceRail .rail-footprint-card {
-  display: none;
-}
-
 @media (min-width: 1120px) {
   #workspaceRail .rail-section-label {
     display: block;
@@ -76,52 +72,6 @@
     color: var(--accent, #2e5984);
     background: color-mix(in srgb, var(--accent, #2e5984) 13%, transparent);
     font-weight: 600;
-  }
-
-  #workspaceRail .rail-footprint-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    width: calc(100% - 8px);
-    margin: 0 4px 8px;
-    padding: 7px 10px;
-    border-radius: 10px;
-    border: 1px solid color-mix(in srgb, var(--line, #cbd5e1) 75%, transparent);
-    background: color-mix(in srgb, var(--surface-soft, #f8fafc) 82%, transparent);
-    color: var(--ink-soft, #475569);
-    font-size: 11.5px;
-    cursor: pointer;
-    transition: background-color 140ms ease, border-color 140ms ease;
-  }
-
-  #workspaceRail .rail-footprint-card:hover {
-    background: color-mix(in srgb, var(--accent, #2e5984) 7%, var(--surface, #ffffff));
-    border-color: color-mix(in srgb, var(--accent, #2e5984) 26%, transparent);
-  }
-
-  #workspaceRail .rail-footprint-left {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  #workspaceRail .rail-footprint-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #2f855a;
-    box-shadow: 0 0 0 3px rgba(47, 133, 90, 0.16);
-    flex-shrink: 0;
-  }
-
-  #workspaceRail .rail-footprint-hall {
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    color: var(--ink-muted, #64748b);
-    white-space: nowrap;
   }
 }
 
