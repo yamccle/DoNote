@@ -13,10 +13,10 @@ using System.Windows.Forms;
 
 internal sealed partial class WorkspaceWindow
 {
-    private Color chromeBackground = Color.FromArgb(244, 247, 251);
-    private Color chromeText = Color.FromArgb(15, 23, 42);
-    private Color chromeAccent = Color.FromArgb(37, 99, 235);
-    private Color chromeDivider = Color.FromArgb(226, 232, 240);
+    private Color chromeBackground = Color.FromArgb(246, 247, 249);
+    private Color chromeText = Color.FromArgb(17, 24, 39);
+    private Color chromeAccent = Color.FromArgb(54, 92, 198);
+    private Color chromeDivider = Color.FromArgb(228, 231, 236);
     private Panel chromePanel;
     private Button chromeNew;
     private Label chromeSection;

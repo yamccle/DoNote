@@ -613,6 +613,25 @@ async function testPresentationSettingsAndFastWeb(page, closeReader) {
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => !document.getElementById('commandPalette').open && view === 'all');
 
+  // 验证总览栏目统计卡片点击跳转、全栏目常驻显眼快捷指令栏与新版备份恢复中心健康栏
+  await page.locator('#dashboardTop .dashboard-card[data-widget-kind="journal"]').click();
+  await page.waitForFunction(() => view === 'journal');
+  assert.equal(await page.locator('#introCommandTrigger').isVisible(), true);
+  await page.locator('#introCommandTrigger').click();
+  await page.locator('#commandPalette[open]').waitFor();
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => switchView('all'));
+  await page.locator('#dashboardTop .dashboard-card[data-widget-kind="paper"]').click();
+  await page.waitForFunction(() => view === 'resource');
+  await page.evaluate(() => switchView('all'));
+
+  await page.evaluate(() => document.getElementById('backupBtn').click());
+  await page.locator('#backup[open]').waitFor();
+  await page.waitForFunction(() => /\d+ 条记录/.test(document.getElementById('backupStatRecords')?.textContent || ''));
+  assert.equal(await page.locator('.backup-primary-grid #writeFolder').count(), 1);
+  assert.equal(await page.locator('#restoreFolderSlot #restoreLargeBackupFolder').count(), 1);
+  await page.locator('#backup [data-close="backup"]').click();
+
   // 2. 三栏聚合设置中心：单窗标签切换与内联语音模型 / 默认语向即时同步
   await page.evaluate(() => document.getElementById('desktopSettingsButton').click());
   await page.locator('#desktopSettings:popover-open').waitFor();

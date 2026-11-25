@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 读取编辑器提供的记录字段、附件和当前用户。
- * [OUTPUT]: 暂存、恢复和清理草稿，显示备份状态。
- * [POS]: 供记录编辑器调用的草稿存储。
+ * [OUTPUT]: 暂存、恢复和清理草稿，实时更新备份中心健康指标、容量预警与进度横幅。
+ * [POS]: 供记录编辑器与备份恢复中心调用的可靠性与状态层。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 'use strict';
@@ -82,16 +82,87 @@ async function restoreLatestDraft(){
 }
 function markBackupExport(){try{localStorage.setItem('analog-last-export/'+appState.activeId,new Date().toISOString())}catch{}}
 async function refreshStorageSummary(){
- const p=activeProfile(),last=localStorage.getItem('analog-last-export/'+p.id);let text='当前用户 '+p.records.length+' 条记录；上次导出：'+(last?new Date(last).toLocaleString('zh-CN'):'尚未导出');
- try{const usage=await navigator.storage?.estimate();if(usage?.usage!==undefined)text+='。本机存储使用约 '+sizeLabel(usage.usage)}catch{}
- text+='。草稿自动暂存在本浏览器，不等同于外部备份。';$('reliabilityStatus').textContent=text;
+ const p=activeProfile();
+ if(!p)return;
+ const last=localStorage.getItem('analog-last-export/'+p.id);
+ const visibleRecords=p.records.filter(r=>!r.flashcardKind);
+ let attCount=0,attBytes=0;
+ for(const note of p.records)for(const a of note.attachments||[]){attCount++;attBytes+=Number(a.size)||0;}
+ let estBytes=attBytes;
+ try{const usage=await navigator.storage?.estimate();if(usage?.usage!==undefined)estBytes=Math.max(attBytes,usage.usage)}catch{}
+
+ let text='当前用户 '+visibleRecords.length+' 条记录；上次导出：'+(last?new Date(last).toLocaleString('zh-CN'):'尚未导出');
+ if(estBytes>0)text+='。本机存储使用约 '+sizeLabel(estBytes);
+ text+='。草稿自动暂存在本浏览器，不等同于外部备份。';
+ $('reliabilityStatus').textContent=text;
+
+ const statRec=$('backupStatRecords'),statSize=$('backupStatSize'),statLast=$('backupStatLast'),lightHint=$('backupLightHint');
+ if(statRec)statRec.textContent=(p.name||'当前用户')+' · '+visibleRecords.length+' 条记录'+(attCount?'（'+attCount+' 个附件）':'');
+ if(statSize)statSize.textContent=estBytes>0?'约 '+sizeLabel(estBytes):'小于 1 MB';
+ if(statLast){
+  if(!last){
+   statLast.textContent='尚未外部备份 · 建议备份';
+   statLast.dataset.backupHealth='warn';
+  }else{
+   const dt=new Date(last),ageDays=Math.floor((Date.now()-dt.getTime())/86400000);
+   const shortTime=dt.toLocaleDateString('zh-CN',{month:'2-digit',day:'2-digit'})+' '+dt.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+   statLast.textContent=ageDays>14?shortTime+'（'+ageDays+' 天前）':shortTime;
+   statLast.dataset.backupHealth=ageDays>14?'warn':'ok';
+  }
+ }
+ const overLimit=attBytes>MAX_BACKUP;
+ if(lightHint){
+  lightHint.textContent=overLimit
+   ?'当前附件约 '+sizeLabel(attBytes)+'（超过 500 MB 单文件上限），完整备份请用上方「流式备份」或「云端备份」'
+   :'总附件 500 MB 以内可打包为单文件，或仅导出纯文本 Markdown 大纲';
+  lightHint.classList.toggle('is-over-limit',overLimit);
+ }
+ for(const id of ['exportFolder','exportJson']){
+  const btn=$(id);if(btn)btn.classList.toggle('is-muted-limit',overLimit);
+ }
+ const draftHint=$('draftStatusHint');
+ if(draftHint&&database){
+  try{
+   const d=await reqResult(database.transaction('workspace').objectStore('workspace').get(draftStorageKey(p.id)));
+   draftHint.textContent=d
+    ?'检测到暂存草稿（'+new Date(d.savedAt).toLocaleString('zh-CN')+(d.fields?.title?' · '+d.fields.title.slice(0,22):'')+'）'
+    :'当前没有未提交的暂存草稿（草稿仅暂存在应用内，不等同于外部备份）';
+  }catch{}
+ }
+}
+function syncBackupLiveBanner(){
+ const banner=$('backupStatusBanner'),msg=$('importMessage'),bar=$('backupProgressBar');
+ if(!banner||!msg)return;
+ const text=msg.textContent.trim();
+ banner.hidden=!text;
+ if(!text){if(bar)bar.hidden=true;return}
+ const isOk=/^(已保存|大文件备份已完成|导入完成)/.test(text);
+ const isErr=/(未完成|失败|不足|无效|超出|过大|缺少|异常|已变化)/.test(text);
+ banner.dataset.tone=isErr?'error':isOk?'ok':'running';
+ if(bar){
+  const m=text.match(/(\d+)\s*\/\s*(\d+)/);
+  if(!isOk&&!isErr&&m&&Number(m[2])>0){
+   bar.hidden=false;bar.max=Number(m[2]);bar.value=Math.min(Number(m[1]),Number(m[2]));
+  }else bar.hidden=true;
+ }
 }
 function initializeReliability(){
  if(!ready)return;
  window.addEventListener('beforeunload',e=>{if(draftDirty){saveDraftNow();e.preventDefault();e.returnValue=''}});
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveDraftNow()});
  $('restoreDraft').onclick=restoreLatestDraft;
- const backupOpen=$('backupBtn').onclick;$('backupBtn').onclick=()=>{backupOpen();refreshStorageSummary()};
- const originalDownloadBlob=downloadBlob;downloadBlob=function(name,blob){originalDownloadBlob(name,blob);if(/^analog-notes-|^AnalogNotes-/.test(name)&&/\.(json|zip)$/.test(name)){markBackupExport();refreshStorageSummary()}};
+ const dataDirBtn=$('backupOpenDataDir'),hostWeb=location.origin==='https://yams-one.example'?window.chrome?.webview:null;
+ if(dataDirBtn&&hostWeb){
+  dataDirBtn.hidden=false;
+  dataDirBtn.onclick=()=>hostWeb.postMessage('view-data-folder');
+ }
+ const msg=$('importMessage');
+ if(msg){new MutationObserver(syncBackupLiveBanner).observe(msg,{childList:true,characterData:true,subtree:true});syncBackupLiveBanner()}
+ const backupDialog=$('backup');
+ if(backupDialog){
+  new MutationObserver(()=>{if(backupDialog.open){if(msg&&!/正在/.test(msg.textContent))msg.textContent='';void refreshStorageSummary();}}).observe(backupDialog,{attributes:true,attributeFilter:['open']});
+ }
+ const backupOpen=$('backupBtn').onclick;$('backupBtn').onclick=()=>{backupOpen();void refreshStorageSummary()};
+ const originalDownloadBlob=downloadBlob;downloadBlob=function(name,blob){originalDownloadBlob(name,blob);if(/^analog-notes-|^AnalogNotes-/.test(name)&&/\.(json|zip)$/.test(name)){markBackupExport();void refreshStorageSummary()}};
  if(navigator.storage?.persisted)navigator.storage.persisted().then(persisted=>{if(!persisted&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}).catch(()=>{});
 }

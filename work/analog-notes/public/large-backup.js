@@ -22,10 +22,12 @@ async function openLargeBackupFile(directory,path){
 const restoreFolderButton=document.createElement('button');
 restoreFolderButton.id='restoreLargeBackupFolder';
 restoreFolderButton.type='button';
-restoreFolderButton.className='secondary';
-restoreFolderButton.textContent='从备份文件夹恢复';
+restoreFolderButton.className='secondary backup-restore-primary';
+restoreFolderButton.textContent='从备份文件夹恢复（不限容量）';
 restoreFolderButton.hidden=!window.showDirectoryPicker;
-$('writeFolder').after(restoreFolderButton);
+const restoreFolderSlot=$('restoreFolderSlot');
+if(restoreFolderSlot)restoreFolderSlot.append(restoreFolderButton);
+else $('writeFolder').after(restoreFolderButton);
 restoreFolderButton.onclick=async()=>{
  if(!ensureReady()||restoreFolderButton.disabled)return;
  let directory;

@@ -1,15 +1,15 @@
 /**
  * [INPUT]: 读取工作台记录、计划日期与用户自定义的总览组件布局。
- * [OUTPUT]: 渲染 2x2 风格冰蓝统计瓷砖、动态柱状活跃图/热力图切换与组件编排弹窗。
- * [POS]: 总览仪表盘数据可视化层，提供直观研究产出节奏与里程碑倒计时反馈。
+ * [OUTPUT]: 渲染紧凑可跳转的栏目统计条、动态柱状活跃图/热力图切换与组件编排弹窗。
+ * [POS]: 总览仪表盘数据与快捷导航层，点击任意栏目指标卡片即可直接进入对应视图。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 'use strict';
 
 const DASHBOARD_WIDGETS={
- paper:['文献阅读','book'],issue:['设计问题','navDesign'],journal:['工作日志','navWork'],study:['学习日志','navStudy'],
+ paper:['文献阅读','book'],issue:['问题与课题','navDesign'],journal:['工作日志','navWork'],study:['学习日志','navStudy'],
  week:['本周新增记录','calendar'],activity:['记录的足迹','navOverview'],unread:['待读资料','navLibrary'],
- pending:['待排查设计问题','navDesign'],pinned:['置顶收藏','navPinned'],
+ pending:['待推进问题','navDesign'],pinned:['置顶收藏','navPinned'],
  reminders:['临时提醒','calendar'],quick:['快速开始','plus'],
  plansActive:['进行中的计划','calendar'],planDeadline:['最近计划截止','calendar'],plansWeek:['本周计划','calendar'],
  tapeout:['里程碑倒计时','navDesign'],test:['节点 / 考核倒计时','calendar'],deadline:['自定义倒计时','calendar']
@@ -51,6 +51,33 @@ function widgetTitle(widget){
  if(widget.kind==='paper')return names.resource||'文献与媒体库';
  return isCountdown(widget.kind)?widget.title:(activeCategory(widget.kind)?.name||DASHBOARD_WIDGETS[widget.kind][0]);
 }
+function widgetNavigable(kind){
+ if(isCountdown(kind)||kind==='activity')return false;
+ if(['paper','unread','pinned','week'].includes(kind))return true;
+ if(['plansActive','plansWeek','planDeadline'].includes(kind))return !!activeCategory('plan');
+ if(kind==='pending')return !!activeCategory('issue');
+ return Object.hasOwn(names,kind);
+}
+function navigateDashboardWidget(kind){
+ if(!ready||!widgetNavigable(kind))return;
+ if(kind==='paper'){switchView('resource');return}
+ if(kind==='unread'){
+  switchView('resource');
+  const sel=$('libraryStatus');
+  if(sel){sel.value='待读';render()}
+  return;
+ }
+ if(kind==='pending'){switchView('issue');return}
+ if(kind==='pinned'){switchView('pinned');return}
+ if(['plansActive','plansWeek','planDeadline'].includes(kind)){switchView('plan');return}
+ if(kind==='week'){
+  const allTab=document.querySelector('#tabs [data-tab="all"]');
+  if(allTab&&!allTab.classList.contains('active'))allTab.click();
+  $('listTitle')?.scrollIntoView({behavior:'smooth',block:'start'});
+  return;
+ }
+ if(Object.hasOwn(names,kind))switchView(kind);
+}
 function countdownDays(date,day=today()){
  return Math.round((Date.parse(date+'T00:00:00Z')-Date.parse(day+'T00:00:00Z'))/86400000);
 }
@@ -89,39 +116,49 @@ function renderDashboardWidgets(){
  $('dashboardWidgets').hidden=$('dashboardSide').hidden=!shown;
  if(!shown)return;
  const widgets=dashboardWidgetsFor(activeProfile()),now=new Date(),day=today(),counts=new Map();
- for(const {date,flashcardKind} of records)if(!flashcardKind)counts.set(date,(counts.get(date)||0)+1);
+ const activeRecords=records.filter(r=>!r.flashcardKind);
+ for(const {date} of activeRecords)counts.set(date,(counts.get(date)||0)+1);
  const addedDay=record=>(record.createdAt||record.attachments?.[0]?.addedAt||record.date||'').slice(0,10);
- const currentWeek=getWeekKey(day),thisWeek=records.filter(record=>!record.flashcardKind&&addedDay(record)<=day&&getWeekKey(addedDay(record))===currentWeek);
- const plans=records.filter(record=>record.type==='plan'&&validPlanDates(record.planStart,record.planEnd))
+ const currentWeek=getWeekKey(day),thisWeek=activeRecords.filter(record=>addedDay(record)<=day&&getWeekKey(addedDay(record))===currentWeek);
+ const plans=activeRecords.filter(record=>record.type==='plan'&&validPlanDates(record.planStart,record.planEnd))
   .sort((a,b)=>a.planEnd.localeCompare(b.planEnd)||a.planStart.localeCompare(b.planStart));
  const weekStart=currentPlanMonday(),weekEnd=planEndFor(weekStart,'week');
  function renderWidget(widget){
-  const {kind}=widget,heading='<div class="widget-label">'+svg(DASHBOARD_WIDGETS[kind][1])+esc(widgetTitle(widget))+'</div>';
-  const padNum=v=>typeof v==='number'&&v>=0&&v<10?'0'+v:String(v);
-  const metric=(value,foot,attrs='')=>'<div class="widget-metric-row"><i class="widget-accent-bar"></i><div class="widget-value" '+attrs+'>'+padNum(value)+'</div></div><div class="widget-foot">'+foot+'</div>';
-  let content;
-  if(isCountdown(kind))content=metric(countdownLabel(countdownDays(widget.date)),esc(widget.date),'data-countdown="'+widget.date+'"');
-  else if(kind==='activity')content=widgetActivity(counts,now);
-  else if(kind==='week')content=metric(thisWeek.length,new Set(thisWeek.map(addedDay)).size+' 天有记录');
+  const {kind}=widget,titleText=esc(widgetTitle(widget)),iconSvg=svg(DASHBOARD_WIDGETS[kind][1]);
+  if(kind==='activity'){
+   return '<article class="dashboard-card widget-activity" data-widget="'+esc(widget.id)+'" data-widget-kind="activity">'
+    +'<div class="widget-label">'+iconSvg+titleText+'</div>'+widgetActivity(counts,now)+'</article>';
+  }
+  const canJump=widgetNavigable(kind);
+  const renderCompact=(value,foot,attrs='',extra='')=>'<div class="widget-compact-row">'
+   +'<span class="widget-icon-box" aria-hidden="true">'+iconSvg+'</span>'
+   +'<div class="widget-copy"><div class="widget-label">'+titleText+'</div><div class="widget-foot">'+foot+'</div></div>'
+   +'<div class="widget-stat-end"><div class="widget-value" '+attrs+'>'+value+'</div>'
+   +(canJump?'<span class="widget-jump-arrow" aria-hidden="true">›</span>':'')+'</div></div>'+extra;
+  let body;
+  if(isCountdown(kind))body=renderCompact(countdownLabel(countdownDays(widget.date)),esc(widget.date),'data-countdown="'+widget.date+'"');
+  else if(kind==='week')body=renderCompact(thisWeek.length,new Set(thisWeek.map(addedDay)).size+' 天有新增');
   else if(kind==='plansActive'){
    const active=plans.filter(plan=>plan.status==='进行中');
-   content=metric(active.length,active.length?'项进行中':'暂无进行中的计划')+widgetPlanLinks(active);
+   body=renderCompact(active.length,active.length?'项进行中':'暂无进行中计划','',widgetPlanLinks(active));
   }else if(kind==='plansWeek'){
    const weekly=plans.filter(plan=>plan.planStart<=weekEnd&&plan.planEnd>=weekStart);
-   content=metric(weekly.length,weekly.length?weekly.filter(plan=>plan.status==='已完成').length+' 项已完成':'本周暂无安排')+widgetPlanLinks(weekly);
+   body=renderCompact(weekly.length,weekly.length?weekly.filter(plan=>plan.status==='已完成').length+' 项已完成':'本周无安排','',widgetPlanLinks(weekly));
   }else if(kind==='planDeadline'){
    const incomplete=plans.filter(plan=>plan.status!=='已完成');
    const next=incomplete.find(plan=>plan.planEnd>=day)||incomplete.at(-1);
-   content=next?metric(countdownLabel(countdownDays(next.planEnd)),esc(next.planEnd),'data-countdown="'+next.planEnd+'"')+widgetPlanLinks([next]):metric('—','暂无未完成计划');
-  }
-  else if(kind==='unread')content=metric(records.filter(record=>record.type==='resource'&&record.status==='待读').length,'份资料');
-  else if(kind==='pending')content=metric(records.filter(record=>record.type==='issue'&&record.status==='待排查').length,'个设计问题');
-  else if(kind==='pinned')content=metric(records.filter(record=>!record.flashcardKind&&record.pinned).length,'条已置顶');
+   body=next?renderCompact(countdownLabel(countdownDays(next.planEnd)),esc(next.planEnd),'data-countdown="'+next.planEnd+'"',widgetPlanLinks([next])):renderCompact('—','暂无未完成计划');
+  }else if(kind==='unread')body=renderCompact(activeRecords.filter(record=>record.type==='resource'&&record.status==='待读').length,'份待读资料');
+  else if(kind==='pending')body=renderCompact(activeRecords.filter(record=>record.type==='issue'&&record.status==='待排查').length,'项待推进');
+  else if(kind==='pinned')body=renderCompact(activeRecords.filter(record=>record.pinned).length,'条置顶收藏');
   else{
-   const group=thisWeek.filter(record=>record.type===kind||kind==='paper'&&record.type==='resource');
-   content=metric(group.length,'本周新增');
+   const matchType=record=>record.type===kind||(kind==='paper'&&(record.type==='resource'||record.type==='paper'));
+   const total=activeRecords.filter(matchType).length;
+   const weekAdded=thisWeek.filter(matchType).length;
+   body=renderCompact(total,weekAdded?'本周新增 +'+weekAdded:'共 '+total+' 条 · 点击进入');
   }
-  return '<article class="dashboard-card'+(kind==='activity'?' widget-activity':'')+'" data-widget="'+esc(widget.id)+'" data-widget-kind="'+esc(kind)+'">'+heading+content+'</article>';
+  const navAttrs=canJump?' data-widget-nav="'+esc(kind)+'" role="button" tabindex="0" title="点击前往：'+titleText+'"':'';
+  return '<article class="dashboard-card'+(canJump?' is-clickable':'')+'" data-widget="'+esc(widget.id)+'" data-widget-kind="'+esc(kind)+'"'+navAttrs+'>'+body+'</article>';
  }
  const key=JSON.stringify(widgets.map(({id,kind,zone})=>[id,kind,zone]));
  if(dashboardLayoutKey!==key){
@@ -178,12 +215,25 @@ function renderDashboardEditor(){
 }
 function initializeDashboardWidgets(){
  const dialog=$('dashboardWidgetDialog'),form=$('dashboardWidgetForm');
- for(const id of ['dashboardTop','dashboardSide'])$(id).addEventListener('click',event=>{
-  const modeBtn=event.target.closest('[data-activity-mode]');
-  if(modeBtn){activityChartMode=modeBtn.dataset.activityMode;renderDashboardWidgets();return}
-  const plan=event.target.closest('[data-widget-plan]')?.dataset.widgetPlan;
-  if(plan)showDetail(plan);
- });
+ for(const id of ['dashboardTop','dashboardSide']){
+  const zoneEl=$(id);
+  zoneEl.addEventListener('click',event=>{
+   const modeBtn=event.target.closest('[data-activity-mode]');
+   if(modeBtn){activityChartMode=modeBtn.dataset.activityMode;renderDashboardWidgets();return}
+   const plan=event.target.closest('[data-widget-plan]')?.dataset.widgetPlan;
+   if(plan){showDetail(plan);return}
+   const navCard=event.target.closest('.dashboard-card[data-widget-nav]');
+   if(navCard)navigateDashboardWidget(navCard.dataset.widgetNav);
+  });
+  zoneEl.addEventListener('keydown',event=>{
+   if(event.key!=='Enter'&&event.key!==' ')return;
+   const navCard=event.target.closest('.dashboard-card[data-widget-nav]');
+   if(navCard&&event.target===navCard){
+    event.preventDefault();
+    navigateDashboardWidget(navCard.dataset.widgetNav);
+   }
+  });
+ }
  $('widgetKind').innerHTML=Object.entries(DASHBOARD_WIDGETS).map(([kind,[title]])=>'<option value="'+kind+'">'+title+'</option>').join('');
  $('dashboardCustomize').onclick=()=>{
   if(!ensureReady())return;

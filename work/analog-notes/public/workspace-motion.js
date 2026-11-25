@@ -52,18 +52,27 @@
     render();
   }
 
-  // ── 1. 顶部栏 Ctrl+K 聚光灯触发器 + 视图切换胶囊组 ──
+  function cleanDisplayText(val) {
+    return String(val ?? '').replace(/&(amp|#38);/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'");
+  }
+
+  // ── 1. 顶部显眼聚光灯快捷指令栏 + 视图切换胶囊组 ──
   function ensureViewControls() {
-    const introActions = document.querySelector('#workspaceIntro .workspace-intro-actions');
-    if (introActions && !$('introCommandTrigger')) {
+    const intro = $('workspaceIntro');
+    const introActions = intro?.querySelector('.workspace-intro-actions');
+    if (intro && !$('introCommandTrigger')) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.id = 'introCommandTrigger';
-      btn.className = 'cmdk-intro-pill';
-      btn.title = '打开快速跳转与全局指令面板 (Ctrl+K)';
-      btn.innerHTML = KANBAN_ICONS.spark + '<span>快速指令</span><kbd>Ctrl K</kbd>';
+      btn.className = 'cmdk-hero-bar';
+      btn.title = '打开快捷指令与全库速查面板 (Ctrl+K)';
+      btn.setAttribute('aria-label', '打开快捷指令与全库速查面板 (Ctrl+K)');
+      btn.innerHTML = '<span class="cmdk-hero-icon" aria-hidden="true">' + KANBAN_ICONS.spark + '</span>'
+        + '<span class="cmdk-hero-copy"><strong>快捷指令</strong><span>搜索全库、新建记录或跳转栏目…</span></span>'
+        + '<span class="cmdk-hero-kbd"><kbd>Ctrl</kbd><kbd>K</kbd></span>';
       btn.onclick = () => openCommandPalette();
-      introActions.prepend(btn);
+      if (introActions) intro.insertBefore(btn, introActions);
+      else intro.append(btn);
     }
 
     const libControls = $('libraryControls');
@@ -231,7 +240,7 @@
             + '<span class="kanban-date">' + esc(dateInfo) + '</span>'
             + (r.pinned ? '<span class="kanban-pin-pill" title="已置顶">★ 置顶</span>' : '')
             + '</div>'
-            + '<h3>' + esc(r.title) + '</h3>'
+            + '<h3>' + esc(cleanDisplayText(r.title)) + '</h3>'
             + (excerpt ? '<p class="card-excerpt">' + esc(excerpt) + '</p>' : '')
             + '<div class="kanban-card-foot">'
             + '<div class="tags">' + r.tags.slice(0, 3).map(t => '<span class="tag">' + esc(t) + '</span>').join('')
@@ -434,8 +443,8 @@
       btn.className = 'cmdk-item' + (idx === cmdActiveIdx ? ' is-active' : '');
       btn.setAttribute('role', 'option');
       btn.setAttribute('aria-selected', String(idx === cmdActiveIdx));
-      btn.innerHTML = '<span class="cmdk-item-main"><strong>' + esc(item.title) + '</strong>'
-        + (item.sub ? '<small>' + esc(item.sub) + '</small>' : '') + '</span>'
+      btn.innerHTML = '<span class="cmdk-item-main"><strong>' + esc(cleanDisplayText(item.title)) + '</strong>'
+        + (item.sub ? '<small>' + esc(cleanDisplayText(item.sub)) + '</small>' : '') + '</span>'
         + '<span class="cmdk-item-hint">' + esc(item.hint || '') + '</span>';
       btn.onpointerenter = () => { cmdActiveIdx = idx; syncCmdSelection(); };
       btn.onclick = () => { cmdDialog.close(); item.run(); };
@@ -486,6 +495,9 @@
       return;
     }
     enhanceLibraryCards(visibleList || []);
+    for (const heading of host.querySelectorAll('.card h3')) {
+      if (heading.textContent.includes('&')) heading.textContent = cleanDisplayText(heading.textContent);
+    }
     if (view !== 'resource') {
       let idx = 0;
       for (const card of host.querySelectorAll(':scope > .card')) {

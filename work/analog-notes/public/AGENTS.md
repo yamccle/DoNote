@@ -3,9 +3,9 @@
 > L2 | 项目规则来自工作区 AGENTS.md。
 
 - `notebook.html` 装配主页、栏目工具栏与记录编辑器。
-- `workspace-home.js` 和 `workspace-home.css` 从保存的附件位置和计划生成总览问候语、多彩 Bento 精读进度环网格与近期计划卡片。
-- `dashboard-widgets.js` 提供 2x2 风格统计瓷砖、近 7 天动态柱状活跃图与近 8 周热力图切换，以及里程碑倒计时编排。
-- `workspace-motion.js` 和 `workspace-bento.css` 提供毛玻璃顶栏、`Ctrl+K` 全局聚光灯指令面板、资料库画廊/列表双视图切换、问题与计划多列拖拽看板及微交互动效。
+- `workspace-home.js` 和 `workspace-home.css` 从保存的附件位置和计划生成总览问候语、紧凑克制的继续阅读进度环网格与近期计划列表。
+- `dashboard-widgets.js` 提供紧凑可点击跳转的栏目统计条、近 7 天动态柱状活跃图与近 8 周热力图切换，以及里程碑倒计时编排。
+- `workspace-motion.js` 和 `workspace-bento.css` 提供全站常驻显眼 `快捷指令 Ctrl+K` 启动条与聚光灯面板、资料库画廊/列表双视图切换、问题与计划多列拖拽看板及备份恢复中心样式。
 - `reader-session.js` 和 `reader-tabs.js` 从附件检查点恢复 PDF / PPT / 视频阅读位置，并支持在论文 PDF 与讲义 PPT 多标签之间原地切换。
 - `workspace-toolbar.js` 重用搜索、栏目筛选和菜单动作，按当前栏目排列。
 - `workspace-toolbar.css` 布置栏目的主操作和响应式菜单。
@@ -16,7 +16,7 @@
 - `rich-text.js` 同步正文纯文本，并通知草稿存储正文已经改变。
 - `record-editor.css` 布置类型选择器和记录编辑器。附件与关联资料集中于正文前。
 - `library.js` 在展开关联资料时生成候选列表。已选择的资料在收起后继续保留。
-- `reliability.js` 暂存记录草稿、计划日期、归档文件夹和附件。
+- `reliability.js` 暂存记录草稿、计划日期、归档文件夹和附件，并刷新备份恢复中心的规模健康指标、超限提示与实时进度横幅。
 - `notebook-v2.js` 存取工作台记录与附件，并为本机备份和云端快照生成同一恢复清单。
 - `large-backup.js` 读取用户选择的快照目录，并调用统一恢复流程。
 - `workspace-navigation.js` 同步栏目的选中状态、历史和快捷导航焦点。

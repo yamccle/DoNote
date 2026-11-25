@@ -354,7 +354,7 @@ async function collectBackup(includeData,{large=false,onProgress}={}){
  const p=structuredClone(activeProfile()),files=[];
  let attachmentBytes=0;
  for(const note of p.records)for(const a of note.attachments||[])attachmentBytes+=includeData?Math.ceil(a.size/3)*4:a.size;
- if(!large&&attachmentBytes>MAX_BACKUP)throw new Error('附件超出备份文件容量。桌面版请完全退出软件，再复制「设置」中显示的资料目录进行备份。');
+ if(!large&&attachmentBytes>MAX_BACKUP)throw new Error('当前附件总量（约 '+sizeLabel(attachmentBytes)+'）超过 500 MB 单文件上限，请直接使用上方推荐的「流式备份到文件夹」或「云端版本化备份」。');
  for(const note of p.records){for(const a of note.attachments||[]){const blob=await readBlob(a.id,p.id);if(blob.size!==a.size)throw new Error('附件大小异常：'+a.name);a.annotations=await fileAnnotations(p.id,a);if(fileIsPdf(a)&&typeof readPdfOcrPages==='function'){const ocr=await readPdfOcrPages(a.id,p.id);if(ocr?.pages&&Object.keys(ocr.pages).length)a.ocrPages=ocr.pages;else delete a.ocrPages}if(fileIsVideo(a)){const frames=await fileVideoFrameNotes(p.id,a);if(frames.length)a.videoFrameNotes=frames;else delete a.videoFrameNotes}a.sha256=await fileDigest(blob,(done,total)=>onProgress?.(a.name,done,total));a.path=attachmentPath(p,note,a);if(includeData)a.data=await blobToBase64(blob);files.push({path:a.path,blob})}}
  return {backup:{format:'analog-notes',version:2,exportedAt:new Date().toISOString(),profile:{name:p.name,role:p.role,topics:p.topics,categories:p.categories,journalLayoutVersion:p.journalLayoutVersion,planLayoutVersion:p.planLayoutVersion,navLabels:p.navLabels,navDescriptions:p.navDescriptions||{},reading:p.reading,reminders:p.reminders||[],readingLists:p.readingLists||[],folders:p.folders||[],dashboardWidgets:dashboardWidgetsFor(p),dashboardWidgetLayoutVersion:1},records:p.records},files};
 }
@@ -613,6 +613,7 @@ async function ensureBackupImportSpace(backup){
   message.textContent='校验通过，正在保存记录和附件…';
   await commitState(next,entries.flatMap(({writes})=>writes));
   render();
+  if(typeof refreshStorageSummary==='function')void refreshStorageSummary();
   message.textContent='导入完成：新增 '+incoming.length+' 条，跳过 '+finalSkipped+' 条重复记录；附件已恢复。';
   toast('记录与附件已恢复');
  }catch(error){

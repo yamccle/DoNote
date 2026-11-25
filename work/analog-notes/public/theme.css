@@ -5,36 +5,23 @@
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 :root {
- --paper:#f4f7fb; --surface:#ffffff; --surface-soft:#eef3fa; --surface-hover:#e3ebf6;
- --ink:#0f172a; --text-soft:#334155; --muted:#64748b; --line:#e2e8f0; --field-border:#cbd5e1;
- --strong:#2563eb; --on-strong:#ffffff; --strong-hover:#1d4ed8; --cover:#e8eff9; --reader-bg:#e9eff7;
- --heat-1:#dbeafe; --heat-2:#60a5fa; --heat-3:#2563eb; --scrim:#0f172a66;
- --bento-blue:linear-gradient(135deg,#2563eb 0%,#38bdf8 100%);
- --bento-amber:linear-gradient(135deg,#ea580c 0%,#fb923c 100%);
- --bento-emerald:linear-gradient(135deg,#059669 0%,#34d399 100%);
- --bento-gold:linear-gradient(135deg,#d97706 0%,#fbbf24 100%);
- --bento-violet:linear-gradient(135deg,#6366f1 0%,#a855f7 100%);
- --orange:var(--strong); --green:#059669; --purple:#6366f1;
- --type-caption:.75rem; --type-label:.8125rem; --type-control:.875rem; --type-body:1rem;
- --type-section:1.125rem; --type-page:clamp(1.75rem,1.55rem + .48vw,2.25rem);
+ --paper:#f6f7f9; --surface:#ffffff; --surface-soft:#f0f2f6; --surface-hover:#e6eaf0;
+ --ink:#111827; --text-soft:#374151; --muted:#6b7280; --line:#e4e7ec; --field-border:#cfd5df;
+ --strong:#365cc6; --on-strong:#ffffff; --strong-hover:#2b4dad; --cover:#ebeef4; --reader-bg:#eaedf3;
+ --heat-1:#dce5f9; --heat-2:#8ca8ec; --heat-3:#365cc6; --scrim:#0f172a5c;
+ --orange:var(--strong); --green:#267359; --purple:#5258a6;
+ --type-caption:.75rem; --type-label:.8125rem; --type-control:.875rem; --type-body:.9375rem;
+ --type-section:1.0625rem; --type-page:clamp(1.35rem,1.25rem + .35vw,1.65rem);
 }
 :root[data-theme=dark] {
- --paper:#0b1120; --surface:#111827; --surface-soft:#1a2336; --surface-hover:#243049;
- --ink:#f1f5f9; --text-soft:#cbd5e1; --muted:#94a3b8; --line:#1e293b; --field-border:#334155;
- --strong:#3b82f6; --on-strong:#ffffff; --strong-hover:#2563eb; --cover:#182235; --reader-bg:#090e1a;
- --heat-1:#1e3a8a; --heat-2:#2563eb; --heat-3:#60a5fa; --scrim:#020617b8;
- --bento-blue:linear-gradient(135deg,#1d4ed8 0%,#0284c7 100%);
- --bento-amber:linear-gradient(135deg,#c2410c 0%,#ea580c 100%);
- --bento-emerald:linear-gradient(135deg,#047857 0%,#10b981 100%);
- --bento-gold:linear-gradient(135deg,#b45309 0%,#d97706 100%);
- --bento-violet:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);
+ --paper:#0f131a; --surface:#161b24; --surface-soft:#1d2430; --surface-hover:#252e3d;
+ --ink:#edf2f7; --text-soft:#cbd5e1; --muted:#8b98ab; --line:#252f3f; --field-border:#334155;
+ --strong:#6d92f4; --on-strong:#0b111e; --strong-hover:#85a5f8; --cover:#1c2330; --reader-bg:#0b0f16;
+ --heat-1:#1e2f56; --heat-2:#3c61b8; --heat-3:#6d92f4; --scrim:#020617b0;
 }
 body {
  background-color:var(--paper);
- background-image:
-  radial-gradient(920px circle at 8% -6%, color-mix(in srgb, var(--strong) 7%, transparent), transparent 60%),
-  radial-gradient(780px circle at 96% 2%, color-mix(in srgb, #10b981 5%, transparent), transparent 55%);
- background-attachment:fixed;
+ background-image:none;
 }
 :focus-visible {outline:2px solid var(--muted);outline-offset:3px}
 .brand .brand-logo {width:42px;height:42px;border-radius:9px;overflow:hidden;flex:none;background:transparent}
@@ -58,15 +45,15 @@ body {
 :is(.tab.active,.library-mode .filterrow .tab.active,.side-tags button.active) {color:var(--ink);border-color:var(--muted)}
 .library-mode .filterrow .tab.active:after,.dot {background:var(--muted)}
 .primary {
- background:linear-gradient(180deg,color-mix(in srgb,var(--strong) 88%,#60a5fa) 0%,var(--strong) 100%);
+ background:var(--strong);
  border-color:var(--strong);color:var(--on-strong);
- box-shadow:0 4px 14px -3px color-mix(in srgb,var(--strong) 45%,transparent),inset 0 1px 0 rgba(255,255,255,.22);
+ box-shadow:0 1px 2px rgba(15,23,42,.08);
  font-weight:600;
 }
 .primary:hover {
- background:linear-gradient(180deg,var(--strong) 0%,var(--strong-hover) 100%);
+ background:var(--strong-hover);
  border-color:var(--strong-hover);
- box-shadow:0 7px 18px -4px color-mix(in srgb,var(--strong) 56%,transparent),inset 0 1px 0 rgba(255,255,255,.28);
+ box-shadow:0 2px 6px rgba(15,23,42,.12);
 }
 :is(.side-tags button,.tag,.quick .quickicon,.library-card-tags span,.status,.status.done,.avatar,.banner,.focus,.upload-zone,.manager-row,.linked-resource,.inline-note-links,.rich-toolbar,.image-tools,.inline-media .image-loading,.empty,.pdf-note,.reader-ai-answer,.pdf-side details,.rich-content pre,.pdf-side pre) {
  background:var(--surface-soft);color:var(--text-soft);border-color:var(--line)
@@ -564,12 +551,12 @@ html:has(#reader.reader-video-expanded[open]){overflow:hidden;scrollbar-gutter:a
 
 /* Keep the workspace balanced on large desktop monitors and short lists. */
 main {
- width:100%;min-height:calc(100dvh - var(--workspace-top));
- display:flex;flex-direction:column;
+ width:100%;max-width:1420px;margin-inline:auto;min-height:calc(100dvh - var(--workspace-top));
+ display:flex;flex-direction:column;padding:20px 28px 28px;
 }
 main > .footer {margin-top:auto}
 @media(min-width:1700px) {
- main {max-width:1820px;margin-inline:auto;padding-inline:44px}
+ main {max-width:1460px;padding-inline:34px}
 }
 
 

@@ -11,9 +11,11 @@
  if(host&&writer){
   const localRestore=$('restoreLargeBackupFolder');
   const opener=document.createElement('button');
-  opener.id='cloudBackupOpen';opener.type='button';opener.className='secondary';
+  opener.id='cloudBackupOpen';opener.type='button';opener.className='secondary backup-cloud-btn';
   opener.textContent='云端备份';
-  (localRestore||$('writeFolder')).after(opener);
+  const cloudSlot=$('cloudBackupSlot');
+  if(cloudSlot)cloudSlot.append(opener);
+  else (localRestore||$('writeFolder')).after(opener);
   document.body.insertAdjacentHTML('beforeend',`
    <dialog id="cloudBackupDialog" aria-labelledby="cloudBackupTitle">
     <div class="modalhead"><h2 id="cloudBackupTitle">云端备份</h2><button class="icon-button" data-close="cloudBackupDialog" aria-label="关闭">✕</button></div>
