@@ -4,7 +4,7 @@ DoNote 是一款面向跨学科文献精读、专业学习与项目研究的 **W
 
 - **本地优先**：桌面端基于 C# WinForms 和 Microsoft Edge WebView2，工作台采用原生 JavaScript。记录、附件、阅读进度、批注、OCR、全文检索、语音识别和本地模型翻译都在本机处理。在线翻译、外部 AI 和云端备份按所选服务处理相应内容。
 - **数据自主可控**：工作台数据保存在本机（WebView2 IndexedDB 与程序同级 `Data/` 目录，或 `data-location.txt` 指定的自定义资料目录），不改写原始 PDF 与媒体文件；常规程序升级自动保护用户资料与本地模型，整目录拷贝即可离线迁移。
-- **当前正式程序基线**：`r137`（版本号 `26.1137.0083`，对应源码标签 `r137` / 提交 `76dc288`）。
+- **当前正式程序基线**：`r137`（版本号 `26.1137.0083`，对应源码标签 `r137` / 提交 `295d8b3`）。
 
 ---
 
@@ -79,9 +79,9 @@ DoNote 是一款面向跨学科文献精读、专业学习与项目研究的 **W
 
 | 文件 | 适用场景 | 大小 | SHA-256 |
 | --- | --- | ---: | --- |
-| [`DoNote-Windows-x64-r137.zip`](https://github.com/yamccle/DoNote/releases/download/r137/DoNote-Windows-x64-r137.zip) | **首次安装**，或从任意早于 `r136` 的旧版跨版本升级 | 1,070,488,786 字节（约 1.00 GiB） | `f21f88800dc78d6333c19f572c50d3dadd13bcb961991c90eacefba0744570c5` |
-| [`DoNote-Update-26.1136.0082-to-r137.zip`](https://github.com/yamccle/DoNote/releases/download/r137/DoNote-Update-26.1136.0082-to-r137.zip) | **增量升级**（仅限本机当前版本为 `r136` / `26.1136.0082`） | 601,652 字节（约 588 KB） | `3fe91281ee2eb93f47df14f80b16a6385d357e1026776aec2a55ff5f54f5781a` |
-| [`DoNote-r137-release.json`](https://github.com/yamccle/DoNote/releases/download/r137/DoNote-r137-release.json) | 发布溯源清单（源码提交 `76dc288`、依赖锁与回归检查记录） | 984 字节 | `dff908ceb5626c0f9ab27895828ea57557ef5c5b2b848c962f09c360f897ce74` |
+| [`DoNote-Windows-x64-r137.zip`](https://github.com/yamccle/DoNote/releases/download/r137/DoNote-Windows-x64-r137.zip) | **首次安装**，或从任意早于 `r136` 的旧版跨版本升级 | 1,070,488,598 字节（约 1.00 GiB） | `4a3a5db5a5dd257d3a49d0e403d6e02be47b5771bdacf50ef64a4626e551749f` |
+| [`DoNote-Update-26.1136.0082-to-r137.zip`](https://github.com/yamccle/DoNote/releases/download/r137/DoNote-Update-26.1136.0082-to-r137.zip) | **增量升级**（仅限本机当前版本为 `r136` / `26.1136.0082`） | 605,934 字节（约 592 KB） | `3f4672c5949f1a8a5c182f145c7c7881748c2a11e895fec67e97c80f614c8ceb` |
+| [`DoNote-r137-release.json`](https://github.com/yamccle/DoNote/releases/download/r137/DoNote-r137-release.json) | 发布溯源清单（源码提交 `295d8b3`、依赖锁与回归检查记录） | 984 字节 | `e997a75a02c9ed6d542d9ba70358f3147a523fd78614bea8ab12f5ce4c634940` |
 
 ### 2. 运行环境与安装步骤
 
