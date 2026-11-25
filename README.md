@@ -1,6 +1,6 @@
 # DoNote · 本地优先、零信任多端协同的知识精读与课题研究工作台
 
-[![Latest Release](https://img.shields.io/badge/Release-r140%20(26.1140.0086)-2e5984?style=flat-square)](https://github.com/yamccle/DoNote/releases/tag/r140)
+[![Latest Release](https://img.shields.io/badge/Release-r141%20(26.1141.0087)-2e5984?style=flat-square)](https://github.com/yamccle/DoNote/releases/tag/r141)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20x64-35639c?style=flat-square)](https://github.com/yamccle/DoNote/releases/latest)
 [![Architecture](https://img.shields.io/badge/Stack-WinForms%20%2B%20WebView2%20%2B%20Node%20%2B%20Python-28785a?style=flat-square)](#系统架构与仓库导览)
 [![Sync Security](https://img.shields.io/badge/Sync-CRDT%20%2B%20SSE%20%2B%20AES--256--GCM%20E2EE-6d529e?style=flat-square)](#5-零信任多端在线协同批注级-crdt--sse-实时推送--端到端加密)
@@ -11,7 +11,7 @@
 
 - **本地优先，数据自主可控**：桌面端基于 C# WinForms 与 Microsoft Edge WebView2 构建，工作台采用零框架依赖的原生 JavaScript。所有记录、原始附件（单文件支持最大 `2 GB`）、阅读进度、批注、离线 OCR、全文检索、本地语音识别与本地大模型翻译均在本机完成，绝不篡改原始 PDF 与媒体文件；程序升级自动隔离保护 `Data/` 与 `models/` 目录。
 - **平滑演进至零信任在线协同**：支持局域网直连或自建轻量同步节点（`/api/sync/v1`），具备 **SHA-256 内容寻址附件去重**、**PDF / PPT 单条批注级 CRDT 无冲突合并**、**SSE 毫秒级实时变更推送** 以及 **`PBKDF2 + AES-256-GCM` 端到端加密（E2EE）**——同步服务端仅存储不可读密文。
-- **当前正式程序基线**：**[`r140`](https://github.com/yamccle/DoNote/releases/tag/r140)**（版本号 `26.1140.0086`，源码标签 `r140` / 提交 `73c6897`）。
+- **当前正式程序基线**：**[`r141`](https://github.com/yamccle/DoNote/releases/tag/r141)**（版本号 `26.1141.0087`，源码标签 `r141` / 提交 `878f853`；基础完整包为 [`r140`](https://github.com/yamccle/DoNote/releases/tag/r140)）。
 
 ---
 
@@ -106,15 +106,15 @@
 
 ## 下载、安装与在线自动升级
 
-> **版本下载指引**：最新正式桌面版发布页为 **[DoNote `r140` Release](https://github.com/yamccle/DoNote/releases/tag/r140)**（[GitHub Latest](https://github.com/yamccle/DoNote/releases/latest) 亦直接指向该版本）。仓库同时独立托管离线语音与翻译大模型分卷包（[`models-2026-11-23`](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)），首次安装桌面端只需下载下方 `DoNote-Windows-x64-r140.zip`。
+> **版本下载指引**：最新正式增量发布页为 **[DoNote `r141` Release](https://github.com/yamccle/DoNote/releases/tag/r141)**（[GitHub Latest](https://github.com/yamccle/DoNote/releases/latest) 指向该版本），完整独立安装包位于 **[DoNote `r140` Release](https://github.com/yamccle/DoNote/releases/tag/r140)**。仓库同时独立托管离线语音与翻译大模型分卷包（[`models-2026-11-23`](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)）。
 
-### 1. 正式版程序包下载（`r140` · `26.1140.0086`）
+### 1. 正式版程序包下载（最新 `r141` · `26.1141.0087`）
 
 | 资产文件 | 适用场景 | 精确大小 | SHA-256 校验摘要 |
 | --- | --- | ---: | --- |
-| [`DoNote-Windows-x64-r140.zip`](https://github.com/yamccle/DoNote/releases/download/r140/DoNote-Windows-x64-r140.zip) | **首次安装**，或从早于 `r139` 的任意旧版跨版本升级 | 1,070,552,134 字节（约 1.00 GiB） | `e1dea0697fb71cb4736f4e25b4f4bc9bce7e088e814a6a1b59e29768cf0be7ca` |
-| [`DoNote-Update-26.1139.0085-to-r140.zip`](https://github.com/yamccle/DoNote/releases/download/r140/DoNote-Update-26.1139.0085-to-r140.zip) | **极速增量升级**（本机当前版本为 `r139` / `26.1139.0085`） | 645,437 字节（约 630 KB） | `35382a14b7e61fae216d71b432d41f06b8dcf52b30cef4d25bb0719ea01b2698` |
-| [`DoNote-r140-release.json`](https://github.com/yamccle/DoNote/releases/download/r140/DoNote-r140-release.json) | 发布溯源清单（源码提交 `73c6897`、依赖锁与四项自动化门禁记录） | 984 字节 | `90f2b0a1ed5cb46f69f8a9f2a2fab1deb63fa5f172cf2f4831ebe7ffdf8f83f7` |
+| [`DoNote-Update-26.1140.0086-to-r141.zip`](https://github.com/yamccle/DoNote/releases/download/r141/DoNote-Update-26.1140.0086-to-r141.zip) | **极速增量升级**（本机当前为 `r140` / `26.1140.0086`，亦可在软件内点「检查在线更新」自动升级） | 491,000 字节（约 479 KB） | `1e179901127fc930cf1b6ed3a81cba414e9b0fd00ae9c9093eafae11c0fefab3` |
+| [`DoNote-r141-release.json`](https://github.com/yamccle/DoNote/releases/download/r141/DoNote-r141-release.json) | `r141` 发布溯源清单（源码提交 `878f853`、依赖锁与四项自动化门禁记录） | 984 字节 | `c97ad12cf30bb9d18aa4046d5b0c6ed7bbeaa0229bfad0e6f40c9d2623fe22df` |
+| [`DoNote-Windows-x64-r140.zip`](https://github.com/yamccle/DoNote/releases/download/r140/DoNote-Windows-x64-r140.zip) | **首次安装基础完整包**（或早于 `r140` 跨版本升级；解压运行后点一次「检查在线更新」即升至 `r141`） | 1,070,552,134 字节（约 1.00 GiB） | `e1dea0697fb71cb4736f4e25b4f4bc9bce7e088e814a6a1b59e29768cf0be7ca` |
 
 ### 2. 运行环境、首次安装与无损升级
 
