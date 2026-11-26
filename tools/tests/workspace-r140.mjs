@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收已初始化的 Playwright 页面实例 page 与 Node.js AI/Sync 桥接服务 createBridge。
- * [OUTPUT]: 暴露 verifyRefinementsAndSyncProR140，端到端验证 r140 全部 13 项交互精修、视频多模态问答与零信任多端同步进阶能力。
+ * [OUTPUT]: 暴露 verifyRefinementsAndSyncProR140，端到端验证 r140 全部 13 项交互精修、视频多模态问答与多端协同。检查画廊与主动打开对同步附件的访问。
  * [POS]: 由 tools/tests/workspace-excerpts.mjs 调用的 r140 专项自动化回归套件。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -70,7 +70,10 @@ export async function verifyRefinementsAndSyncProR140(page) {
   const settingsAndAch = await page.evaluate(async () => {
     const dlgRect = document.getElementById('desktopSettings').getBoundingClientRect();
     document.querySelector('#desktopSettings [data-settings-group="sync"]').click();
-    const tokenRect = document.getElementById('settingsSyncToken').getBoundingClientRect();
+    const folderPath = document.getElementById('settingsFolderSyncPath');
+    const folderRect = folderPath.getBoundingClientRect();
+    const removedSyncControls = ['settingsSyncToken', 'settingsSyncEndpoint', 'settingsAccountLogin', 'settingsSyncE2eePass', 'settingsSyncRealtimeToggle']
+      .map(id => document.getElementById(id));
 
     document.querySelector('#desktopSettings [data-settings-group="appearance"]').click();
     const toggle = document.getElementById('desktopAchievementToggle');
@@ -86,17 +89,44 @@ export async function verifyRefinementsAndSyncProR140(page) {
     const tabVisibleWhenOn = document.getElementById('achievementTab')?.hidden === false;
     return {
       settingsWidth: Math.round(dlgRect.width),
-      tokenInputWidth: Math.round(tokenRect.width),
+      folderInputWidth: Math.round(folderRect.width),
+      folderVisible: folderPath && !folderPath.hidden,
+      oldSyncControlsGone: removedSyncControls.every(el => !el),
       disabledState,
       tabHiddenWhenOff,
       tabVisibleWhenOn
     };
   });
   assert.ok(settingsAndAch.settingsWidth >= 720, `Settings dialog should be spacious (>=720px), got ${settingsAndAch.settingsWidth}`);
-  assert.ok(settingsAndAch.tokenInputWidth >= 200, `Sync token input should not be cramped, got ${settingsAndAch.tokenInputWidth}`);
+  assert.ok(settingsAndAch.folderVisible, 'Sync page should show the cloud folder picker');
+  assert.ok(settingsAndAch.folderInputWidth >= 200, `Folder path input should not be cramped, got ${settingsAndAch.folderInputWidth}`);
+  assert.equal(settingsAndAch.oldSyncControlsGone, true);
   assert.equal(settingsAndAch.disabledState, false);
   assert.equal(settingsAndAch.tabHiddenWhenOff, true);
   assert.equal(settingsAndAch.tabVisibleWhenOn, true);
+
+  // 浏览画廊只读取本机附件。显式打开时才读取所选附件。
+  const attachmentReads = await page.evaluate(async () => {
+    const previous = window.DoNoteFolderSync;
+    const profileId = appState.activeId;
+    const file = { id: crypto.randomUUID(), name: '同步附件.png', mime: 'image/png', size: 6 };
+    const requested = [];
+    window.DoNoteFolderSync = {
+      loadAttachment: async id => {
+        requested.push(id);
+        return new Blob(['测试'], { type: file.mime });
+      }
+    };
+    try {
+      await thumbnail(file, profileId).catch(() => {});
+      const galleryReadCount = requested.length;
+      const blob = await readBlob(file.id, profileId, { fromSync: true });
+      return { galleryReadCount, requestedOnlySelected: requested.length === 1 && requested[0] === file.id, text: await blob.text() };
+    } finally {
+      window.DoNoteFolderSync = previous;
+    }
+  });
+  assert.deepEqual(attachmentReads, { galleryReadCount: 0, requestedOnlySelected: true, text: '测试' });
 
   // 7, 8, 10 & 11. 顶栏日期字号放大、莫兰迪低饱和类型色相、胶囊分页器与精细化行动统计计数
   const visualAndCountState = await page.evaluate(async () => {

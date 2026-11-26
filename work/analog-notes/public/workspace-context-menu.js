@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 读取选中记录、当前账户和目标文件夹。
- * [OUTPUT]: 提供右键操作及带版本校验的记录移动入口。
+ * [OUTPUT]: 提供右键操作、单份附件下载及带版本校验的记录移动入口。
  * [POS]: 为情境菜单与资料库多选复用同一个目标选择器。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -108,7 +108,7 @@ document.addEventListener('contextmenu',event=>{
  const selection=getSelection()?.toString().trim();
  if(selection&&el.closest('.rich-content,.detail-body,.reader-content')){showWorkspaceMenu(event,[{label:'复制所选文字',run:()=>navigator.clipboard.writeText(selection)}]);return}
  const fileRow=el.closest('#detailFiles .file-row');
- if(fileRow){const id=fileRow.querySelector('[data-download-attachment]')?.dataset.downloadAttachment,note=records.find(n=>n.id===current),file=note?.attachments?.find(a=>a.id===id);if(file)showWorkspaceMenu(event,[{label:'预览 / 打开附件',run:()=>openAttachment(file)},{label:'下载原文件',run:async()=>downloadBlob(file.name,await readBlob(file.id))},{label:'复制文件名',run:()=>navigator.clipboard.writeText(file.name)},{label:'编辑附件…',run:()=>{$('detail').close();openEditor(note.type,note)}}]);return}
+ if(fileRow){const id=fileRow.querySelector('[data-download-attachment]')?.dataset.downloadAttachment,note=records.find(n=>n.id===current),file=note?.attachments?.find(a=>a.id===id);if(file)showWorkspaceMenu(event,[{label:'预览 / 打开附件',run:()=>openAttachment(file)},{label:'下载原文件',run:async()=>downloadBlob(file.name,await readBlob(file.id,appState.activeId,{fromSync:true}))},{label:'复制文件名',run:()=>navigator.clipboard.writeText(file.name)},{label:'编辑附件…',run:()=>{$('detail').close();openEditor(note.type,note)}}]);return}
  const card=el.closest('#records .card[data-id],[data-widget-plan],[data-journal-plan],#pending [data-id]');
  const id=card?.dataset.id||card?.dataset.widgetPlan||card?.dataset.journalPlan;
  const note=records.find(n=>n.id===(id||(el.closest('#detailContent')?current:null)));

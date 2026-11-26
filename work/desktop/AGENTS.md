@@ -7,8 +7,10 @@
 - `build.ps1` 构建桌面宿主和工作台，并写入发布清单。
 - `stage-runtime.ps1` 按运行依赖锁定文件核验旧包，只提取发布所需依赖。
 - `make-update-patch.ps1` 比较两个完整清单，生成已验证的增量 ZIP。
-- `UpdatePackage.cs` 校验文件路径、版本及内容。普通应用包拒绝模型文件。
-- `LocalUpdate.cs` 同时支持本地更新包校验启动与 GitHub Releases 在线检查更新（自动优先匹配当前版本增量包 `DoNote-Update-<current>-to-<tag>.zip`，支持纯补丁 Release 逐级桥接检索或回退完整包，完成流式下载与 SHA-256 校验后拉起 `DoNoteUpdater.exe`）。
+- `UpdatePackage.cs` 校验包内容、版本和基础版本。保护资料与模型路径。
+- `OnlineUpdatePlan.cs` 计算从本机到最新正式版的更新路径。按总下载量比较增量包和完整包。
+- `LocalUpdate.cs` 查询 GitHub Releases。逐包下载并校验 SHA-256。完成后启动独立更新器。
+- `UpdateHost.cs` 持有单实例锁逐包安装。单步失败时回退该步，安装结束后重新打开 DoNote。
 - `Program.cs` 为已验证来源的工作台消息选择 Windows 宿主服务。
 
 ## 云备份
@@ -17,6 +19,12 @@
 - `CloudBackup.cs` 绑定系统选取的同步目录，保存 Windows 用户加密设置及保留份数策略，并在新快照上传完成后触发旧快照清理。
 - `CloudBackupTransport.cs` 传输版本化 ZIP 和完成标记，按先删标记再删归档顺序清理超限旧快照，验证下载后解包。
 
+## 文件夹对齐
+
+- `FolderSync.cs` 记住云盘客户端已经在同步的文件夹，监视 `DoNote` 子目录，并按块读写记录与附件。云盘客户端负责外网传输。
+- `folder-sync-merge.js` 按更新时间比较记录和删除标记，不读写磁盘。
+- `folder-sync.js` 在设置页选择文件夹后对齐记录目录。本机已有的附件写回文件夹。打开某一份时再读取那一份，对齐时不把缺的附件拉进本机。
+
 ## 开场动画
 
 - `Program.cs` 读取当前资料目录的开场设置。WebView2 开始播放后，宿主隐藏标题栏。播放退出、页面切换或超时后，宿主恢复标题栏。
@@ -24,11 +32,11 @@
 - `startup-splash.css` 保持画布宽高比，并使用工作台主题色铺满窗口。
 - `startup-wordmark.js` 提供由签名照描摹的矢量轮廓。
 - `build.ps1` 将开场脚本、样式和画面放入安装包的 `workspace` 目录。
-- `开始使用.md` 记录开场设置、键盘操作和减少动态效果的行为。
+- `开始使用.md` 记录云盘文件夹对齐、开场设置、键盘操作和减少动态效果的行为。
 
 ## 设置中心与网页收藏
 
-- `desktop-settings.html`、`desktop-settings.js`、`desktop-settings.css` 和 `WindowChrome.cs` 提供「外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统」四栏自适应舒展设置中心，支持成就殿宇显隐开关、多端实时推送/端到端加密配置，以及启动后静默检查新版本并在原生标题栏与设置图标亮起温和圆点提示。
+- `desktop-settings.html`、`desktop-settings.js`、`desktop-settings.css` 和 `WindowChrome.cs` 提供「外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统」四栏自适应舒展设置中心。多端协同只保留云盘文件夹对齐，不再提供网址、令牌、登录、实时推送或加密口令。另支持成就殿宇显隐开关，以及启动后静默检查新版本并在原生标题栏与设置图标亮起温和圆点提示。
 - `web-fetch.mjs` 执行公网 IP 校验防 SSRF，复用 TLS Keep-Alive 连接与 `gzip/deflate/br` 流式限额解压，单进程 8 路并发限时抓取网页正文与配图样式。
 
 ## 云端备份

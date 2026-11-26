@@ -1,6 +1,6 @@
 <!--
  [INPUT]: 接收桌面构建时注入的版本号 {{DONOTE_VERSION}} 与工作台设置脚本绑定。
- [OUTPUT]: 提供「外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统」四栏自适应设置中心、成就殿宇开关、静默更新与多端同步加密面板。
+ [OUTPUT]: 提供四栏设置中心、多端协同和成就殿宇开关。软件更新窗口展示版本路径和一次确认按钮。
  [POS]: 由 build.ps1 注入桌面工作台 index.html 尾部，与 desktop-settings.js / desktop-settings.css 协同工作。
  [PROTOCOL]: Update this header on change, then check AGENTS.md
 -->
@@ -99,51 +99,16 @@
    </section>
 
    <section id="desktopSettingsPage-sync" data-settings-page="sync" role="tabpanel" class="settings-pane" hidden>
-    <div class="settings-card" id="settingsSyncFoundationCard">
-     <h3>本机节点与批注细粒度合并</h3>
-     <div class="settings-row">
-      <span class="settings-row-text"><strong>本机工作台节点</strong><small id="settingsSyncDeviceMeta">设备指纹与增量变更日志已就绪</small></span>
-      <div class="settings-inline-actions">
-       <input id="settingsSyncDeviceName" class="settings-inline-input" maxlength="40" placeholder="本机桌面工作台" aria-label="本机设备名称">
-       <button type="button" class="secondary settings-mini-btn" id="settingsSyncPrepareHashes">补齐指纹</button>
-      </div>
-     </div>
-     <div class="settings-row">
-      <span class="settings-row-text"><strong>PDF / PPT 批注级跨设备细粒度合并</strong><small id="settingsSyncCrdtMeta">按单条高亮、手绘笔迹与幻灯片页批注 ID 独立 CRDT 合并，双端同读互不覆盖</small></span>
-      <span class="settings-status-pill">无冲突合并已启用</span>
-     </div>
-    </div>
-
-    <div class="settings-card">
-     <h3>远端 / 局域网同步节点与实时推送</h3>
+    <div class="settings-card" id="settingsFolderSyncCard">
+     <h3>云盘文件夹</h3>
      <div class="settings-row settings-sync-endpoint-row">
-      <span class="settings-row-text"><strong>同步服务地址与管理令牌</strong><small id="settingsSyncStatusText">填入另一台电脑或自建同步服务的地址与管理令牌，即可握手同步增量记录、批注与去重附件</small></span>
+      <span class="settings-row-text"><strong>对齐已同步的文件夹</strong><small id="settingsFolderSyncStatus">选择坚果云、Nextcloud 或 Google Drive 桌面版已经在同步的文件夹。目录会对齐，附件在打开时再加载。不必填写网址和令牌。</small></span>
       <div class="settings-sync-field-grid">
-       <input id="settingsSyncEndpoint" class="settings-inline-input" type="url" spellcheck="false" placeholder="同步服务地址，例如 http://127.0.0.1:4318" aria-label="同步服务地址">
-       <input id="settingsSyncToken" class="settings-inline-input" type="password" autocomplete="off" placeholder="同步管理令牌（本机桥接已连接时可留空）" aria-label="同步管理令牌">
+       <input id="settingsFolderSyncPath" class="settings-inline-input" readonly placeholder="尚未选择文件夹" aria-label="同步文件夹">
       </div>
       <div class="settings-sync-action-bar">
-       <button type="button" class="secondary settings-mini-btn" id="settingsSyncProbeBtn">检测握手</button>
-       <button type="button" class="primary settings-mini-btn" id="settingsSyncNowBtn">立即同步</button>
-      </div>
-     </div>
-     <button type="button" class="settings-row settings-switch-row" id="settingsSyncRealtimeToggle" role="switch" aria-checked="false">
-      <span class="settings-row-text"><strong>实时变更推送（SSE 自动增量拉取）</strong><small id="settingsSyncRealtimeMeta">开启后保持轻量事件流连接，其他设备推送更新时本机在数秒内自动同步</small></span>
-      <span class="desktop-switch" aria-hidden="true"></span>
-     </button>
-    </div>
-
-    <div class="settings-card">
-     <h3>端到端加密（E2EE · 零信任同步）</h3>
-     <div class="settings-row settings-sync-endpoint-row">
-      <span class="settings-row-text">
-       <strong>同步加密口令（PBKDF2 + AES-256-GCM）<em class="settings-e2ee-badge" id="settingsSyncE2eeBadge">未开启</em></strong>
-       <small id="settingsSyncE2eeHint">口令仅在本机派生 256 位密钥，记录、批注与附件均在上传前加密，同步服务端仅存密文；留空则保持局域网明文同步</small>
-      </span>
-      <div class="settings-sync-action-bar">
-       <input id="settingsSyncE2eePass" class="settings-inline-input settings-e2ee-input" type="password" autocomplete="new-password" placeholder="输入多端一致的端到端加密口令…" aria-label="端到端加密口令">
-       <button type="button" class="secondary settings-mini-btn" id="settingsSyncSaveE2ee">应用加密口令</button>
-       <button type="button" class="secondary settings-mini-btn is-danger" id="settingsSyncClearE2ee" hidden>关闭加密</button>
+       <button type="button" class="secondary settings-mini-btn" id="settingsFolderSyncChoose">选择文件夹</button>
+       <button type="button" class="primary settings-mini-btn" id="settingsFolderSyncNow">立即对齐</button>
       </div>
      </div>
     </div>
@@ -206,7 +171,7 @@
 
 <dialog id="onlineUpdateDialog" class="compact-dialog" aria-labelledby="onlineUpdateTitle">
  <div class="modalhead">
-  <h2 id="onlineUpdateTitle">检查与下载更新</h2>
+  <h2 id="onlineUpdateTitle">软件更新</h2>
   <button type="button" class="icon-button" data-close-online-update aria-label="关闭">✕</button>
  </div>
  <div class="modalbody online-update-body">
@@ -224,7 +189,7 @@
   <div class="right">
    <button type="button" class="secondary" id="onlineUpdateCancelBtn" hidden>取消下载</button>
    <button type="button" class="secondary" id="onlineUpdateRecheck">重新检查</button>
-   <button type="button" class="primary" id="onlineUpdateActionBtn" hidden>下载并验证更新</button>
+   <button type="button" class="primary" id="onlineUpdateActionBtn" hidden>下载并自动更新</button>
   </div>
  </div>
 </dialog>

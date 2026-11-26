@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 读取桌面设置控件、宿主偏好消息、默认翻译语向、语音识别与成就/更新偏好。
- * [OUTPUT]: 管理四栏自适应设置中心标签切换、成就殿宇显隐开关、启动静默更新圆点提示与宿主命令分发。
+ * [OUTPUT]: 管理设置中心与启动静默检查。显示整条更新路径和下载进度。
  * [POS]: 桌面设置控制器，消除旧版多级悬停子菜单与碎片弹窗，可在任意阅读浮窗上方呼出。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -341,7 +341,7 @@
       updCandidate = null;
       updReqId = crypto.randomUUID();
       updRemote.textContent = '正在查询…';
-      updStrategy.textContent = '自动优选增量补丁';
+      updStrategy.textContent = '正在规划更新路径…';
       updStatus.textContent = '正在查询 GitHub Releases 最新正式版本…';
       updNotes.hidden = true;
       updProg.hidden = true;
@@ -357,152 +357,109 @@
       if (updState !== 'downloading' && updState !== 'ready-download') startOnlineCheck();
     });
     updDialog?.querySelectorAll('[data-close-online-update]').forEach(b => b.addEventListener('click', () => updDialog.close()));
-    document.getElementById('onlineUpdateLocalFallback')?.addEventListener('click', () => {
+    const localFallback = document.getElementById('onlineUpdateLocalFallback');
+    localFallback?.addEventListener('click', () => {
       updDialog.close();
       host.postMessage('install-update');
     });
     updRecheck?.addEventListener('click', () => { if (updState !== 'downloading') startOnlineCheck(); });
     updCancel?.addEventListener('click', () => {
+      updCancel.disabled = true;
       host.postMessage({ type: 'online-update', action: 'cancel', id: updReqId });
     });
+
+    function updateSize(bytes) {
+      return bytes < 1048576 ? (bytes / 1024).toFixed(0) + ' KB' : (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
     updAction?.addEventListener('click', () => {
-      if (updState === 'ready-download' && updCandidate) {
-        updState = 'downloading';
-        updReqId = crypto.randomUUID();
-        updProg.hidden = false;
-        updProg.value = 0;
-        updAction.disabled = true;
-        updAction.textContent = '正在下载…';
-        updCancel.hidden = false;
-        updRecheck.disabled = true;
-        updStatus.textContent = '正在下载 ' + updCandidate.assetName + '…（可关闭此窗口，在右上角后台任务中心查看进度）';
-        window.DoNoteTasks?.upsert('online-update', {
-          title: '下载软件更新 ' + updCandidate.tag,
-          detail: updCandidate.assetName,
-          percent: 0,
-          state: 'running',
-          onOpen: () => { if (!updDialog.open) updDialog.showModal(); }
-        });
-        host.postMessage({
-          type: 'online-update', action: 'download', id: updReqId,
-          assetUrl: updCandidate.assetUrl, assetName: updCandidate.assetName,
-          assetSize: updCandidate.assetSize, assetSha256: updCandidate.assetSha256 || ''
-        });
-      } else if (updState === 'downloaded') {
-        if (!confirm('更新包已通过 SHA-256 与清单校验。\n请先确认正在编辑的记录已保存；点击确定后将自动备份旧程序、完成升级并重启 DoNote（您的 Data 资料与本地模型完全保留）。')) return;
-        host.postMessage({ type: 'online-update', action: 'apply-downloaded', id: crypto.randomUUID() });
-      }
+      if (updState !== 'ready-download' || !updCandidate) return;
+      updState = 'downloading';
+      updReqId = crypto.randomUUID();
+      updProg.hidden = false;
+      updProg.value = 0;
+      updAction.disabled = true;
+      updAction.textContent = '正在下载…';
+      updCancel.hidden = false;
+      updCancel.disabled = false;
+      updRecheck.disabled = true;
+      localFallback.disabled = true;
+      updStatus.textContent = '正在下载更新包。下载和校验完成后将自动安装并重启。';
+      window.DoNoteTasks?.upsert('online-update', {
+        title: '更新到 ' + updCandidate.tag,
+        detail: '正在下载更新包',
+        percent: 0,
+        state: 'running',
+        onOpen: () => { if (!updDialog.open) updDialog.showModal(); }
+      });
+      host.postMessage({ type: 'online-update', action: 'download', id: updReqId, planId: updCandidate.id });
     });
 
     host.addEventListener('message', event => {
       const msg = event.data;
-      if (msg?.type === 'online-update-progress') {
-        const mbDone = (msg.received / 1048576).toFixed(1), mbTotal = msg.total > 0 ? (msg.total / 1048576).toFixed(1) : '?';
-        updProg.hidden = false;
-        updProg.value = msg.percent || 0;
-        updStatus.textContent = '正在下载 ' + msg.assetName + ' · ' + mbDone + ' / ' + mbTotal + ' MB（' + (msg.percent || 0) + '%）';
-        window.DoNoteTasks?.upsert('online-update', {
-          title: '下载软件更新',
-          detail: mbDone + ' / ' + mbTotal + ' MB（' + (msg.percent || 0) + '%）',
-          percent: msg.percent || 0,
-          state: 'running',
-          onOpen: () => { if (!updDialog.open) updDialog.showModal(); }
-        });
+      if (msg?.type === 'online-update-prepare' && msg.id === updReqId && updState === 'downloading') {
+        updStatus.textContent = '更新包已校验。正在暂存编辑内容…';
+        void (async () => {
+          let error = '';
+          try {
+            if (!await flushEditorDraft()) throw new Error('当前草稿暂存失败，请保存记录后重试。');
+            await waitForReaderSaves();
+          } catch (failure) { error = failure.message; }
+          host.postMessage({ type: 'online-update', action: 'ready', id: msg.id, error });
+        })();
         return;
       }
-      if (msg?.type === 'online-update-result') {
-        const isSilent = !!silentReqId && msg.id === silentReqId;
-        if (isSilent) {
-          silentReqId = '';
-          if (msg.error || msg.cancelled) return;
-          if (msg.hasUpdate) {
-            updState = 'ready-download';
-            updCandidate = msg;
-            updRemote.textContent = msg.remoteVersion + ' (' + msg.tag + ')';
-            const sizeStr = msg.assetSize < 1048576 ? (msg.assetSize / 1024).toFixed(0) + ' KB' : (msg.assetSize / 1048576).toFixed(1) + ' MB';
-            updStrategy.textContent = (msg.downloadMode === 'patch' ? '增量极速补丁 · ' : '跨版本完整包 · ') + sizeStr;
-            updStatus.textContent = '发现新版本 ' + msg.remoteVersion + '！系统已自动匹配最适合您当前版本的' + (msg.downloadMode === 'patch' ? '增量更新补丁' : '完整安装包') + '，下载后将自动校验 SHA-256。';
-            if (msg.releaseNotes) { updNotes.textContent = msg.releaseNotes; updNotes.hidden = false; }
-            updAction.hidden = false;
-            updAction.disabled = false;
-            updAction.textContent = '下载并验证更新（' + sizeStr + '）';
-            setUpdateIndicator(true, msg.tag || msg.remoteVersion);
-          } else if (msg.hasUpdate === false) {
-            setUpdateIndicator(false);
-          }
-          return;
-        }
-        updRecheck.disabled = false;
-        updCancel.hidden = true;
-        if (msg.cancelled) {
-          updState = updCandidate ? 'ready-download' : 'idle';
-          updProg.hidden = true;
-          updAction.disabled = false;
-          updAction.hidden = !updCandidate;
-          if (updCandidate) updAction.textContent = '下载并验证更新';
-          updStatus.textContent = '已取消下载。';
-          window.DoNoteTasks?.remove('online-update');
-          return;
-        }
-        if (msg.error) {
-          updState = updCandidate ? 'ready-download' : 'idle';
-          updProg.hidden = true;
-          updAction.disabled = false;
-          updAction.hidden = !updCandidate;
-          if (updCandidate) updAction.textContent = '重试下载';
-          updStatus.textContent = msg.error;
-          window.DoNoteTasks?.upsert('online-update', { title: '软件更新未完成', detail: msg.error, state: 'error' });
-          return;
-        }
-        if (msg.downloaded) {
-          updState = 'downloaded';
-          setUpdateIndicator(true, msg.targetVersion);
-          updProg.hidden = false;
-          updProg.value = 100;
-          updAction.hidden = false;
-          updAction.disabled = false;
-          updAction.textContent = '立即重启并安装 ' + msg.targetVersion;
-          updStatus.textContent = '✓ 已下载并通过 SHA-256 与文件清单校验（' + msg.assetName + '），点击右下角按钮即可无损升级。';
-          window.DoNoteTasks?.upsert('online-update', {
-            title: '更新包 ' + msg.targetVersion + ' 已就绪',
-            detail: '校验通过，点击打开安装',
-            percent: 100,
-            state: 'done',
-            onOpen: () => { if (!updDialog.open) updDialog.showModal(); }
-          });
-          toast('DoNote ' + msg.targetVersion + ' 更新包已校验就绪', {
-            label: '立即安装',
-            run: () => { if (!updDialog.open) updDialog.showModal(); }
-          });
-          return;
-        }
-        if (msg.hasUpdate === false) {
-          updState = 'up-to-date';
-          setUpdateIndicator(false);
-          updRemote.textContent = msg.remoteVersion + (msg.tag ? ' (' + msg.tag + ')' : '');
-          updStrategy.textContent = '无需更新';
-          updStatus.textContent = '✓ 当前已是最新正式版本（' + msg.currentVersion + '）。';
-          updAction.hidden = true;
-          return;
-        }
-        if (msg.hasUpdate) {
-          updState = 'ready-download';
-          updCandidate = msg;
-          setUpdateIndicator(true, msg.tag || msg.remoteVersion);
-          updRemote.textContent = msg.remoteVersion + ' (' + msg.tag + ')';
-          const sizeStr = msg.assetSize < 1048576 ? (msg.assetSize / 1024).toFixed(0) + ' KB' : (msg.assetSize / 1048576).toFixed(1) + ' MB';
-          updStrategy.textContent = (msg.downloadMode === 'patch' ? '增量极速补丁 · ' : '跨版本完整包 · ') + sizeStr;
-          updStatus.textContent = '发现新版本 ' + msg.remoteVersion + '！系统已自动匹配最适合您当前版本的' + (msg.downloadMode === 'patch' ? '增量更新补丁' : '完整安装包') + '，下载后将自动校验 SHA-256。';
-          if (msg.releaseNotes) {
-            updNotes.textContent = msg.releaseNotes;
-            updNotes.hidden = false;
-          }
-          updAction.hidden = false;
-          updAction.disabled = false;
-          updAction.textContent = '下载并验证更新（' + sizeStr + '）';
-          return;
-        }
+      if (msg?.type !== 'online-update-progress' && msg?.type !== 'online-update-result') return;
+      if (msg.id === silentReqId && silentReqId) {
+        silentReqId = '';
+        if (!msg.error && !msg.cancelled) setUpdateIndicator(msg.hasUpdate, msg.tag || msg.remoteVersion);
+        return;
       }
+      if (msg.id !== updReqId) return;
+      if (msg.type === 'online-update-progress') {
+        const downloaded = updateSize(msg.received) + ' / ' + updateSize(msg.total);
+        const details = '第 ' + msg.step + ' / ' + msg.steps + ' 包 · ' + msg.targetVersion + ' · ' + downloaded;
+        updProg.value = msg.percent;
+        updStatus.textContent = details + '。全部校验后自动安装并重启。';
+        window.DoNoteTasks?.upsert('online-update', { detail: details, percent: msg.percent, state: 'running' });
+        return;
+      }
+      updRecheck.disabled = false;
+      updCancel.hidden = true;
+      localFallback.disabled = false;
+      if (msg.cancelled || msg.error) {
+        updState = updCandidate ? 'ready-download' : 'idle';
+        updProg.hidden = true;
+        updAction.disabled = false;
+        updAction.hidden = !updCandidate;
+        updAction.textContent = '下载并自动更新';
+        updStatus.textContent = msg.cancelled ? '已取消下载。' : msg.error;
+        if (msg.cancelled) window.DoNoteTasks?.remove('online-update');
+        else if (updCandidate) window.DoNoteTasks?.upsert('online-update', { title: '软件更新未完成', detail: msg.error, state: 'error' });
+        return;
+      }
+      if (!msg.hasUpdate) {
+        updState = 'up-to-date';
+        setUpdateIndicator(false);
+        updRemote.textContent = msg.remoteVersion + (msg.tag ? ' (' + msg.tag + ')' : '');
+        updStrategy.textContent = '无需更新';
+        updStatus.textContent = '当前已是最新正式版本（' + msg.currentVersion + '）。';
+        return;
+      }
+      updState = 'ready-download';
+      updCandidate = msg;
+      const count = msg.versions.length;
+      setUpdateIndicator(true, msg.tag || msg.remoteVersion);
+      updRemote.textContent = msg.remoteVersion + ' (' + msg.tag + ')';
+      const strategy = msg.downloadMode === 'patch' ? '增量更新' : count === 1 ? '完整更新包' : '完整包与增量包';
+      updStrategy.textContent = strategy + ' · ' + count + ' 包 · ' + updateSize(msg.assetSize);
+      updStatus.textContent = [msg.currentVersion, ...msg.versions].join(' → ') +
+        '。请先保存正在编辑的记录。确认后将自动下载、校验、安装并重启。';
+      updNotes.textContent = msg.releaseNotes || '';
+      updNotes.hidden = !msg.releaseNotes;
+      updAction.hidden = false;
+      updAction.disabled = false;
+      updAction.textContent = '下载并自动更新';
     });
 
     host.addEventListener('message', event => {

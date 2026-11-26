@@ -76,6 +76,7 @@ internal sealed partial class WorkspaceWindow : Form
             StopLocalLlmTranslation();
             StopBilingualPairProcesses();
             StopNativeBackup(false);
+            StopFolderSyncWatch();
             StopCloudBackupTransfer();
             StopOnlineUpdateDownload();
             StopMinerUReflow();
@@ -319,6 +320,7 @@ internal sealed partial class WorkspaceWindow : Form
             if (await HandleVideoTranscribe(web, objectMessage)) return;
             if (await HandleDocumentTranslationMessage(web, objectMessage)) return;
             if (await HandleMinerUReflowMessage(web, objectMessage)) return;
+            if (HandleFolderSyncMessage(web, objectMessage)) return;
             if (await HandleCloudBackupMessage(web, objectMessage)) return;
             if (await HandleOnlineUpdateMessage(web, objectMessage)) return;
             if (HandleLargeBackupMessage(web, objectMessage)) return;

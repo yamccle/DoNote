@@ -1,4 +1,11 @@
+/**
+ * [INPUT]: 读取当前 PDF 阅读会话和 PdfMathTranslate 整页翻译。
+ * [OUTPUT]: 安装原文与译文对照，并把正在翻译的文件编号交给任务中心。
+ * [POS]: PDF 阅读器里的整页对照。完成后从任务中心点回这份文档。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
+
 
 function installPdfPageComparison(session, {button, layout, originalBar, tools, bar, leaveReflow}) {
   if (!window.PdfMathTranslate?.available) {
@@ -283,6 +290,7 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
       const result = await document.translate(number, {
         preference: translation.preference,
         signal,
+        source: { fileId: session.file?.id, page: number, name: session.file?.name },
         onProgress: progress,
         onParagraph(text) {
           if (signal.aborted || !text?.trim()) return;

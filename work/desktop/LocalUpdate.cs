@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 接收本地 ZIP 更新请求或 WebView2 在线检查/下载 GitHub Releases 消息。
- * [OUTPUT]: 查询 GitHub 最新正式版、优先匹配增量补丁、流式校验 SHA-256 下载并移交 DoNoteUpdater.exe。
+ * [OUTPUT]: 规划到最新版的更新路径。下载并校验每个 ZIP 后交给更新器。
  * [POS]: 桌面端本地与在线自动更新入口，严格保护用户 Data/ 与 models/ 目录。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -24,7 +25,9 @@ internal sealed partial class WorkspaceWindow
     private const string AllowedDownloadPrefix = "https://github.com/yamccle/DoNote/releases/download/";
     private bool updateChecking;
     private CancellationTokenSource onlineUpdateCancel;
-    private string verifiedDownloadedZip;
+    private string offeredUpdateId, downloadingUpdateId;
+    private List<OnlineUpdateStep> offeredUpdate;
+    private TaskCompletionSource<string> workspaceReadyForUpdate;
 
     private string ReadInstalledVersion(string installDirectory)
     {
@@ -39,17 +42,17 @@ internal sealed partial class WorkspaceWindow
         catch { return "26.1105.0001"; }
     }
 
-    private void LaunchUpdaterAndExit(string packageZipPath, string installDirectory)
+    private void LaunchUpdaterAndExit(string package, string installDirectory, bool chain = false)
     {
         var helper = Path.Combine(installDirectory, "DoNoteUpdater.exe");
         if (!File.Exists(helper)) throw new FileNotFoundException("当前版本没有更新助手，请先覆盖安装支持更新的版本。");
-        var temporary = Path.Combine(Path.GetTempPath(), "DoNote-Update-" + Guid.NewGuid().ToString("N"));
+        var temporary = chain ? Path.GetDirectoryName(package) : Path.Combine(Path.GetTempPath(), "DoNote-Update-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporary);
         var copiedHelper = Path.Combine(temporary, "DoNoteUpdater.exe");
         File.Copy(helper, copiedHelper);
         Process.Start(new ProcessStartInfo(copiedHelper)
         {
-            Arguments = Quote(packageZipPath) + " " + Quote(installDirectory) + " " + Quote(dataRoot) + " " + Process.GetCurrentProcess().Id,
+            Arguments = Quote(package) + " " + Quote(installDirectory) + " " + Quote(dataRoot) + " " + Process.GetCurrentProcess().Id + (chain ? " --chain" : ""),
             UseShellExecute = false,
             WorkingDirectory = temporary
         });
@@ -58,7 +61,7 @@ internal sealed partial class WorkspaceWindow
 
     private async void BeginLocalUpdate()
     {
-        if (updateChecking) return;
+        if (updateChecking || onlineUpdateCancel != null) return;
         updateChecking = true;
         try
         {
@@ -99,7 +102,7 @@ internal sealed partial class WorkspaceWindow
         if (cts != null)
         {
             try { cts.Cancel(); } catch { }
-            cts.Dispose();
+
         }
     }
 
@@ -129,336 +132,279 @@ internal sealed partial class WorkspaceWindow
 
     private async Task<bool> HandleOnlineUpdateMessage(CoreWebView2 web, string requestJson)
     {
-        if (requestJson.Length > 32768 || requestJson.IndexOf("\"online-update\"", StringComparison.Ordinal) < 0)
-            return false;
-        Dictionary<string, object> req;
-        try
-        {
-            req = new JavaScriptSerializer { MaxJsonLength = 32768, RecursionLimit = 6 }.Deserialize<Dictionary<string, object>>(requestJson);
-        }
+        if (requestJson.Length > 32768 || requestJson.IndexOf("\"online-update\"", StringComparison.Ordinal) < 0) return false;
+        Dictionary<string, object> request;
+        try { request = new JavaScriptSerializer { MaxJsonLength = 32768, RecursionLimit = 6 }.Deserialize<Dictionary<string, object>>(requestJson); }
         catch { return false; }
-
-        object typeObj, actionObj, idObj;
-        if (req == null || !req.TryGetValue("type", out typeObj) || (typeObj as string) != "online-update")
-            return false;
-        req.TryGetValue("action", out actionObj);
-        req.TryGetValue("id", out idObj);
-        string action = actionObj as string ?? "";
-        string id = idObj as string ?? "";
-        string installDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-
-        if (action == "cancel")
-        {
-            StopOnlineUpdateDownload();
-            PostWorkspaceMessage(web, new { type = "online-update-result", id = id, cancelled = true });
-            return true;
-        }
-        if (action == "apply-downloaded")
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(verifiedDownloadedZip) || !File.Exists(verifiedDownloadedZip))
-                    throw new InvalidOperationException("未找到已校验的更新包，请重新下载。");
-                var manifest = UpdatePackage.Read(verifiedDownloadedZip, false);
-                UpdatePackage.CheckVersion(manifest, installDir);
-                LaunchUpdaterAndExit(verifiedDownloadedZip, installDir);
-            }
-            catch (Exception error)
-            {
-                PostWorkspaceMessage(web, new { type = "online-update-result", id = id, error = error.Message });
-            }
-            return true;
-        }
+        if (GetUpdateString(request, "type") != "online-update") return false;
+        var action = GetUpdateString(request, "action");
+        var id = GetUpdateString(request, "id");
+        var installDirectory = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
         if (action == "check")
         {
-            try
-            {
-                string currentVersion = ReadInstalledVersion(installDir);
-                string feedUrl = Environment.GetEnvironmentVariable("DONOTE_UPDATE_FEED_URL");
-                if (string.IsNullOrWhiteSpace(feedUrl)) feedUrl = DefaultReleaseApiUrl;
-
-                using (var client = CreateUpdateHttpClient(TimeSpan.FromSeconds(25)))
-                {
-                    string payload = await client.GetStringAsync(feedUrl);
-                    var serializer = new JavaScriptSerializer { MaxJsonLength = 4 * 1024 * 1024 };
-                    var rel = serializer.Deserialize<Dictionary<string, object>>(payload);
-                    string tag = GetStr(rel, "tag_name");
-                    string relName = GetStr(rel, "name");
-                    string body = GetStr(rel, "body");
-                    string htmlUrl = GetStr(rel, "html_url");
-                    var assetsRaw = rel.ContainsKey("assets") ? rel["assets"] as System.Collections.ArrayList : null;
-
-                    string remoteVersion = "";
-                    var m = Regex.Match(relName + " " + body, @"\b(26\.\d+\.\d+)\b");
-                    if (m.Success) remoteVersion = m.Groups[1].Value;
-
-                    string patchName = "DoNote-Update-" + currentVersion + "-to-" + tag + ".zip";
-                    string fullName = "DoNote-Windows-x64-" + tag + ".zip";
-                    string metaName = "DoNote-" + tag + "-release.json";
-                    Dictionary<string, object> patchAsset = null, fullAsset = null, metaAsset = null;
-
-                    if (assetsRaw != null)
-                    {
-                        foreach (object item in assetsRaw)
-                        {
-                            var asset = item as Dictionary<string, object>;
-                            if (asset == null) continue;
-                            string aName = GetStr(asset, "name");
-                            if (string.Equals(aName, patchName, StringComparison.OrdinalIgnoreCase)) patchAsset = asset;
-                            else if (string.Equals(aName, fullName, StringComparison.OrdinalIgnoreCase)) fullAsset = asset;
-                            else if (string.Equals(aName, metaName, StringComparison.OrdinalIgnoreCase)) metaAsset = asset;
-                        }
-                    }
-
-                    var metaShas = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    if (metaAsset != null)
-                    {
-                        string metaUrl = GetStr(metaAsset, "browser_download_url");
-                        if (IsAllowedUpdateUrl(metaUrl))
-                        {
-                            try
-                            {
-                                string metaText = await client.GetStringAsync(metaUrl);
-                                var metaObj = serializer.Deserialize<Dictionary<string, object>>(metaText);
-                                string v = GetStr(metaObj, "version");
-                                if (!string.IsNullOrWhiteSpace(v)) remoteVersion = v;
-                                var arts = metaObj.ContainsKey("artifacts") ? metaObj["artifacts"] as System.Collections.ArrayList : null;
-                                if (arts != null)
-                                {
-                                    foreach (object a in arts)
-                                    {
-                                        var d = a as Dictionary<string, object>;
-                                        if (d != null && !string.IsNullOrWhiteSpace(GetStr(d, "name")) && !string.IsNullOrWhiteSpace(GetStr(d, "sha256")))
-                                            metaShas[GetStr(d, "name")] = GetStr(d, "sha256");
-                                    }
-                                }
-                            }
-                            catch { }
-                        }
-                    }
-
-                    Version curVer, remVer;
-                    if (!Version.TryParse(currentVersion, out curVer)) curVer = new Version("26.1105.0001");
-                    if (!Version.TryParse(remoteVersion, out remVer) || remVer <= curVer)
-                    {
-                        PostWorkspaceMessage(web, new
-                        {
-                            type = "online-update-result",
-                            id = id,
-                            hasUpdate = false,
-                            currentVersion = currentVersion,
-                            remoteVersion = string.IsNullOrWhiteSpace(remoteVersion) ? currentVersion : remoteVersion,
-                            tag = tag,
-                            htmlUrl = htmlUrl
-                        });
-                        return true;
-                    }
-
-                    var chosen = patchAsset ?? fullAsset;
-                    if (chosen == null && string.Equals(feedUrl, DefaultReleaseApiUrl, StringComparison.OrdinalIgnoreCase))
-                    {
-                        // 支持纯补丁发布流：当最新 Release 仅上传相邻增量补丁时，自动在近期 Releases 中检索当前版本可用的桥接增量包或较新完整包
-                        try
-                        {
-                            string listPayload = await client.GetStringAsync("https://api.github.com/repos/yamccle/DoNote/releases?per_page=12");
-                            var relList = serializer.Deserialize<System.Collections.ArrayList>(listPayload);
-                            if (relList != null)
-                            {
-                                foreach (object rItem in relList)
-                                {
-                                    var rDict = rItem as Dictionary<string, object>;
-                                    if (rDict == null || (rDict.ContainsKey("draft") && Equals(rDict["draft"], true))) continue;
-                                    string rTag = GetStr(rDict, "tag_name");
-                                    string rName = GetStr(rDict, "name");
-                                    string rBody = GetStr(rDict, "body");
-                                    var rVerMatch = Regex.Match(rName + " " + rBody, @"\b(26\.\d+\.\d+)\b");
-                                    Version rVer;
-                                    if (!rVerMatch.Success || !Version.TryParse(rVerMatch.Groups[1].Value, out rVer) || rVer <= curVer) continue;
-                                    var rAssets = rDict.ContainsKey("assets") ? rDict["assets"] as System.Collections.ArrayList : null;
-                                    if (rAssets == null) continue;
-                                    string stepPatchName = "DoNote-Update-" + currentVersion + "-to-" + rTag + ".zip";
-                                    string stepFullName = "DoNote-Windows-x64-" + rTag + ".zip";
-                                    Dictionary<string, object> stepPatch = null, stepFull = null;
-                                    foreach (object aObj in rAssets)
-                                    {
-                                        var aDict = aObj as Dictionary<string, object>;
-                                        if (aDict == null) continue;
-                                        string aName = GetStr(aDict, "name");
-                                        if (string.Equals(aName, stepPatchName, StringComparison.OrdinalIgnoreCase)) stepPatch = aDict;
-                                        else if (string.Equals(aName, stepFullName, StringComparison.OrdinalIgnoreCase)) stepFull = aDict;
-                                    }
-                                    if (stepPatch != null || stepFull != null)
-                                    {
-                                        chosen = stepPatch ?? stepFull;
-                                        patchAsset = stepPatch;
-                                        tag = rTag;
-                                        remoteVersion = rVerMatch.Groups[1].Value;
-                                        body = rBody;
-                                        htmlUrl = GetStr(rDict, "html_url");
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-                    if (chosen == null)
-                        throw new InvalidOperationException("GitHub 最新版本（" + tag + "）为增量补丁发布，请先从 Releases 安装最近的完整包后再在线更新。");
-
-                    string chosenName = GetStr(chosen, "name");
-                    string chosenUrl = GetStr(chosen, "browser_download_url");
-                    long chosenSize = GetLong(chosen, "size");
-                    string digestField = GetStr(chosen, "digest");
-                    string sha = "";
-                    if (digestField.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
-                        sha = digestField.Substring(7).Trim();
-                    else if (metaShas.ContainsKey(chosenName))
-                        sha = metaShas[chosenName];
-
-                    PostWorkspaceMessage(web, new
-                    {
-                        type = "online-update-result",
-                        id = id,
-                        hasUpdate = true,
-                        currentVersion = currentVersion,
-                        remoteVersion = remoteVersion,
-                        tag = tag,
-                        releaseNotes = body.Length > 2400 ? body.Substring(0, 2400) + "…" : body,
-                        downloadMode = patchAsset != null ? "patch" : "full",
-                        assetName = chosenName,
-                        assetSize = chosenSize,
-                        assetUrl = chosenUrl,
-                        assetSha256 = sha,
-                        htmlUrl = htmlUrl
-                    });
-                }
-            }
+            var silent = id.StartsWith("silent-", StringComparison.Ordinal);
+            if (!silent) { offeredUpdateId = id; offeredUpdate = null; }
+            try { await OfferOnlineUpdate(web, id, installDirectory, silent); }
             catch (Exception error)
             {
-                PostWorkspaceMessage(web, new { type = "online-update-result", id = id, error = "检查更新失败：" + error.Message });
+                PostWorkspaceMessage(web, new { type = "online-update-result", id, error = "检查更新失败：" + error.Message });
             }
-            return true;
         }
-        if (action == "download")
+        else if (action == "download")
         {
-            string url = GetStr(req, "assetUrl");
-            string fileName = Path.GetFileName(GetStr(req, "assetName"));
-            string expectedSha = GetStr(req, "assetSha256").Trim();
-            long expectedSize = GetLong(req, "assetSize");
-
-            if (!IsAllowedUpdateUrl(url) || string.IsNullOrWhiteSpace(fileName) || !fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-            {
-                PostWorkspaceMessage(web, new { type = "online-update-result", id = id, error = "更新包下载地址不受信任。" });
-                return true;
-            }
-            StopOnlineUpdateDownload();
-            var cts = new CancellationTokenSource();
-            onlineUpdateCancel = cts;
-            string cacheDir = Path.Combine(Path.GetTempPath(), "DoNote-AutoUpdate");
-            Directory.CreateDirectory(cacheDir);
-            string targetZip = Path.Combine(cacheDir, fileName);
-            string tempPart = targetZip + ".part";
-
-            try
-            {
-                await Task.Run(async () =>
-                {
-                    using (var client = CreateUpdateHttpClient(TimeSpan.FromMinutes(30)))
-                    using (var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token))
-                    {
-                        resp.EnsureSuccessStatusCode();
-                        long total = resp.Content.Headers.ContentLength ?? expectedSize;
-                        using (var netStream = await resp.Content.ReadAsStreamAsync())
-                        using (var outStream = new FileStream(tempPart, FileMode.Create, FileAccess.Write, FileShare.None, 65536))
-                        using (var sha = SHA256.Create())
-                        {
-                            byte[] buffer = new byte[65536];
-                            long received = 0;
-                            var clock = Stopwatch.StartNew();
-                            long lastTick = 0;
-                            int read;
-                            while ((read = await netStream.ReadAsync(buffer, 0, buffer.Length, cts.Token)) > 0)
-                            {
-                                outStream.Write(buffer, 0, read);
-                                sha.TransformBlock(buffer, 0, read, buffer, 0);
-                                received += read;
-                                if (clock.ElapsedMilliseconds - lastTick >= 160 || (total > 0 && received >= total))
-                                {
-                                    lastTick = clock.ElapsedMilliseconds;
-                                    int pct = total > 0 ? (int)Math.Min(100, (received * 100L) / total) : 0;
-                                    BeginInvoke((Action)(() =>
-                                    {
-                                        PostWorkspaceMessage(web, new
-                                        {
-                                            type = "online-update-progress",
-                                            id = id,
-                                            assetName = fileName,
-                                            received = received,
-                                            total = total,
-                                            percent = pct
-                                        });
-                                    }));
-                                }
-                            }
-                            sha.TransformFinalBlock(buffer, 0, 0);
-                            string actualSha = BitConverter.ToString(sha.Hash).Replace("-", "").ToLowerInvariant();
-                            if (expectedSize > 0 && received != expectedSize)
-                                throw new InvalidDataException("下载字节数不完整（" + received + " / " + expectedSize + "）。");
-                            if (!string.IsNullOrWhiteSpace(expectedSha) && !string.Equals(actualSha, expectedSha, StringComparison.OrdinalIgnoreCase))
-                                throw new InvalidDataException("更新包 SHA-256 校验未通过，已拦截安装。");
-                        }
-                    }
-                    if (File.Exists(targetZip)) File.Delete(targetZip);
-                    File.Move(tempPart, targetZip);
-                    var manifest = UpdatePackage.Read(targetZip, false);
-                    UpdatePackage.CheckVersion(manifest, installDir);
-                    verifiedDownloadedZip = targetZip;
-                    BeginInvoke((Action)(() =>
-                    {
-                        PostWorkspaceMessage(web, new
-                        {
-                            type = "online-update-result",
-                            id = id,
-                            downloaded = true,
-                            targetVersion = manifest.version,
-                            isPatch = !string.IsNullOrWhiteSpace(manifest.baseVersion),
-                            assetName = fileName
-                        });
-                    }));
-                }, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                try { if (File.Exists(tempPart)) File.Delete(tempPart); } catch { }
-                PostWorkspaceMessage(web, new { type = "online-update-result", id = id, cancelled = true });
-            }
-            catch (Exception error)
-            {
-                try { if (File.Exists(tempPart)) File.Delete(tempPart); } catch { }
-                PostWorkspaceMessage(web, new { type = "online-update-result", id = id, error = "下载或校验失败：" + error.Message });
-            }
-            finally
-            {
-                if (onlineUpdateCancel == cts) onlineUpdateCancel = null;
-                cts.Dispose();
-            }
-            return true;
+            if (updateChecking || onlineUpdateCancel != null)
+                PostWorkspaceMessage(web, new { type = "online-update-result", id, error = "已有更新任务正在进行。" });
+            else if (GetUpdateString(request, "planId") != offeredUpdateId || offeredUpdate == null)
+                PostWorkspaceMessage(web, new { type = "online-update-result", id, error = "更新方案已失效，请重新检查。" });
+            else await DownloadAndInstallOnlineUpdate(web, id, installDirectory, offeredUpdate);
         }
+        else if (action == "cancel" && id == downloadingUpdateId && onlineUpdateCancel != null)
+            onlineUpdateCancel.Cancel();
+        else if (action == "ready" && id == downloadingUpdateId && workspaceReadyForUpdate != null)
+            workspaceReadyForUpdate.TrySetResult(GetUpdateString(request, "error"));
         return true;
     }
 
-    private static string GetStr(Dictionary<string, object> dict, string key)
+    private async Task OfferOnlineUpdate(CoreWebView2 web, string id, string installDirectory, bool silent)
     {
-        object val;
-        return dict != null && dict.TryGetValue(key, out val) && val != null ? Convert.ToString(val) : "";
+        var currentText = ReadInstalledVersion(installDirectory);
+        var current = Version.Parse(currentText);
+        var feedUrl = Environment.GetEnvironmentVariable("DONOTE_UPDATE_FEED_URL");
+        var official = String.IsNullOrWhiteSpace(feedUrl) || String.Equals(feedUrl, DefaultReleaseApiUrl, StringComparison.OrdinalIgnoreCase);
+        if (official) feedUrl = DefaultReleaseApiUrl;
+        var serializer = new JavaScriptSerializer { MaxJsonLength = 16 * 1024 * 1024 };
+        using (var client = CreateUpdateHttpClient(TimeSpan.FromSeconds(25)))
+        {
+            var payload = await client.GetStringAsync(feedUrl);
+            var releases = payload.TrimStart().StartsWith("[", StringComparison.Ordinal)
+                ? new List<GitHubUpdateRelease>(serializer.Deserialize<GitHubUpdateRelease[]>(payload))
+                : new List<GitHubUpdateRelease> { serializer.Deserialize<GitHubUpdateRelease>(payload) };
+            var latest = releases.Where(release => release != null && release.ReadVersion() != null)
+                .OrderByDescending(release => release.ReadVersion()).FirstOrDefault();
+            if (latest == null) throw new InvalidDataException("发行版缺少有效的版本号。");
+            var target = latest.ReadVersion();
+            if (target <= current || silent)
+            {
+                PostWorkspaceMessage(web, new
+                {
+                    type = "online-update-result", id, hasUpdate = target > current, currentVersion = currentText,
+                    remoteVersion = latest.VersionText(), tag = latest.tag_name
+                });
+                return;
+            }
+            if (official)
+            {
+                for (int page = 1; ; page++)
+                {
+                    var listUrl = "https://api.github.com/repos/yamccle/DoNote/releases?per_page=100&page=" + page;
+                    var batch = serializer.Deserialize<GitHubUpdateRelease[]>(await client.GetStringAsync(listUrl));
+                    releases.AddRange(batch.Where(release => release != null && release.tag_name != latest.tag_name));
+                    if (batch.Length < 100) break;
+                }
+            }
+            var rejected = new HashSet<GitHubUpdateAsset>();
+            var checksums = new Dictionary<GitHubUpdateRelease, Dictionary<string, string>>();
+            List<OnlineUpdateStep> plan;
+            while (true)
+            {
+                plan = OnlineUpdatePlan.Find(current, target, releases,
+                    asset => IsAllowedUpdateUrl(asset.browser_download_url) && !rejected.Contains(asset));
+                if (plan == null)
+                    throw new InvalidOperationException("找不到可校验且能升级到 " + latest.VersionText() + " 的更新路径。");
+                foreach (var step in plan)
+                {
+                    step.Sha256 = await UpdateAssetHash(client, serializer, step, checksums);
+                    if (!Regex.IsMatch(step.Sha256, @"\A[0-9a-fA-F]{64}\z")) rejected.Add(step.Asset);
+                }
+                if (plan.All(step => !rejected.Contains(step.Asset))) break;
+            }
+            if (id != offeredUpdateId) return;
+            offeredUpdate = plan;
+            var notes = latest.body ?? "";
+            PostWorkspaceMessage(web, new
+            {
+                type = "online-update-result", id, hasUpdate = true, currentVersion = currentText,
+                remoteVersion = latest.VersionText(), tag = latest.tag_name,
+                downloadMode = plan.All(step => step.BaseVersion != null) ? "patch" : "full",
+                assetSize = plan.Sum(step => step.Asset.size),
+                versions = plan.Select(step => step.Release.VersionText()).ToArray(),
+                releaseNotes = notes.Length > 2400 ? notes.Substring(0, 2400) + "…" : notes
+            });
+        }
     }
 
-    private static long GetLong(Dictionary<string, object> dict, string key)
+    private async Task<string> UpdateAssetHash(HttpClient client, JavaScriptSerializer serializer, OnlineUpdateStep step,
+        Dictionary<GitHubUpdateRelease, Dictionary<string, string>> checksums)
     {
-        object val;
-        if (dict == null || !dict.TryGetValue(key, out val) || val == null) return 0;
-        long parsed;
-        return long.TryParse(Convert.ToString(val), out parsed) ? parsed : 0;
+        var digest = step.Asset.digest ?? "";
+        if (digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+        {
+            var sha256 = digest.Substring(7).Trim();
+            if (Regex.IsMatch(sha256, @"\A[0-9a-fA-F]{64}\z")) return sha256;
+        }
+        Dictionary<string, string> byName;
+        if (!checksums.TryGetValue(step.Release, out byName))
+        {
+            byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            checksums.Add(step.Release, byName);
+            var meta = (step.Release.assets ?? new GitHubUpdateAsset[0]).FirstOrDefault(asset => asset != null &&
+                String.Equals(asset.name, "DoNote-" + step.Release.tag_name + "-release.json", StringComparison.OrdinalIgnoreCase));
+            if (meta != null && IsAllowedUpdateUrl(meta.browser_download_url))
+            {
+                try
+                {
+                    var report = serializer.Deserialize<Dictionary<string, object>>(await client.GetStringAsync(meta.browser_download_url));
+                    object artifacts;
+                    if (report != null && report.TryGetValue("artifacts", out artifacts) && artifacts is System.Collections.IList)
+                        foreach (var item in (System.Collections.IList)artifacts)
+                        {
+                            var entry = item as Dictionary<string, object>;
+                            byName[GetUpdateString(entry, "name")] = GetUpdateString(entry, "sha256");
+                        }
+                }
+                catch (HttpRequestException) { }
+                catch (ArgumentException) { }
+                catch (InvalidOperationException) { }
+            }
+        }
+        string hash;
+        return byName.TryGetValue(step.Asset.name, out hash) ? hash : "";
+    }
+
+    private async Task DownloadAndInstallOnlineUpdate(CoreWebView2 web, string id, string installDirectory, List<OnlineUpdateStep> plan)
+    {
+        var cts = new CancellationTokenSource();
+        onlineUpdateCancel = cts;
+        downloadingUpdateId = id;
+        var root = Path.Combine(Path.GetTempPath(), "DoNote-Update-" + Guid.NewGuid().ToString("N"));
+        var handedOff = false;
+        var total = plan.Sum(step => step.Asset.size);
+        var progress = new Progress<Tuple<int, long>>(value =>
+        {
+            if (onlineUpdateCancel != cts || cts.IsCancellationRequested || IsDisposed || Disposing) return;
+            var index = value.Item1;
+            PostWorkspaceMessage(web, new
+            {
+                type = "online-update-progress", id, step = index + 1, steps = plan.Count,
+                targetVersion = plan[index].Release.VersionText(),
+                received = value.Item2, total, percent = (int)(value.Item2 * 100.0 / total)
+            });
+        });
+        try
+        {
+            Directory.CreateDirectory(root);
+            var current = ReadInstalledVersion(installDirectory);
+            await Task.Run(() => DownloadUpdatePlan(root, current, plan, progress, cts.Token));
+            cts.Token.ThrowIfCancellationRequested();
+            await WaitForWorkspaceBeforeUpdate(web, id, cts.Token);
+            cts.Token.ThrowIfCancellationRequested();
+            LaunchUpdaterAndExit(Path.Combine(root, "chain.json"), installDirectory, true);
+            handedOff = true;
+        }
+        catch (Exception error)
+        {
+            if (cts.IsCancellationRequested)
+                PostWorkspaceMessage(web, new { type = "online-update-result", id, cancelled = true });
+            else
+                PostWorkspaceMessage(web, new { type = "online-update-result", id, error = "无法开始安装：" + error.Message });
+        }
+        finally
+        {
+            onlineUpdateCancel = null;
+            downloadingUpdateId = null;
+            cts.Dispose();
+            if (!handedOff)
+                try { if (Directory.Exists(root)) Directory.Delete(root, true); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    private async Task WaitForWorkspaceBeforeUpdate(CoreWebView2 web, string id, CancellationToken token)
+    {
+        var ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        workspaceReadyForUpdate = ready;
+        try
+        {
+            PostWorkspaceMessage(web, new { type = "online-update-prepare", id });
+            var finished = await Task.WhenAny(ready.Task, Task.Delay(TimeSpan.FromMinutes(2), token));
+            token.ThrowIfCancellationRequested();
+            if (finished != ready.Task) throw new TimeoutException("等待编辑内容暂存超时。");
+            var error = await ready.Task;
+            if (!String.IsNullOrWhiteSpace(error)) throw new IOException(error);
+        }
+        finally { workspaceReadyForUpdate = null; }
+    }
+
+    private static async Task DownloadUpdatePlan(string root, string current, List<OnlineUpdateStep> plan,
+        IProgress<Tuple<int, long>> progress, CancellationToken token)
+    {
+        long completed = 0;
+        var names = new string[plan.Count];
+        using (var client = CreateUpdateHttpClient(TimeSpan.FromMinutes(30)))
+        {
+            for (var index = 0; index < plan.Count; index++)
+            {
+                var step = plan[index];
+                if (step.BaseVersion != null && step.BaseVersion != Version.Parse(current))
+                    throw new InvalidDataException("本机版本已变化，请重新检查更新。");
+                names[index] = (index + 1).ToString("D3") + ".zip";
+                var zip = Path.Combine(root, names[index]);
+                progress.Report(Tuple.Create(index, completed));
+                var stepIndex = index;
+                await DownloadUpdateAsset(client, step, zip, received =>
+                    progress.Report(Tuple.Create(stepIndex, completed + received)), token);
+                var manifest = UpdatePackage.Read(zip, false);
+                UpdatePackage.CheckVersionFrom(manifest, current);
+                if (Version.Parse(manifest.version) != step.Version ||
+                    (String.IsNullOrWhiteSpace(manifest.baseVersion) ? null : Version.Parse(manifest.baseVersion)) != step.BaseVersion)
+                    throw new InvalidDataException("更新包版本与确认的更新路径不一致：" + step.Asset.name);
+                current = manifest.version;
+                completed += step.Asset.size;
+            }
+        }
+        File.WriteAllText(Path.Combine(root, "chain.json"), new JavaScriptSerializer().Serialize(names));
+    }
+
+    private static async Task DownloadUpdateAsset(HttpClient client, OnlineUpdateStep step, string path,
+        Action<long> progress, CancellationToken token)
+    {
+        using (var response = await client.GetAsync(step.Asset.browser_download_url, HttpCompletionOption.ResponseHeadersRead, token))
+        using (token.Register(response.Dispose))
+        {
+            response.EnsureSuccessStatusCode();
+            using (var input = await response.Content.ReadAsStreamAsync())
+            using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536))
+            using (var sha = SHA256.Create())
+            {
+                var buffer = new byte[65536];
+                var clock = Stopwatch.StartNew();
+                long size = 0;
+                int read;
+                while ((read = await input.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
+                {
+                    size += read;
+                    if (size > step.Asset.size) throw new InvalidDataException("更新包超出声明大小。");
+                    output.Write(buffer, 0, read);
+                    sha.TransformBlock(buffer, 0, read, buffer, 0);
+                    if (clock.ElapsedMilliseconds >= 160 || size == step.Asset.size)
+                    {
+                        progress(size);
+                        clock.Restart();
+                    }
+                }
+                sha.TransformFinalBlock(buffer, 0, 0);
+                var actual = BitConverter.ToString(sha.Hash).Replace("-", "");
+                if (size != step.Asset.size || !String.Equals(actual, step.Sha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("更新包大小或 SHA-256 校验未通过：" + step.Asset.name);
+            }
+        }
+    }
+
+    private static string GetUpdateString(Dictionary<string, object> request, string key)
+    {
+        object value;
+        return request != null && request.TryGetValue(key, out value) ? value as string ?? "" : "";
     }
 
     private static string Quote(string path) { return "\"" + path.Replace("\"", "") + "\""; }

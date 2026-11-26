@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收桌面发布包解压后的 workspace 目录。
- * [OUTPUT]: 验证总览、记录、长 PDF、双向引用回跳、扫描页离线识字入索引与云备份消息流程。
+ * [OUTPUT]: 验证工作台、阅读器、云备份与后台字幕任务跳回原视频。
  * [POS]: 发布回归入口。浏览器使用临时账户和本地模拟宿主。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -688,9 +688,10 @@ async function testBackgroundSubtitles(page) {
   const received = await page.evaluate(() => qaRelease.messages.find(message => message.type === 'video-transcribe-range'));
   assert.equal(received.data, prefix);
   await send({ type: 'video-transcribe-progress', status: '后台识别', percent: 40 });
-  await page.evaluate(async id => {
-    await openAttachment(records.flatMap(note => note.attachments).find(file => file.id === id));
-  }, fileId);
+  const task = page.locator('#taskCenterList [data-task-id="asr:' + ownerId + ':' + fileId + '"]');
+  await page.locator('#taskCenterTrigger').click();
+  await task.locator('.task-item-title').click();
+  await page.waitForFunction(id => readingSession?.video && readingSession.file.id === id, fileId);
   assert.equal(await page.locator('.video-subtitles progress').getAttribute('value'), '40');
   await closeReader(page);
 
@@ -710,20 +711,28 @@ async function testBackgroundSubtitles(page) {
   assert.equal(await page.evaluate(() => [...videoSubtitleJobs.values()].some(job => job.id)), true, '识别仍在进行时译文已出现');
   await send({ type: 'video-transcribe-result', count: 2 });
   await page.waitForFunction(() => [...videoSubtitleJobs.values()].every(job => !job.kind));
+  assert.equal(await page.evaluate(() => appState.activeId), otherId);
+  await page.locator('#taskCenterTrigger').click();
+  assert.equal(await task.getAttribute('class'), 'task-item is-done is-openable');
+  await task.locator('button').filter({ hasText: '打开视频' }).click();
+  await page.waitForFunction(({ fileId, ownerId }) => readingSession?.file?.id === fileId &&
+    readingSession.profileId === ownerId && appState.activeId === ownerId, { fileId, ownerId });
+  assert.equal(await page.evaluate(() => qaRelease.messages.filter(message => message.type === 'video-transcribe').length), 1);
+  await closeReader(page);
   await page.reload();
   await page.waitForFunction(() => ready);
-  const state = await page.evaluate(({ ownerId, recordId, fileId }) => ({
+  const state = await page.evaluate(({ ownerId, otherId, recordId, fileId }) => ({
     activeId: appState.activeId,
-    otherRecords: activeProfile().records.length,
+    otherRecords: appState.profiles.find(profile => profile.id === otherId)?.records.length,
     cues: appState.profiles.find(profile => profile.id === ownerId)?.records.find(note => note.id === recordId)?.videoSubtitles?.[fileId]
-  }), { ownerId, recordId, fileId });
-  assert.equal(state.activeId, otherId);
+  }), { ownerId, otherId, recordId, fileId });
+  assert.equal(state.activeId, ownerId);
   assert.equal(state.otherRecords, 0);
   assert.deepEqual(state.cues, [
     { start: 0, end: 0.2, en: 'Background result', zh: '译：Background result' },
     { start: 0.25, end: 0.45, en: 'Second line', zh: '译：Second line' }
   ]);
-  console.log('PASS background subtitles: range bytes, reopen progress, correct account, incremental translation from the first cue and IndexedDB persistence');
+  console.log('PASS background subtitles: open the original video from running and completed tasks, restore the owning workspace and verify persisted bilingual cues');
 }
 
 async function testCloudBackupUi(page) {

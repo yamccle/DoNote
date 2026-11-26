@@ -24,10 +24,21 @@ node tools/tests/test-cloud-backup.mjs
 
 需要 Windows x64、Node.js 22 或更新版本，以及 .NET Framework C# 编译器。正式发布会运行此项。传输测试使用实际桌面代码和回环 WebDAV 服务，验证认证、多版本快照、校验失败和中断保护。工作台测试通过模拟宿主验证备份界面的配置、失败重试和下载入口。Google Drive 账户和桌面同步客户端需要另行实测。
 
+## 云盘文件夹合并
+
+```powershell
+node tools/tests/test-folder-sync-merge.mjs
+```
+
+只检查记录更新时间、删除标记和目录合并。不启动桌面程序，也不连接云盘。
+
 ## Windows 更新器
 
 ```powershell
 & tools/tests/test-release-update.ps1 -PreviousReleaseZip <旧版完整包> -UpdateZip <候选增量包>
+pwsh -File tools/tests/test-update-chain.ps1
 ```
 
 依赖 Windows x64 的 .NET Framework C# 编译器。测试根据候选包清单从旧版 ZIP 提取实际旧程序文件，分别验证默认资料路径、自选资料路径和模拟中断回退。测试用隔离记录、附件、资料路径设置和自定义模型标记校验 SHA-256。候选完整包也可验证，所需临时空间和运行时间更长。
+
+更新链测试使用合成包，验证下载路径、完整包桥接、缺包、第二步失败回退和从最后成功版本继续。

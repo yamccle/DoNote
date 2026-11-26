@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收导入、备份、云端传输、在线更新、网页抓取、PDF 翻译重排与视频语音识别任务的实时状态。
- * [OUTPUT]: 暴露 window.DoNoteTasks 统一任务注册表，渲染工作台顶栏与全屏阅读器内的后台任务进度中心。
+ * [OUTPUT]: 提供后台任务进度和文件跳转。视频字幕任务在生成时也能返回原视频。
  * [POS]: 全局非阻塞后台任务可观测层，关闭各业务弹窗后仍可实时查看进度、定位或取消任务。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -238,6 +238,26 @@
       const card = document.createElement('article');
       card.className = 'task-item is-' + item.state;
       card.dataset.taskId = item.id;
+      const openDocument = item.fileId && (item.state === 'done' || item.openWhileRunning && item.state === 'running')
+        ? () => openFile(item.fileId, item.page, item.profileId)
+        : null;
+      if (openDocument) {
+        card.classList.add('is-openable');
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.title = item.openLabel || '打开对应文档';
+        card.onclick = event => {
+          if (event.target.closest('button')) return;
+          popoverEl.hidePopover?.();
+          openDocument();
+        };
+        card.onkeydown = event => {
+          if (event.target !== card || (event.key !== 'Enter' && event.key !== ' ')) return;
+          event.preventDefault();
+          popoverEl.hidePopover?.();
+          openDocument();
+        };
+      }
 
       const top = document.createElement('div');
       top.className = 'task-item-top';
@@ -282,14 +302,16 @@
       time.textContent = formatRelativeTime(item.updatedAt);
       const actions = document.createElement('div');
       actions.className = 'task-item-actions';
-      if (typeof item.onOpen === 'function') {
+      if (openDocument || typeof item.onOpen === 'function') {
         const openBtn = document.createElement('button');
         openBtn.type = 'button';
         openBtn.className = 'secondary task-mini-btn';
-        openBtn.textContent = item.openLabel || '查看';
-        openBtn.onclick = () => {
+        openBtn.textContent = item.openLabel || (openDocument ? '打开' : '查看');
+        openBtn.onclick = event => {
+          event.stopPropagation();
           popoverEl.hidePopover?.();
-          item.onOpen();
+          if (openDocument) openDocument();
+          else item.onOpen();
         };
         actions.append(openBtn);
       }
@@ -429,13 +451,60 @@
     }
   }
 
+  function findTaskAttachment(fileId, profileId) {
+    const profiles = appState?.profiles || [];
+    const current = profiles.find(profile => profile.id === (profileId || appState?.activeId));
+    for (const profile of profileId ? [current] : [current, ...profiles]) {
+      for (const note of profile?.records || []) {
+        const file = (note.attachments || []).find(item => item.id === fileId);
+        if (file) return { file, profileId: profile.id };
+      }
+    }
+    return null;
+  }
+
+  async function openFile(fileId, page, profileId) {
+    const target = findTaskAttachment(fileId, profileId);
+    if (!target) {
+      if (typeof toast === 'function') toast('找不到这份文档。');
+      return;
+    }
+    try {
+      const { file } = target;
+      const reader = document.getElementById('reader');
+      const alreadyOpen = reader?.open && readingSession?.file?.id === file.id &&
+        readingSession.profileId === target.profileId;
+      if (!alreadyOpen) {
+        if (reader?.open) await new Promise(resolve => {
+          reader.addEventListener('close', resolve, { once: true });
+          reader.close();
+        });
+        if (appState.activeId !== target.profileId) {
+          await waitForReaderSaves();
+          const next = structuredClone(appState);
+          next.activeId = target.profileId;
+          await commitState(next);
+          updateIdentity();
+          switchView('all');
+        }
+        await openAttachment(file);
+      }
+      if (page && readingSession?.file?.id === file.id && typeof readingSession.showPage === 'function') {
+        await readingSession.showPage(page);
+      }
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
   window.DoNoteTasks = {
     upsert,
     remove,
     clearCompleted,
     list: orderedTasks,
     activeCount: () => activeTasks().length,
-    openPopover: () => togglePopover(triggerBtn)
+    openPopover: () => togglePopover(triggerBtn),
+    openFile
   };
 
   if (document.readyState === 'loading') {

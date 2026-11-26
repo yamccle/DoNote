@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 读取本机 IndexedDB 记录状态、PDF/PPT 批注库、DoNoteSyncCrypto 加解密内核与远端 /api/sync/v1 节点响应。
- * [OUTPUT]: 暴露 window.DoNoteSync 核心协议接口，实现增量记录同步、PDF/PPT 批注级细粒度 CRDT 合并与 AES-256-GCM 端到端加密传输。
- * [POS]: 多端在线零信任工作台数据同步内核，与 sync-realtime.js (SSE 推送与设置面板绑定) 协同工作。
+ * [OUTPUT]: 暴露 window.DoNoteSync 核心协议接口，实现增量记录同步、PDF/PPT 批注级细粒度 CRDT 合并、删除标记读取与批注包收集。
+ * [POS]: 文件夹对齐与既有同步服务共用的记录、删除标记和批注包内核。设置页不再绑定网址、令牌或加密口令。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 'use strict';
@@ -10,6 +10,8 @@
   const DEVICE_ID_KEY = 'donote-sync-device-id';
   const DEVICE_NAME_KEY = 'donote-sync-device-name';
   const ENDPOINT_KEY = 'donote-sync-endpoint';
+  const DEVICE_TOKEN_KEY = 'donote-sync-device-token';
+  const ACCOUNT_ID_KEY = 'donote-account-id';
   const MAX_TOMBSTONES = 500;
   let syncing = false;
 
@@ -186,7 +188,8 @@
     const fallbackConn = typeof bridgeConnection !== 'undefined' ? bridgeConnection : null;
     const savedEndpoint = (() => { try { return localStorage.getItem(ENDPOINT_KEY) || ''; } catch { return ''; } })();
     const base = normalizeSyncUrl(rawUrl || document.getElementById('settingsSyncEndpoint')?.value || savedEndpoint || fallbackConn?.base || document.getElementById('bridgeUrl')?.value || 'http://127.0.0.1:4318');
-    const token = String(rawToken || document.getElementById('settingsSyncToken')?.value || fallbackConn?.token || document.getElementById('bridgeAdminToken')?.value || '').trim();
+    const savedToken = (() => { try { return localStorage.getItem(DEVICE_TOKEN_KEY) || ''; } catch { return ''; } })();
+    const token = String(rawToken || document.getElementById('settingsSyncToken')?.value || savedToken || fallbackConn?.token || document.getElementById('bridgeAdminToken')?.value || '').trim();
     if (!token) throw new Error('请填写同步管理令牌，或先在「AI 管理」启动连接本机服务。');
     try { localStorage.setItem(ENDPOINT_KEY, base); } catch {}
     return { base, token };
@@ -335,9 +338,11 @@
     if (typeof ensureReady === 'function' && !ensureReady()) throw new Error('本地记录库尚未就绪。');
     syncing = true;
     const profileId = appState.activeId;
+    const remoteProfileId = (() => { try { return localStorage.getItem(ACCOUNT_ID_KEY) || ''; } catch { return ''; } })() || profileId;
     const cryptoApi = window.DoNoteSyncCrypto;
     const passphrase = cryptoApi?.getPassphrase?.() || '';
     const useE2ee = passphrase.length > 0;
+    if (remoteProfileId !== profileId && !useE2ee) throw new Error('账号同步只发送密文。请先设置加密口令。');
 
     const updateTask = (detail, percent, state = 'running') => {
       window.DoNoteTasks?.upsert?.('multi-device-sync', {
@@ -378,7 +383,7 @@
       const delta = await syncFetchJson(base, token, '/api/sync/v1/delta', {
         method: 'POST',
         body: {
-          profileId, profileName: useE2ee ? '[E2EE]' : p.name, deviceId: getDeviceId(), deviceName: getDeviceName(), sinceSeq,
+          profileId: remoteProfileId, profileName: useE2ee ? '[E2EE]' : p.name, deviceId: getDeviceId(), deviceName: getDeviceName(), sinceSeq,
           ...(useE2ee ? { metaEnvelope } : { categories: p.categories, topics: p.topics, folders: p.folders || [] }),
           records: outboundRecords, annotations: outboundAnnotations, tombstones: readTombstones(profileId)
         }
@@ -534,8 +539,23 @@
     stampRecordMutation,
     recordTombstone,
     getReadinessSummary,
+    readTombstones,
+    collectAnnotationBundles: collectLocalAnnotationBundles,
     ensureAttachmentHashes,
     probeNode,
-    syncNow
+    syncNow,
+    saveAccountSession(session) {
+      const endpoint = normalizeSyncUrl(session.endpoint);
+      const token = String(session.token || '').trim();
+      const accountId = String(session.accountId || '').trim();
+      if (!token || !accountId) throw new Error('登录结果不完整。');
+      localStorage.setItem(ENDPOINT_KEY, endpoint);
+      localStorage.setItem(DEVICE_TOKEN_KEY, token);
+      localStorage.setItem(ACCOUNT_ID_KEY, accountId);
+      const endpointInput = document.getElementById('settingsSyncEndpoint');
+      const tokenInput = document.getElementById('settingsSyncToken');
+      if (endpointInput) endpointInput.value = endpoint;
+      if (tokenInput) tokenInput.value = token;
+    }
   };
 })();

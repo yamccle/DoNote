@@ -1,3 +1,9 @@
+/*
+ * [INPUT]: 读取更新 ZIP、声明的基础版本与发行清单。
+ * [OUTPUT]: 校验版本、文件路径和内容。支持安装前验证连续的增量版本。
+ * [POS]: 本地更新、在线更新和安装器共用的包校验。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -42,12 +48,21 @@ internal static class UpdatePackage
 
     internal static string CheckVersion(ReleaseManifest incoming, string installDirectory)
     {
+        return CheckVersionFrom(incoming, InstalledVersion(installDirectory));
+    }
+
+    internal static string InstalledVersion(string installDirectory)
+    {
         var path = Path.Combine(installDirectory, "release-manifest.json");
         var currentManifest = File.Exists(path)
             ? new JavaScriptSerializer { MaxJsonLength = 32 * 1024 * 1024 }
                 .Deserialize<ReleaseManifest>(File.ReadAllText(path))
             : null;
-        var current = currentManifest == null ? "26.1105.0001" : currentManifest.version;
+        return currentManifest == null ? "26.1105.0001" : currentManifest.version;
+    }
+
+    internal static string CheckVersionFrom(ReleaseManifest incoming, string current)
+    {
         if (Version.Parse(incoming.version) <= Version.Parse(current))
             throw new InvalidDataException("请选择比当前版本更新的安装包。当前：" + current);
         if (!String.IsNullOrWhiteSpace(incoming.baseVersion) &&

@@ -14,6 +14,7 @@ import {pipeline} from 'node:stream/promises';
 import {fileURLToPath} from 'node:url';
 import {serveMcp} from './mcp.mjs';
 import {createSyncStore,handleSyncV1} from './sync-v1.mjs';
+import {createAccountApi} from './account-v1.mjs';
 
 const VERSION='1.3.0',MAX_FILE=100*1024*1024,SCOPES=['records:read','records:create','records:update','records:delete','files:read','files:write','subtitles:read','subtitles:write'];
 const subtitleScopes=['subtitles:read','subtitles:write'];
@@ -72,7 +73,8 @@ export async function createBridge({dataDir,adminToken,host='127.0.0.1',port=431
  const transact=fn=>{const result=pending.catch(()=>{}).then(async()=>{const next=structuredClone(state),value=await fn(next);await atomicJson(statePath,next);state=next;return value});pending=result;return result};
  const log=(s,actor,event,details={})=>{s.audit.push({id:crypto.randomUUID(),at:new Date().toISOString(),actor,event,...details});s.audit=s.audit.slice(-2000)};
  const ownerHash=digest(adminToken);
- function identity(req){const token=req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];if(!token)throw fail('需要 Bearer 令牌。',401);const hash=digest(token);if(equalHash(hash,ownerHash))return {owner:true,id:'owner'};const agent=state.agents.find(a=>!a.revoked&&equalHash(a.tokenHash,hash));if(!agent)throw fail('令牌无效或已撤销。',401);return agent}
+ const accounts=createAccountApi({fail,digest,equalHash,bounded,jsonBody,transact,getState:()=>state,log});
+ function identity(req){const token=req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];if(!token)throw fail('需要 Bearer 令牌。',401);const device=accounts.identifyDevice(token,state);if(device)return device;const hash=digest(token);if(equalHash(hash,ownerHash))return {owner:true,id:'owner'};const agent=state.agents.find(a=>!a.revoked&&equalHash(a.tokenHash,hash));if(!agent)throw fail('令牌无效或已撤销。',401);return agent}
  const scope=(who,permission)=>{if(!who.owner&&!who.scopes.includes(permission))throw fail('此助手没有 '+permission+' 权限。',403)};
  const owner=who=>{if(!who.owner)throw fail('此操作仅限管理令牌。',403)};
 
@@ -249,6 +251,7 @@ export async function createBridge({dataDir,adminToken,host='127.0.0.1',port=431
    if(!originAllowed(origin))throw fail('未授权的浏览器来源。',403);
    if(req.method==='OPTIONS'){res.writeHead(204);res.end();return}
    const url=new URL(req.url,'http://localhost'),route=url.pathname;
+   if(await accounts.handle(req,route,reply))return;
    if(req.method==='GET'&&route==='/health')return reply({service:'analog-notes-ai-bridge',version:VERSION,storage:'durable queue; browser applies changes',mcp:'/mcp'});
    if(req.method==='GET'&&route==='/openapi.json'){const spec=JSON.parse(await fs.readFile(new URL('./openapi.json',import.meta.url),'utf8'));return reply(spec)}
    if(route==='/mcp'){

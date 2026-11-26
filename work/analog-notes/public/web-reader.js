@@ -1,3 +1,9 @@
+/**
+ * [INPUT]: 读取已收藏网页的正文、离线快照和标注。
+ * [OUTPUT]: 展示正文和快照。保存摘录并跳回原文。
+ * [POS]: 打开网页时读取正文。选择离线快照时再请求快照附件。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 'use strict';
 
 let webReaderSession=null,webReaderSaveQueue=Promise.resolve();
@@ -306,7 +312,7 @@ async function openSavedWebpage(record){
  if(!articleFile){toast('网页正文缺失，请从完整备份恢复。');return}
  const reader=$('reader'),download=$('readerDownload');
  try{
-  const articleBlob=await readBlob(articleFile.id,profileId);
+  const articleBlob=await readBlob(articleFile.id,profileId,{fromSync:true});
   const snapshotBlob=snapshotFile?await readBlob(snapshotFile.id,profileId).catch(()=>null):null;
   if(profileId!==appState.activeId||reader.open||!webRecord(record.id))return;
   const content=safeCapturedHtml(await articleBlob.text());
@@ -374,16 +380,28 @@ async function openSavedWebpage(record){
   get('.web-reader-header h1').textContent=record.title;
   get('.web-reader-header small').textContent=[record.author,record.webArticle.capturedAt?.slice(0,10)].filter(Boolean).join(' · ');
   session.article.innerHTML=content;
-  session.snapshotMode.disabled=!snapshot;
+  session.snapshotMode.disabled=!snapshotFile;
   get('.web-offline-status').title=snapshot?'正文和快照均可离线读取':'已保存的正文可离线读取';
   const live=get('[data-web-live]');
   live.hidden=!(location.origin==='https://yams-one.example'&&typeof openLiveWebPage==='function');
   live.onclick=()=>openLiveWebPage(record);
   session.articleMode.onclick=()=>selectWebReaderMode(session,'article');
-  session.snapshotMode.onclick=()=>selectWebReaderMode(session,'snapshot');
+  session.snapshotMode.onclick=async()=>{
+   if(session.snapshot){selectWebReaderMode(session,'snapshot');return}
+   if(!snapshotFile)return;
+   session.snapshotMode.disabled=true;
+   try{
+    const blob=await readBlob(snapshotFile.id,profileId,{fromSync:true});
+    const html=safeCapturedHtml(await blob.text(),{snapshot:true});
+    if(session!==webReaderSession||profileId!==appState.activeId)return;
+    session.snapshot=html;
+    selectWebReaderMode(session,'snapshot');
+   }catch(error){if(session===webReaderSession)toast(error.message)}
+   finally{session.snapshotMode.disabled=false}
+  };
   session.exportButton.onclick=()=>{
    const isSnapshot=session.mode==='snapshot',label=isSnapshot?'离线快照':'正文阅读';
-   const html=isSnapshot?snapshot:exportWebArticle(record,content);
+   const html=isSnapshot?session.snapshot:exportWebArticle(record,content);
    downloadBlob(safeFileName(record.title).slice(0,66)+'-'+label+'.html',new Blob([html],{type:'text/html;charset=utf-8'}));
   };
   session.marksButton.onclick=()=>{

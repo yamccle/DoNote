@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 读取已打开的 PDF / PPT 阅读附件列表与当前工作台资料库。
+ * [INPUT]: 读取已打开的 PDF / PPT 附件列表与资料库。新增标签时按需读取所选文档。
  * [OUTPUT]: 提供 registerReaderTab、activateReaderTab、closeReaderTab 与多标签选择器。
  * [POS]: 阅读器顶部多开文档标签栏，支持在论文 PDF 与讲义 PPT 之间原地快速切换。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
@@ -83,7 +83,7 @@ function renderReaderTabPicker(){
   $('readerTabPicker').close();
   const profile=appState.activeId,session=readingSession;
   try{
-   const blob=await readBlob(entry.file.id,profile);
+   const blob=await readBlob(entry.file.id,profile,{fromSync:true});
    if($('reader').open&&readingSession===session&&appState.activeId===profile){
     if(typeof fileIsPresentation==='function'&&fileIsPresentation(entry.file))await openPresentationAttachment(entry.file,blob);
     else await openReadableAttachment(entry.file,blob);

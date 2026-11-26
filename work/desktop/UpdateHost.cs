@@ -1,3 +1,9 @@
+/*
+ * [INPUT]: 读取本地更新 ZIP 或经桌面宿主校验的更新顺序。
+ * [OUTPUT]: 逐包安装、回退失败步骤，并在整次更新结束后启动 DoNote。
+ * [POS]: 独立更新进程。持有单实例锁，保护每一步的程序和资料边界。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,6 +14,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 internal static class UpdateHost
@@ -16,8 +23,9 @@ internal static class UpdateHost
     private static void Main(string[] args)
     {
         Application.EnableVisualStyles();
+        var chain = args.Length == 5 && args[4] == "--chain";
         int parentId;
-        if (args.Length != 4 || !int.TryParse(args[3], out parentId)) return;
+        if ((!chain && args.Length != 4) || !int.TryParse(args[3], out parentId)) return;
         var window = new Form
         {
             Text = "DoNote · 正在更新", Width = 450, Height = 145, StartPosition = FormStartPosition.CenterScreen,
@@ -46,13 +54,19 @@ internal static class UpdateHost
                     using (var instance = new Mutex(true, "Local\\YamsOne.Desktop", out reserved))
                     {
                         if (!reserved) throw new IOException("DoNote 已重新打开，或正在进行另一次更新。");
-                        return Install(args[0], args[1], args[2], report: progress.Report);
+                        return chain ? InstallChain(args[0], args[1], args[2], progress.Report)
+                            : Install(args[0], args[1], args[2], report: progress.Report);
                     }
                 });
                 var message = Directory.Exists(Path.Combine(backup, "Data"))
                     ? "更新完成。旧版程序和资料备份位于：\n" + backup
                     : "更新完成。旧版程序备份位于：\n" + backup + "\n资料目录保持原位。";
-                MessageBox.Show(window, message, "DoNote 已更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (chain)
+                {
+                    label.Text = "更新完成，正在重新启动 DoNote…";
+                    await Task.Delay(800);
+                }
+                else MessageBox.Show(window, message, "DoNote 已更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception error)
             {
@@ -60,6 +74,7 @@ internal static class UpdateHost
             }
             finally
             {
+                if (chain) RemoveOnlineUpdateFiles(args[0]);
                 try { Process.Start(new ProcessStartInfo(Path.Combine(args[1], "DoNote.exe")) { WorkingDirectory = args[1], UseShellExecute = true }); }
                 catch (Exception error) { MessageBox.Show(window, "请手动打开 DoNote.exe。\n" + error.Message); }
                 canClose = true;
@@ -67,6 +82,58 @@ internal static class UpdateHost
             }
         };
         Application.Run(window);
+    }
+
+    internal static string InstallChain(string plan, string installDirectory, string dataDirectory, Action<string> report = null)
+    {
+        var packages = ReadChainPackages(plan);
+        string installed = UpdatePackage.InstalledVersion(installDirectory);
+        string current = installed;
+        var versions = new string[packages.Length];
+        for (var index = 0; index < packages.Length; index++)
+        {
+            var manifest = UpdatePackage.Read(packages[index], false);
+            UpdatePackage.CheckVersionFrom(manifest, current);
+            versions[index] = current = manifest.version;
+        }
+
+        string backup = null;
+        for (var index = 0; index < packages.Length; index++)
+        {
+            var label = "步骤 " + (index + 1) + " / " + packages.Length + " · " + versions[index] + "\n";
+            try
+            {
+                backup = Install(packages[index], installDirectory, dataDirectory, report: status => Report(report, label + status));
+                installed = versions[index];
+            }
+            catch (Exception error)
+            {
+                throw new IOException(label + error.Message + "\n最后成功安装的版本：" + installed, error);
+            }
+        }
+        return backup;
+    }
+
+    private static string[] ReadChainPackages(string plan)
+    {
+        if (!File.Exists(plan) || new FileInfo(plan).Length > 65536) throw new InvalidDataException("更新计划不存在或太大。");
+        var root = Path.GetDirectoryName(Path.GetFullPath(plan));
+        var names = new JavaScriptSerializer().Deserialize<string[]>(File.ReadAllText(plan));
+        if (names == null || names.Length == 0 || names.Where((name, index) => name != (index + 1).ToString("D3") + ".zip").Any())
+            throw new InvalidDataException("更新计划中的文件顺序无效。");
+        return names.Select(name => Path.Combine(root, name)).ToArray();
+    }
+
+    private static void RemoveOnlineUpdateFiles(string plan)
+    {
+        try
+        {
+            var root = AppDomain.CurrentDomain.BaseDirectory;
+            if (!String.Equals(Path.GetFullPath(plan), Path.Combine(root, "chain.json"), StringComparison.OrdinalIgnoreCase)) return;
+            foreach (var package in ReadChainPackages(plan)) File.Delete(package);
+            File.Delete(plan);
+        }
+        catch { }
     }
 
     internal static string Install(string package, string installDirectory, string dataDirectory, int failAfter = -1, Action<string> report = null)

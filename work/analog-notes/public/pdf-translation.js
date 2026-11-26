@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 读取 PDF 选区、框选识字结果、术语表与桌面翻译桥。
- * [OUTPUT]: 提供文本规范化、整页/按段翻译桥及翻译与摘录侧栏 installPdfTranslationPanel。
+ * [OUTPUT]: 提供文本规范化、整页/按段翻译桥及翻译与摘录侧栏 installPdfTranslationPanel。整页翻译任务记下源文件，完成后可从任务中心打开。
  * [POS]: 连接阅读器选区/识字与离线/在线翻译、批注保存、研究笔记保存及记录追加。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -20,7 +20,15 @@ function wellFormedText(value){
  }
  return clean;
 }
-const pdf2zhPending=new Map();
+const pdf2zhSources=new Map();
+function pdf2zhTaskPatch(id){
+ const source=pdf2zhSources.get(id);
+ return {
+  fileId:source?.fileId||null,
+  page:source?.page||null,
+  title:source?.name?source.name+' · 整页翻译':'PDF 整页双语翻译'
+ };
+}
 const bilingualPairPending=new Map();
 const pdf2zhChunkSize=256*1024;
 const pdf2zhUploadWindow=4;
@@ -76,7 +84,7 @@ if(window.chrome?.webview){
    if (data.type === 'pdf2zh-progress' && window.DoNoteTasks) {
     window.DoNoteTasks.upsert('pdf2zh:' + data.id, {
      kind: 'translate',
-     title: 'PDF 整页双语翻译',
+     ...pdf2zhTaskPatch(data.id),
      detail: data.message || data.stage || '正在排版与翻译文档…',
      percent: Number.isFinite(data.percent) ? data.percent : null,
      state: 'running'
@@ -87,8 +95,8 @@ if(window.chrome?.webview){
   if (data?.type === 'pdf2zh-result' && window.DoNoteTasks) {
    window.DoNoteTasks.upsert('pdf2zh:' + data.id, {
     kind: 'translate',
-    title: 'PDF 整页双语翻译',
-    detail: data.error ? ('翻译未完成：' + data.error) : '整页双语对照翻译已完成',
+    ...pdf2zhTaskPatch(data.id),
+    detail: data.error ? ('翻译未完成：' + data.error) : '整页双语对照翻译已完成，点击打开文档',
     percent: data.error ? null : 100,
     state: data.error ? 'error' : 'done'
    });
@@ -173,10 +181,11 @@ window.PdfMathTranslate = {
   }
   return {
    close,
-   async translate(page, {preference, signal: pageSignal, onProgress = () => {}, onParagraph = () => {}}) {
+   async translate(page, {preference, signal: pageSignal, onProgress = () => {}, onParagraph = () => {}, source} = {}) {
     const requestSignal = pageSignal ? AbortSignal.any([documentSignal, pageSignal]) : documentSignal;
     requestSignal.throwIfAborted();
     const requestId = crypto.randomUUID();
+    if (source?.fileId) pdf2zhSources.set(requestId, source);
     const parts = [];
     let bytes = 0;
     let invalidOutput = false;

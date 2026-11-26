@@ -1,7 +1,7 @@
 /*
- * [INPUT]: 读取 IndexedDB 中当前工作台的记录和附件。
+ * [INPUT]: 读取 IndexedDB 中当前工作台的记录和附件。显式请求时可以从同步文件夹读取附件。
  * [OUTPUT]: 提交记录状态并派发 workspace-records-changed，导出本机备份和可恢复的云端快照。
- * [POS]: 工作台数据入口，为桌面备份复用同一清单和附件。
+ * [POS]: 工作台数据入口。预览和下载可按需读取。封面、索引和自动浏览使用本机附件。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 'use strict';
@@ -55,7 +55,18 @@ async function putWorkspaceForFile(profileId,fileId,key,value){
  }
  return true;
 }
-async function readBlob(id,profileId=appState.activeId){const tx=database.transaction('files');const value=await reqResult(tx.objectStore('files').get(fileKey(profileId,id)));if(!(value instanceof Blob))throw new Error('附件文件缺失，请从完整备份恢复。');return value}
+async function readBlob(id,profileId=appState.activeId,{fromSync=false}={}){
+ const tx=database.transaction('files');
+ const value=await reqResult(tx.objectStore('files').get(fileKey(profileId,id)));
+ if(value instanceof Blob)return value;
+ const sync=fromSync?window.DoNoteFolderSync:null;
+ if(sync?.isAligning?.())throw new Error('正在对齐目录，请稍后再打开这份附件。');
+ if(sync?.loadAttachment){
+  const loaded=await sync.loadAttachment(id,profileId);
+  if(loaded instanceof Blob)return loaded;
+ }
+ throw new Error('附件文件缺失，请从完整备份恢复。');
+}
 function waitForReaderSaves(){
  return Promise.all([readingSaveQueue,annotationQueue,webReaderSaveQueue.catch(()=>{}),videoFrameSaveQueue.catch(()=>{})]);
 }
@@ -268,12 +279,12 @@ function renderDetailAttachments(note){
  if(files.some(a=>fileIsPresentation(a)||fileIsPdf(a)||fileIsDocx(a)))details.insertBefore(node,details.querySelector('.detail-body'));
  else details.append(node);
  node.querySelectorAll('[data-open-attachment]').forEach(b=>b.onclick=()=>openAttachment(files.find(a=>a.id===b.dataset.openAttachment)));
- node.querySelectorAll('[data-download-attachment]').forEach(b=>b.onclick=async()=>{try{downloadBlob(b.dataset.downloadAttachment&&files.find(a=>a.id===b.dataset.downloadAttachment).name,await readBlob(b.dataset.downloadAttachment))}catch(e){toast(e.message)}});
+ node.querySelectorAll('[data-download-attachment]').forEach(b=>b.onclick=async()=>{try{downloadBlob(b.dataset.downloadAttachment&&files.find(a=>a.id===b.dataset.downloadAttachment).name,await readBlob(b.dataset.downloadAttachment,appState.activeId,{fromSync:true}))}catch(e){toast(e.message)}});
 }
 function downloadBlob(name,blob){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),60000)}
 async function openAttachment(a){
  try{
-  const profile=appState.activeId,raw=await readBlob(a.id,profile);
+  const profile=appState.activeId,raw=await readBlob(a.id,profile,{fromSync:true});
   if(appState.activeId!==profile||$('reader').open)return;
   discardMinimizedWorkspaceDialog('reader');
   if(requiresExternalReader(a,raw.size)){downloadBlob(a.name,raw);return}
@@ -359,7 +370,7 @@ async function collectBackup(includeData,{large=false,onProgress}={}){
  let attachmentBytes=0;
  for(const note of p.records)for(const a of note.attachments||[])attachmentBytes+=includeData?Math.ceil(a.size/3)*4:a.size;
  if(!large&&attachmentBytes>MAX_BACKUP)throw new Error('当前附件总量（约 '+sizeLabel(attachmentBytes)+'）超过 500 MB 单文件上限，请直接使用上方推荐的「流式备份到文件夹」或「云端版本化备份」。');
- for(const note of p.records){for(const a of note.attachments||[]){const blob=await readBlob(a.id,p.id);if(blob.size!==a.size)throw new Error('附件大小异常：'+a.name);a.annotations=await fileAnnotations(p.id,a);if(fileIsPdf(a)&&typeof readPdfOcrPages==='function'){const ocr=await readPdfOcrPages(a.id,p.id);if(ocr?.pages&&Object.keys(ocr.pages).length)a.ocrPages=ocr.pages;else delete a.ocrPages}if(fileIsVideo(a)){const frames=await fileVideoFrameNotes(p.id,a);if(frames.length)a.videoFrameNotes=frames;else delete a.videoFrameNotes}a.sha256=await fileDigest(blob,(done,total)=>onProgress?.(a.name,done,total));a.path=attachmentPath(p,note,a);if(includeData)a.data=await blobToBase64(blob);files.push({path:a.path,blob})}}
+ for(const note of p.records){for(const a of note.attachments||[]){const blob=await readBlob(a.id,p.id,{fromSync:true});if(blob.size!==a.size)throw new Error('附件大小异常：'+a.name);a.annotations=await fileAnnotations(p.id,a);if(fileIsPdf(a)&&typeof readPdfOcrPages==='function'){const ocr=await readPdfOcrPages(a.id,p.id);if(ocr?.pages&&Object.keys(ocr.pages).length)a.ocrPages=ocr.pages;else delete a.ocrPages}if(fileIsVideo(a)){const frames=await fileVideoFrameNotes(p.id,a);if(frames.length)a.videoFrameNotes=frames;else delete a.videoFrameNotes}a.sha256=await fileDigest(blob,(done,total)=>onProgress?.(a.name,done,total));a.path=attachmentPath(p,note,a);if(includeData)a.data=await blobToBase64(blob);files.push({path:a.path,blob})}}
  const usageExport=window.DoNoteUsage?.exportForBackup?.(p)||{};
  return {backup:{format:'analog-notes',version:2,exportedAt:new Date().toISOString(),profile:{name:p.name,role:p.role,topics:p.topics,categories:p.categories,journalLayoutVersion:p.journalLayoutVersion,planLayoutVersion:p.planLayoutVersion,navLabels:p.navLabels,navDescriptions:p.navDescriptions||{},reading:p.reading,reminders:p.reminders||[],readingLists:p.readingLists||[],folders:p.folders||[],dashboardWidgets:dashboardWidgetsFor(p),dashboardWidgetLayoutVersion:1,usageDays:usageExport.usageDays,focusMinutes:usageExport.focusMinutes},records:p.records},files};
 }

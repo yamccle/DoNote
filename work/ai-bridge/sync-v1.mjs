@@ -94,12 +94,22 @@ function mergeServerPlainAnnotations(existing = {}, incoming = {}) {
 
 export async function handleSyncV1({ req, res, url, route, who, owner, fail, identifier, bounded, jsonBody, transact, getState, log, syncStore, reply }) {
   if (!route.startsWith('/api/sync/v1/')) return false;
-  owner(who);
+  if (who.accountId) {
+    if (!identifier(who.accountId)) throw fail('账号无效。', 401);
+  } else {
+    owner(who);
+  }
+
+  function accountProfile(requested) {
+    if (!who.accountId) return requested || 'default';
+    if (requested && requested !== who.accountId) throw fail('不能访问其他账号的同步空间。', 403);
+    return who.accountId;
+  }
 
   const { blobsDir } = syncStore;
 
   if (route === '/api/sync/v1/status' && req.method === 'GET') {
-    const profileId = url.searchParams.get('profileId') || 'default';
+    const profileId = accountProfile(url.searchParams.get('profileId'));
     const state = getState();
     const space = state.syncSpaces?.[profileId];
     const blobCount = Object.keys(state.syncBlobs || {}).length;
@@ -121,7 +131,7 @@ export async function handleSyncV1({ req, res, url, route, who, owner, fail, ide
   }
 
   if (route === '/api/sync/v1/events' && req.method === 'GET') {
-    const profileId = url.searchParams.get('profileId') || 'default';
+    const profileId = accountProfile(url.searchParams.get('profileId'));
     if (!identifier(profileId)) throw fail('无效的工作台 profileId。');
     const cursor = getState().syncSpaces?.[profileId]?.cursor || 0;
     res.writeHead(200, {
@@ -234,6 +244,7 @@ export async function handleSyncV1({ req, res, url, route, who, owner, fail, ide
   if (route === '/api/sync/v1/delta' && req.method === 'POST') {
     const input = await jsonBody(req, 48 * 1024 * 1024);
     if (!identifier(input.profileId)) throw fail('无效的工作台 profileId。');
+    input.profileId = accountProfile(input.profileId);
     const sinceSeq = Math.max(0, Number(input.sinceSeq || 0) || 0);
     const deviceId = bounded(input.deviceId, 64) ? input.deviceId : 'dev-unknown';
     const deviceName = bounded(input.deviceName, 60) ? input.deviceName : '工作台节点';
@@ -242,6 +253,11 @@ export async function handleSyncV1({ req, res, url, route, who, owner, fail, ide
     const incomingAnnotations = Array.isArray(input.annotations) ? input.annotations : [];
     if (incomingRecords.length > 50000 || incomingAnnotations.length > 20000) {
       throw fail('单次同步条目数量超出上限。');
+    }
+    if (who.accountId) {
+      if (incomingRecords.some(rec => !validE2eeEnvelope(rec?.e2ee))) throw fail('账号中转只接受密文记录。');
+      if (incomingAnnotations.some(ann => !validE2eeEnvelope(ann?.e2ee))) throw fail('账号中转只接受密文批注。');
+      if (input.topics || input.folders || input.categories) throw fail('账号中转不接受明文目录。');
     }
 
     let changedCursor = 0;

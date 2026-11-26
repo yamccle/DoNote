@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 接收已初始化的 Playwright 页面实例 page，以及 Node.js 文件系统与 AI/Sync 桥接模块。
- * [OUTPUT]: 暴露 verifyPlatformEvolutionR139，端到端验证 r139 八大平台化演进特性。
+ * [OUTPUT]: 验证平台交互、后台任务与在线更新的一次确认流程。
  * [POS]: 由 tools/tests/workspace-excerpts.mjs 调用的 r139 专项自动化回归套件。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -164,24 +164,27 @@ export async function verifyPlatformEvolutionR139(page) {
     document.getElementById('taskCenterPopover')?.hidePopover?.();
 
     const sent = [];
+    let onlinePlanId, onlineDownload;
     const origPost = window.chrome.webview.postMessage;
     window.chrome.webview.postMessage = msg => {
       if (msg?.type === 'online-update') {
         sent.push(msg.action);
         if (msg.action === 'check') {
+          onlinePlanId = msg.id;
           queueMicrotask(() => window.qaRelease.post({
             type: 'online-update-result',
             id: msg.id,
-            currentVersion: '26.1138.0084',
+            currentVersion: '26.1137.0083',
             remoteVersion: '26.1139.0085',
             tag: 'r139',
             hasUpdate: true,
             downloadMode: 'patch',
-            assetName: 'DoNote-Update-26.1138.0084-to-r139.zip',
+            versions: ['26.1138.0084', '26.1139.0085'],
             assetSize: 4194304,
             releaseNotes: '### r139 更新\n- 新增 GitHub 自动在线更新'
           }));
         }
+        if (msg.action === 'download') onlineDownload = msg;
         return;
       }
       return origPost(msg);
@@ -193,15 +196,22 @@ export async function verifyPlatformEvolutionR139(page) {
       await new Promise(r => setTimeout(r, 80));
       const strategyText = document.getElementById('onlineUpdateStrategy')?.textContent || '';
       const remoteText = document.getElementById('onlineUpdateRemote')?.textContent || '';
+      const pathText = document.getElementById('onlineUpdateStatus')?.textContent || '';
+      document.getElementById('onlineUpdateActionBtn').click();
       window.qaRelease.post({
         type: 'online-update-progress',
-        id: 'dl-1',
-        assetName: 'DoNote-Update-26.1138.0084-to-r139.zip',
+        id: onlineDownload.id,
+        targetVersion: '26.1139.0085',
+        step: 2,
+        steps: 2,
         received: 2306867,
         total: 4194304,
         percent: 55
       });
       const updateTask = window.DoNoteTasks.list().find(t => t.id === 'online-update');
+      window.qaRelease.post({ type: 'online-update-prepare', id: onlineDownload.id });
+      await new Promise(resolve => setTimeout(resolve, 80));
+      window.qaRelease.post({ type: 'online-update-result', id: onlineDownload.id, cancelled: true });
       document.getElementById('onlineUpdateDialog').close();
       window.DoNoteTasks.upsert('online-update', { state: 'done', percent: 100, detail: '校验通过' });
       window.DoNoteTasks.clearCompleted();
@@ -213,6 +223,8 @@ export async function verifyPlatformEvolutionR139(page) {
         sent,
         strategyText,
         remoteText,
+        pathText,
+        confirmedPlan: onlineDownload.planId === onlinePlanId,
         updateTaskPercent: updateTask?.percent
       };
     } finally {
@@ -223,8 +235,10 @@ export async function verifyPlatformEvolutionR139(page) {
   assert.equal(updateAndTaskState.triggerActive, true);
   assert.equal(updateAndTaskState.popoverOpen, true);
   assert.equal(updateAndTaskState.cancelled, true);
-  assert.deepEqual(updateAndTaskState.sent, ['check']);
-  assert.ok(updateAndTaskState.strategyText.includes('增量极速补丁'));
+  assert.deepEqual(updateAndTaskState.sent, ['check', 'download', 'ready']);
+  assert.equal(updateAndTaskState.confirmedPlan, true);
+  assert.ok(updateAndTaskState.strategyText.includes('增量更新 · 2 包'));
+  assert.ok(updateAndTaskState.pathText.includes('26.1137.0083 → 26.1138.0084 → 26.1139.0085'));
   assert.ok(updateAndTaskState.remoteText.includes('26.1139.0085'));
   assert.equal(updateAndTaskState.updateTaskPercent, 55);
 

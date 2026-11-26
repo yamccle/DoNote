@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 承接 design-system.css 与 workspace-bento.css 的色彩与圆角变量。
- * [OUTPUT]: 定义侧边栏微层次、精简版 AI 管理弹窗、篮板式全局拖拽分拣台、后台任务中心与多端同步设置卡片样式。
+ * [OUTPUT]: 定义侧边栏微层次、精简版 AI 管理弹窗、篮板式全局拖拽分拣台、后台任务中心与多端同步设置卡片样式。已完成的文档任务整行可点。
  * [POS]: r139 平台化演进专属样式表，保持全站低饱和学术纸感与统一圆角尺度。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
@@ -452,7 +452,8 @@
   color: var(--accent, #2e5984);
 }
 
-.task-item.is-done .task-state-label { color: #2f855a; }
+.task-item.is-openable { cursor: pointer; }
+.task-item.is-openable:hover { border-color: var(--line-strong, #9aab9b); }
 .task-item.is-error .task-state-label { color: #c43c39; }
 
 .task-item-detail {

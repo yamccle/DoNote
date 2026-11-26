@@ -1,4 +1,10 @@
-﻿param([Parameter(Mandatory=$true)][string]$Output,[switch]$ReuseStagedRuntime)
+﻿<#
+[INPUT]: 读取桥接脚本与锁定的 Node.js 运行依赖。
+[OUTPUT]: 写入桌面包的 ai-bridge 目录。
+[POS]: 为桌面宿主提供完整的桥接模块。
+[PROTOCOL]: Update this header on change, then check AGENTS.md
+#>
+param([Parameter(Mandatory=$true)][string]$Output,[switch]$ReuseStagedRuntime)
 $ErrorActionPreference = 'Stop'
 $runtime = Join-Path $PSScriptRoot '../desktop-node-runtime'
 $target = Join-Path ([IO.Path]::GetFullPath($Output)) 'ai-bridge'
@@ -29,7 +35,7 @@ if (!$ReuseStagedRuntime) {
     Copy-Item -LiteralPath $node -Destination (Join-Path $target 'node.exe') -Force
     Copy-Item -LiteralPath $license -Destination (Join-Path $target 'Node-LICENSE.txt') -Force
 }
-$files = @('server.mjs', 'mcp.mjs', 'sync-v1.mjs', 'openapi.json', 'adapter.py', 'Dockerfile', '.dockerignore', 'Start-Local.cmd')
+$files = @('server.mjs', 'mcp.mjs', 'sync-v1.mjs', 'account-v1.mjs', 'openapi.json', 'adapter.py', 'Dockerfile', '.dockerignore', 'Start-Local.cmd')
 foreach ($file in $files) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $target -Force
 }

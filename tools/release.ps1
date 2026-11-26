@@ -1,6 +1,6 @@
 <#
 [INPUT]: 读取干净的 Git 提交、锁定的运行依赖包和旧版完整包。
-[OUTPUT]: 生成 Windows 完整包、增量包和含云备份回归结果的发布记录。
+[OUTPUT]: 生成 Windows 更新包和发布记录。记录云备份、更新链与工作台等验证结果。
 [POS]: 正式发布入口。验证在独立目录运行。
 [PROTOCOL]: Update this header on change, then check AGENTS.md
 #>
@@ -67,6 +67,7 @@ try {
     & (Join-Path $stage 'ai-bridge/node.exe') (Join-Path $tests 'test-cloud-backup.mjs')
     if ($LASTEXITCODE -ne 0) { throw '云备份传输回归验证失败。' }
     & (Join-Path $tests 'test-release-update.ps1') -PreviousReleaseZip $previous -UpdateZip $patch
+    & (Join-Path $tests 'test-update-chain.ps1')
     & (Join-Path $desktop 'package-release.ps1') -Source $stage -Destination $full
 
     $manifestPath = Join-Path $stage 'release-manifest.json'
@@ -77,7 +78,7 @@ try {
         baseVersion = $base.version
         previousArchiveSha256 = (Get-FileHash -LiteralPath $previous).Hash.ToLowerInvariant()
         provenance = $manifest.provenance
-        checks = @('workspace', 'cloud-backup-transport', 'upgrade-and-rollback', 'package-checksums')
+        checks = @('workspace', 'cloud-backup-transport', 'upgrade-and-rollback', 'online-update-chain', 'package-checksums')
         artifacts = @(foreach ($item in $patch,$full) {
             @{ name = [IO.Path]::GetFileName($item); sha256 = (Get-FileHash -LiteralPath $item).Hash.ToLowerInvariant() }
         })
