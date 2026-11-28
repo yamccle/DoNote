@@ -65,7 +65,7 @@ internal sealed partial class WorkspaceWindow
         {
             if (type == "pdf2zh-open")
             {
-                if (pdf2zhDocumentId != null) throw new InvalidOperationException("已有整页翻译文档，请关闭后重试。");
+                if (pdf2zhDocumentId != null) ClosePdf2zhDocument();
                 var size = request.TryGetValue("size", out value) ? Convert.ToInt64(value) : 0;
                 if (size <= 0 || size > 2L * 1024 * 1024 * 1024) throw new InvalidDataException("PDF 大小无效。");
                 var root = Path.Combine(dataRoot, "PdfMathTranslate", "temp");
@@ -134,11 +134,13 @@ internal sealed partial class WorkspaceWindow
                     var offline = preference == "offline";
                     string model;
                     Dictionary<string, object> openaiConfig;
-                    var engine = ResolveDocumentTranslationEngine(preference, out model, out openaiConfig);
+                    Dictionary<string, object> apiConfig;
+                    var engine = ResolveDocumentTranslationEngine(preference, out model, out openaiConfig, out apiConfig);
                     if (bilingualPairRequestId == null) StopBilingualPairWorker();
                     var directory = pdf2zhDirectory;
                     var output = Path.Combine(directory, "page-" + Guid.NewGuid().ToString("N"));
                     var cancelFile = output + ".cancel";
+                    var glossary = request.TryGetValue("glossary", out value) ? value as System.Collections.IList : null;
                     var payload = documentTranslationJson.Serialize(CleanDocumentTranslationValue(new
                     {
                         source = pdf2zhPath,
@@ -149,7 +151,9 @@ internal sealed partial class WorkspaceWindow
                         model,
                         mode,
                         engine,
-                        openai = openaiConfig
+                        openai = openaiConfig,
+                        api = apiConfig,
+                        glossary
                     }));
                     var process = EnsureDocumentWorker(ref pdf2zhProcess, "pdfmathtranslate.py",
                         "pdfmathtranslate-dependencies", "PDFMathTranslate");
@@ -158,8 +162,10 @@ internal sealed partial class WorkspaceWindow
                     pdf2zhWorkerDirectories[process] = directory;
                     try
                     {
+                        var engineLabel = offline ? "离线快速翻译" : engine == "openai" ? "云端大模型并发翻译"
+                            : engine == "baidu" ? "百度翻译 API" : engine == "azure" ? "微软 Translator" : "本地大模型翻译";
                         PostWorkspaceMessage(web, new { type = "pdf2zh-progress", id,
-                            status = (offline ? "离线快速翻译" : engine == "openai" ? "云端大模型并发翻译" : "本地大模型翻译") + " · 第 " + start + " 页…" });
+                            status = engineLabel + " · 第 " + start + " 页…" });
                         Dictionary<string, object> result;
                         try
                         {
@@ -257,7 +263,8 @@ internal sealed partial class WorkspaceWindow
             var preference = request.TryGetValue("preference", out value) ? Convert.ToString(value) : "large";
             string model = null;
             Dictionary<string, object> openaiConfig = null;
-            var engine = translate ? ResolveDocumentTranslationEngine(preference, out model, out openaiConfig) : "gguf";
+            Dictionary<string, object> apiConfig = null;
+            var engine = translate ? ResolveDocumentTranslationEngine(preference, out model, out openaiConfig, out apiConfig) : "gguf";
             var payload = documentTranslationJson.Serialize(CleanDocumentTranslationValue(new Dictionary<string, object>
             {
                 { "blocks", blocks },
@@ -265,6 +272,8 @@ internal sealed partial class WorkspaceWindow
                 { "model", model ?? "" },
                 { "engine", engine },
                 { "openai", openaiConfig },
+                { "api", apiConfig },
+                { "glossary", request.TryGetValue("glossary", out value) ? value as System.Collections.IList : null },
                 { "source", request.TryGetValue("source", out value) ? value : "en" },
                 { "target", request.TryGetValue("target", out value) ? value : "zh" }
             }));
@@ -328,22 +337,40 @@ internal sealed partial class WorkspaceWindow
         return true;
     }
 
-    private string ResolveDocumentTranslationEngine(string preference, out string model, out Dictionary<string, object> openaiConfig)
+    private string ResolveDocumentTranslationEngine(string preference, out string model,
+        out Dictionary<string, object> openaiConfig, out Dictionary<string, object> apiConfig)
     {
         model = null;
         openaiConfig = null;
+        apiConfig = null;
         if (preference == "offline") return "offline";
         var settings = LoadTranslationSettings();
+        if (preference == "api" || preference == "baidu" || preference == "azure" ||
+            (preference == "auto" && settings != null && (settings.provider == "baidu" || settings.provider == "azure")))
+        {
+            string apiEngine;
+            apiConfig = BuildDedicatedApiWorkerConfig(settings, out apiEngine);
+            return apiEngine;
+        }
         if (preference == "openai" || (preference == "auto" && settings != null && settings.provider == "openai"))
         {
             openaiConfig = BuildOpenAiWorkerConfig(settings);
             return "openai";
         }
         model = FindLocalLlmModel(preference);
-        if (model == null && settings != null && settings.provider == "openai" && !string.IsNullOrEmpty(settings.openaiKey))
+        if (model == null && settings != null)
         {
-            openaiConfig = BuildOpenAiWorkerConfig(settings);
-            return "openai";
+            if (settings.provider == "baidu" || settings.provider == "azure")
+            {
+                string fallbackApi;
+                apiConfig = BuildDedicatedApiWorkerConfig(settings, out fallbackApi);
+                return fallbackApi;
+            }
+            if (settings.provider == "openai" && !string.IsNullOrEmpty(settings.openaiKey))
+            {
+                openaiConfig = BuildOpenAiWorkerConfig(settings);
+                return "openai";
+            }
         }
         if (model == null) throw new InvalidOperationException(LocalLlmMissingMessage(preference));
         return "gguf";

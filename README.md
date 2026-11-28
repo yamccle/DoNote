@@ -1,17 +1,17 @@
 # DoNote · 本地优先的知识精读与课题研究工作台
 
-[![Latest Release](https://img.shields.io/badge/Release-r143%20(26.1143.0089)-2e5984?style=flat-square)](https://github.com/yamccle/DoNote/releases/tag/r143)
+[![Latest Release](https://img.shields.io/badge/Release-r144%20(26.1144.0090)-2e5984?style=flat-square)](https://github.com/yamccle/DoNote/releases/tag/r144)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20x64-35639c?style=flat-square)](https://github.com/yamccle/DoNote/releases/latest)
 [![Architecture](https://img.shields.io/badge/Stack-WinForms%20%2B%20WebView2%20%2B%20Node%20%2B%20Python-28785a?style=flat-square)](#系统架构与仓库导览)
 [![Folder Sync](https://img.shields.io/badge/Sync-Cloud%20folder-6d529e?style=flat-square)](#5-云盘文件夹多端协同)
 
 **DoNote** 是一款面向跨学科文献精读、课程学习与工程/科研课题攻关的 **Windows 桌面端知识工作台**。项目最初诞生于模拟与混合信号集成电路（IC）硬核论文推导与设计问题排查场景，现已全面演进为覆盖理工科研、方法学综述与专业研发的通用研究底座。
 
-它将 **文献 PDF、课程讲义 PPT/PPTX、学术研讨视频与公开网页** 统一纳入本机自主可控的资料库，围绕 **「拖拽分拣入库 → 多模态精读与三级加速双语对照 → 公式级 AI 推导问答 → 关联课题问题与实验日志 → 原文选区双向回跳 → 云盘文件夹跨设备接力」** 这一完整研究闭环组织日常知识工作。
+它将 **文献 PDF、课程讲义 PPT/PPTX、学术研讨视频与公开网页** 统一纳入本机自主可控的资料库，围绕 **「拖拽分拣入库 → 多模态精读与多引擎加速双语对照 → 公式级 AI 推导问答 → 关联课题问题与实验日志 → 原文选区双向回跳 → 云盘文件夹跨设备接力」** 这一完整研究闭环组织日常知识工作。
 
 - **本地优先**。记录、原始附件和阅读进度默认保存在本机。支持离线 OCR、全文检索、本地语音识别和本地/云端加速翻译。程序安装、覆盖升级与默认卸载均完整保留用户资料与本地模型。
 - **云盘文件夹多端协同**。两台电脑选择同一个云盘同步文件夹，就能对齐资料目录。附件在打开时读取并核对 SHA-256。
-- **当前正式版**为 **[r143 · 26.1143.0089](https://github.com/yamccle/DoNote/releases/tag/r143)**。该版本新增 **「用户级安装向导 `.exe` + 便携绿色 `.zip` 双轨分发」** 与 **「文献大模型翻译三级加速（轻模型级联与多段打包批译、可选 Vulkan GPU 加速、OpenAI 兼容并发 API）」**。构建源码见 [r143 标签](https://github.com/yamccle/DoNote/tree/r143)。
+- **当前正式版**为 **[r144 · 26.1144.0090](https://github.com/yamccle/DoNote/releases/tag/r144)**。该版本完成 **「专用翻译服务与 AI 大模型服务商中心正交解耦」**（一次填大模型 Key 按 PDF 问答 / 视频视觉 / 字幕精译分配模型；百度翻译标准/高级 QPS 档位与微软 Translator 全线打通划词、整页保公式对照与智能排版批译）、**「学科专业术语表全模式自动对齐」** 以及 **「零构建侵入四重静态门禁与重型阅读模块解耦」**。构建源码见 [r144 标签](https://github.com/yamccle/DoNote/tree/r144)。
 
 ---
 
@@ -33,11 +33,11 @@
 | --- | --- |
 | **总览与组织架构** | 低饱和莫兰迪四色继续阅读进度环（PDF / 视频 / PPT / 网页）、行动导向动态计数（仅统计**进行中计划 / 剩余未解决问题 / 近 7 天新增文献**）、每日打开即留痕活跃图、全栏目常驻 `快捷指令 Ctrl+K` 聚光灯检索、问题与计划多列拖拽看板。 |
 | **批量入库与治理** | 篮板式全局拖拽投递浮层与「投递归档分拣台」（一键清洗论文文件名冗余前后缀、即时建多级目录树、套用标签）、严格 `60px` 等高目录卡片、文献库默认按「最近打开 ↓」排序、研究方向自动拦截日期/课件文件名污染并支持一键无损收纳杂项。 |
-| **PDF 深度精读** | 多标签并行阅读、`1 GB+` 超长文档按区间流式读取、选中即翻与专业双语术语胶囊、MinerU 智能单栏重排与段落双语对照、PDFMathTranslate 整页公式保护对照（支持轻模型级联路由、GGUF 多段打包批译、可选 Vulkan GPU 加速与 OpenAI 兼容并发 API）、扫描页框选离线 OCR 直入全文检索、六色紧凑批注与图表框选摘录、**「被引用 N」角标与双向选区回跳**、流式 KaTeX 公式 AI 问答。 |
+| **PDF 深度精读** | 多标签并行阅读、`1 GB+` 超长文档按区间流式读取、选中即翻与全模式直通的学科双语术语词库、MinerU 智能单栏重排与段落双语对照、PDFMathTranslate 整页公式保护对照（全面支持百度翻译 QPS 自适应与 `action=1` 词库、微软 Translator 批量接口、OpenAI 兼容并发大模型、以及轻模型级联 + GGUF 流式批译 + 可选 Vulkan GPU 加速）、扫描页框选离线 OCR 直入全文检索、六色紧凑批注与图表框选摘录、**「被引用 N」角标与双向选区回跳**、流式 KaTeX 公式 AI 问答。 |
 | **视频多模态学习** | 本地 `faster-whisper` 分段语音识别、「识别时同步离线翻译」边看边出双语字幕、画面原生双语字幕轨与可编辑时间轴、框选画面定格批注，以及 **「✦ AI 助教问答」多模态面板**（自动截取当前视频帧 + 附近/全片字幕上下文、KaTeX 公式推导、点击 `[MM:SS]` 时间码一键跳播与沉淀笔记）。 |
 | **PPT 讲义与网页收藏** | PPT / PPTX 胶片导航、网格总览、沉浸放映、原片讲义自动提取、逐页批注保存及一键导出双栏图文复习讲义（`.html` / `.md`）；单进程 8 路并发防 SSRF 极速收藏公开网页（支持极速纯正文模式）与原文摘录高亮回跳。 |
 | **多端协同** | 通过 Google Drive 桌面版、坚果云或 Nextcloud 同步文件夹对齐目录。按内容指纹保存附件，打开时读取和校验。 |
-| **外部 AI 与任务中心** | 内置 AI Bridge 与 **MCP（Model Context Protocol）** 授权网关（8 项细粒度读写权限，撤销凭证即刻彻底清除）；顶栏与全屏阅读器浮标统一汇总更新下载、语音识别、离线翻译、备份恢复、网页抓取与同步进度。 |
+| **AI 枢纽与任务中心** | **「AI 大模型服务商中心」**（一次加密保存 DeepSeek / 通义千问 / OpenAI / Ollama 密钥，按 PDF 问答、视频视觉、字幕精译独立分配模型，翻译服务亦可一键复用密钥）与独立 **「翻译服务设置」** 正交分离；内置 **MCP（Model Context Protocol）** 授权网关（8 项细粒度读写权限）；顶栏与阅读器浮标统一汇总更新、识别、翻译、备份与同步进度。 |
 | **系统体验与典藏** | 四栏自适应偏好设置中心（`外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统`）、启动静默检查和一次确认的多步在线更新、十张里程碑卡牌「成就殿宇」（第 01 卡致敬模拟 IC 初心，支持在设置中自由隐藏）。 |
 
 ---
@@ -175,11 +175,13 @@
 | 均衡 · `large-v3-turbo` | `models\asr\large-v3-turbo` | [hf-mirror · turbo](https://hf-mirror.com/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf) | [HF · turbo](https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf) | 1,617,884,929 字节<br>`e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da` |
 | 高准确 · `large-v3` | `models\asr\large-v3` | [hf-mirror · large-v3](https://hf-mirror.com/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478) | [HF · large-v3](https://huggingface.co/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478) | 3,087,284,237 字节<br>`69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1` |
 
-### 2. 文献翻译三级加速：离线 GGUF、可选 Vulkan GPU 与云端并发 API
+### 2. 多引擎文献翻译加速与 AI 大模型服务商中心
 
-- **自动级联与流式多段批译（开箱即用）**：使用本地 `Qwen3` GGUF 翻译论文时，极短标题标签自动分流至内置 `opus-mt-en-zh` 瞬时直译，正文与公式段采用 `@@id@@` 零开销流式打包批译，退出对照后自动在后台完成 `±5` 页预缓存。
-- **可选 Vulkan GPU 加速**：可在 DoNote 安装目录执行 `pwsh -File .\tools\enable-vulkan-gpu.ps1 -InstallDir <你的安装目录>` 安装独立的 `vulkan-dependencies` 加速层（支持 AMD / NVIDIA / Intel 核显与独显；传入 `-Disable` 可一键回退 CPU）。
-- **云端大模型并发 API（1–3 秒整页）**：在「设置 → AI 与翻译 → 翻译服务」选择「云端大模型（OpenAI 兼容 · 并发极速）」，配置 DeepSeek、通义千问、OpenAI 或本地 Ollama 接口与并发数（1–16），支持一键连接测速、DPAPI 密钥加密持久化及划词/整页对照/智能排版跨视图即时热切换。
+- **专用翻译服务与大模型中心正交解耦**：
+  - **独立「翻译服务设置」**：支持 **百度翻译 API**（区分标准版 `QPS=1` 自动节流与高级/尊享版 `QPS=10` 多批极速并发，可选开启百度控制台 `action=1` 云端术语库）、**微软 Azure Translator**（整页多段单次请求批译）、**AI 大模型并发翻译**（可一键复用大模型中心已存密钥，无需二次填 Key）、**本地离线 Qwen3 GGUF** 与 **MyMemory 免费在线**，全面覆盖 PDF 选中即翻、整页保公式对照与智能排版双语翻译。
+  - **统一「AI 大模型服务商中心」**：一次加密保存 DeepSeek、通义千问、硅基流动、OpenAI、Kimi 或本机 Ollama 凭证，按 **PDF 文献问答 · 视频与截图多模态视觉 · 字幕大模型精译** 独立指定服务商与模型名。
+  - **学科「专业术语词库」全模式自动对齐**：右侧栏自定义双语术语保存后，大模型翻译自动注入术语提示词，百度/微软/免费机器翻译自动在保护 `{v0}` 与 `$...$` 公式的前提下按整词边界预对齐专业译名。
+- **本地 GGUF 级联批译与可选 Vulkan GPU 加速**：使用本地 `Qwen3` GGUF 翻译论文时，极短标题标签自动分流至内置 `opus-mt-en-zh` 瞬时直译，正文与公式段采用 `@@id@@` 零开销流式打包批译，退出对照后自动在后台完成 `±5` 页预缓存；亦可在安装目录执行 `pwsh -File .\tools\enable-vulkan-gpu.ps1 -InstallDir <你的安装目录>` 启用 AMD / NVIDIA / Intel GPU 加速（传入 `-Disable` 一键回退 CPU）。
 
 安装包已内置 `llama.cpp` 推理后端，下载任一 GGUF 权重按「保存目标文件名」放入 `models\translation\`（注意从 `bartowski` 下载 4B / 1.7B 时去掉文件名前缀 `Qwen_`），在「偏好设置 → AI 与翻译」将翻译源切换为「本地大模型」即可离线使用：
 
@@ -208,18 +210,19 @@ DoNote/
 
 ### 从源码构建与发布校验
 
-重建该版本请先检出 `r143` 标签。构建环境需准备 Windows x64、PowerShell 7、.NET Framework 4.x `csc.exe`、Node.js（≥ 22）、Git、Microsoft Edge Stable 与 Playwright，并放置 [docs/releases/runtime-lock.json](docs/releases/runtime-lock.json) 锁定的 `r122` 运行依赖归档：
+重建该版本请先检出 `r144` 标签。构建环境需准备 Windows x64、PowerShell 7、.NET Framework 4.x `csc.exe`、Node.js（≥ 22）、Git、Microsoft Edge Stable 与 Playwright，并放置 [docs/releases/runtime-lock.json](docs/releases/runtime-lock.json) 锁定的 `r122` 运行依赖归档：
 
 ```powershell
-# 验证工作台、更新链、安装向导及文献翻译加速
+# 验证四重静态门禁（<=800行 / 跨文件词法冲突 / ESLint no-undef / TypeScript allowJs）、工作台、更新链、安装向导及翻译加速
+node tools/tests/test-static-gate.mjs
 node tools/tests/test-workspace.mjs <候选构建目录>/workspace
 pwsh -File tools/tests/test-update-chain.ps1
 pwsh -File tools/tests/test-setup-installer.ps1
 
-# 已有锁定的运行依赖和本地 r142 完整包时，可重建 r143（同步产出安装向导 .exe + 便携 .zip + 增量包 + SHA256SUMS.txt）
-pwsh -File tools/release.ps1 -Revision r143 -Version 26.1143.0089 `
+# 已有锁定的运行依赖和本地 r143 完整包时，可重建 r144（同步产出安装向导 .exe + 便携 .zip + 增量包 + SHA256SUMS.txt）
+pwsh -File tools/release.ps1 -Revision r144 -Version 26.1144.0090 `
   -RuntimeArchive .\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip `
-  -PreviousReleaseZip .\outputs\r142\DoNote-Windows-x64-r142.zip `
+  -PreviousReleaseZip .\outputs\r143\DoNote-Windows-x64-r143.zip `
   -OutputDirectory .\outputs
 ```
 

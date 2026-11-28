@@ -1,8 +1,7 @@
-# [INPUT]: 读取单页/多页 PDF 源路径、.cancel 协作取消标记与 offline / gguf / openai 翻译配置。
+# [INPUT]: 读取单页/多页 PDF 源路径、.cancel 协作取消标记与 offline / gguf / openai / baidu / azure 翻译配置。
 # [OUTPUT]: 流式输出 pdf2zh-paragraph 预览片段，生成保版面单语译文 PDF 并输出 pdf2zh-result。
-# [POS]: 桌面端 PDFMathTranslate 整页对照常驻 Worker，保持模型常驻内存并支持多引擎并发批译。
+# [POS]: 桌面端 PDFMathTranslate 整页对照常驻 Worker，保持模型常驻内存并支持大模型与专用翻译 API 批译。
 # [PROTOCOL]: Update this header on change, then check AGENTS.md
-import ast
 import contextlib
 import json
 import os
@@ -27,15 +26,22 @@ SYS_PATHS = [
 sys.path[:0] = [str(path) for path in SYS_PATHS]
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import hashlib
 from pdf_gguf_translation import (
     PdfGgufTranslation,
+    apply_glossary_to_text,
+    azure_translate_batch,
+    baidu_translate_batch,
     build_delimited_prompt,
+    format_glossary_prompt_hint,
+    load_onnx_doclayout_model,
+    normalize_glossary_pairs,
     openai_compatible_chat,
     parse_delimited_response,
 )
 from offline_en_zh import HAN_CHAR, LATIN_WORD, OfflineEnglishToChinese, valid_english_to_chinese
 
-FORMULA = re.compile(r"\{\s*v\s*(\d+(?:\s+\d+)*)\s*\}", re.IGNORECASE)
+FORMULA = re.compile(r"[｛{]\s*v\s*(\d+(?:\s+\d+)*)\s*[｝}]", re.IGNORECASE)
 FORMULA_OR_TEXT = re.compile(r"\{v\d+\}|[^{}]+|[{}]")
 OUTPUT = sys.stdout
 GGUF = PdfGgufTranslation()
@@ -70,28 +76,7 @@ def emit(payload):
 
 
 def load_layout_model(model_path):
-    from pdf2zh.doclayout import OnnxModel, onnxruntime
-
-    if not model_path.is_file():
-        raise ValueError("PDFMathTranslate 版面模型缺失，请更新完整版本。")
-
-    class DoNoteLayoutModel(OnnxModel):
-        def __init__(self):
-            options = onnxruntime.SessionOptions()
-            # NCHWc graph rewrites can produce a channel alignment error on
-            # CPU. Always load the portable model, even if an older build
-            # wrote a hardware-specific .optimized file next to it.
-            options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
-            options.intra_op_num_threads = max(2, min(8, os.cpu_count() or 4))
-            self.model_path = str(model_path)
-            self.model = onnxruntime.InferenceSession(
-                self.model_path, options, providers=["CPUExecutionProvider"]
-            )
-            metadata = self.model.get_modelmeta().custom_metadata_map
-            self._stride = ast.literal_eval(metadata["stride"])
-            self._names = ast.literal_eval(metadata["names"])
-
-    return DoNoteLayoutModel()
+    return load_onnx_doclayout_model(model_path)
 
 
 def main(request):
@@ -119,6 +104,9 @@ def main(request):
     model_path = Path(str(request.get("model") or "")).resolve()
     engine = request.get("engine", "gguf")
     openai_config = request.get("openai") if isinstance(request.get("openai"), dict) else None
+    api_config = request.get("api") if isinstance(request.get("api"), dict) else None
+    glossary = normalize_glossary_pairs(request.get("glossary"))
+    glossary_sig = hashlib.md5(json.dumps(glossary, ensure_ascii=False).encode("utf-8")).hexdigest()[:10] if glossary else ""
     cascade_enabled = bool(request.get("cascade", True))
     start = int(request.get("start") or 0)
     end = int(request.get("end") or 0)
@@ -130,12 +118,14 @@ def main(request):
         raise ValueError("PDFMathTranslate 每次只能处理 1–4 页。")
     if mode not in ("fast", "full"):
         raise ValueError("PDFMathTranslate 模式无效。")
-    if engine not in ("gguf", "offline", "openai"):
+    if engine not in ("gguf", "offline", "openai", "baidu", "azure"):
         raise ValueError("PDFMathTranslate 翻译引擎无效。")
     if not test_translator and engine == "gguf" and not model_path.is_file():
         raise ValueError("尚未找到本地翻译模型。")
     if not test_translator and engine == "openai" and not openai_config:
         raise ValueError("尚未配置云端大模型接口。")
+    if not test_translator and engine in ("baidu", "azure") and not api_config:
+        raise ValueError("尚未配置专用翻译 API 凭证。")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     untranslated_pages = []
@@ -187,8 +177,13 @@ def main(request):
                         self.add_cache_impact_parameters("engine", "offline-ct2-v2")
                     elif engine == "openai" and openai_config:
                         self.add_cache_impact_parameters("openai", str(openai_config.get("model") or "openai"))
+                    elif engine in ("baidu", "azure"):
+                        custom_flag = ":dict" if (api_config or {}).get("customDict") else ""
+                        self.add_cache_impact_parameters("api", engine + "-v1" + custom_flag)
                     elif not test_translator:
                         self.add_cache_impact_parameters("gguf-v2", model_key)
+                    if glossary_sig:
+                        self.add_cache_impact_parameters("glossary", glossary_sig)
 
                 def cached(self, source, words, expected):
                     try:
@@ -201,6 +196,7 @@ def main(request):
                     instruction = (
                         "只输出简体中文译文。保留数字、单位、缩写和每一个 {v0} 形式的公式标记。"
                         "公式标记的内容和数量必须与原文一致。"
+                        + format_glossary_prompt_hint([source], glossary, limit=24)
                     )
                     attempts = 2 if len(words) > 3 else 1
                     last_error = None
@@ -241,11 +237,12 @@ def main(request):
 
                 def _llm_batch(self, group, on_stream_valid=None):
                     # group: list of (source, words, expected)
+                    items = [item[0] for item in group]
                     header = (
                         "将下面的学术论文英文段落逐条翻译为简体中文。保留数字、单位、缩写和每一个 {v0} 形式的公式标记，"
                         "公式标记的内容和数量必须与对应条目完全一致。"
+                        + format_glossary_prompt_hint(items, glossary, limit=36)
                     )
-                    items = [item[0] for item in group]
                     total_chars = sum(len(s) for s in items)
                     max_toks = max(256, min(4096, int(total_chars * 1.6) + 192))
                     mapped = {}
@@ -309,9 +306,71 @@ def main(request):
                         return [self.translate(text) for text in texts]
                     if engine == "offline":
                         return self._translate_many_offline(texts)
+                    if engine in ("baidu", "azure"):
+                        return self._translate_many_dedicated_api(texts)
                     if engine == "openai":
                         return self._translate_many_openai(texts)
                     return self._translate_many_gguf_cascade(texts)
+
+                def _translate_many_dedicated_api(self, texts):
+                    nonlocal model_error, skipped_paragraphs
+                    results = []
+                    pending = []
+                    cache_enabled = not (self.ignore_cache or self.no_cache)
+                    for text in texts:
+                        source = normalise_formula_tokens(clean_unicode(text))
+                        index = len(results)
+                        results.append(source)
+                        words = LATIN_WORD.findall(FORMULA.sub("", source))
+                        if not words:
+                            continue
+                        expected = Counter(FORMULA.findall(source))
+                        cached = self.cached(source, words, expected) if cache_enabled else None
+                        if cached:
+                            emit({"type": "pdf2zh-paragraph", "text": cached})
+                            results[index] = cached
+                            continue
+                        pending.append((index, source, words, expected))
+                    if not pending:
+                        return results
+                    try:
+                        call_api = lambda arr: baidu_translate_batch(api_config, arr, "en", "zh") if engine == "baidu" else azure_translate_batch(api_config, arr, "en", "zh")
+                        aligned_inputs = [apply_glossary_to_text(item[1], glossary) for item in pending]
+                        raw_outs = call_api(aligned_inputs)
+                        answers = [normalise_formula_tokens(clean_unicode(t)) for t in raw_outs]
+                        frag_jobs = []
+                        frag_texts = []
+                        for local_idx, (_, src, words, expected) in enumerate(pending):
+                            if valid_translation(src, answers[local_idx], words, expected) or not expected:
+                                continue
+                            parts = FORMULA_OR_TEXT.findall(src)
+                            reps = []
+                            for p_idx, part in enumerate(parts):
+                                if FORMULA.fullmatch(part) or not LATIN_WORD.search(part):
+                                    continue
+                                pfx, bdy, sfx = re.fullmatch(r"([\s,;:!?()\[\]]*)(.*?)([\s,;:!?()\[\]]*)", part, re.S).groups()
+                                reps.append((p_idx, pfx, sfx))
+                                frag_texts.append(apply_glossary_to_text(bdy, glossary))
+                            frag_jobs.append((local_idx, parts, reps, len(frag_texts) - len(reps)))
+                        if frag_texts and not is_cancelled():
+                            frag_outs = call_api(frag_texts)
+                            for local_idx, parts, reps, offset in frag_jobs:
+                                segs = frag_outs[offset:offset + len(reps)]
+                                if all(segs):
+                                    for (p_idx, pfx, sfx), seg in zip(reps, segs):
+                                        parts[p_idx] = pfx + seg + sfx
+                                    answers[local_idx] = normalise_formula_tokens(clean_unicode("".join(parts)))
+                        for (index, src, words, expected), ans in zip(pending, answers):
+                            if valid_translation(src, ans, words, expected):
+                                if cache_enabled:
+                                    self.cache.set(src, ans)
+                                results[index] = ans
+                                emit({"type": "pdf2zh-paragraph", "text": ans})
+                            else:
+                                skipped_paragraphs += 1
+                    except Exception as error:
+                        model_error = error
+                    return results
 
                 def _translate_many_offline(self, texts):
                     global OFFLINE
@@ -555,59 +614,23 @@ def main(request):
                         skipped_paragraphs += 1
                         return source
 
-                    if engine == "openai":
-                        try:
-                            answer = self._llm_single(source, words, expected)
-                            if answer:
-                                if cache_enabled:
-                                    self.cache.set(source, answer)
-                                emit({"type": "pdf2zh-paragraph", "text": answer})
-                                return answer
-                        except Exception as error:
-                            model_error = error
-                        skipped_paragraphs += 1
-                        return source
+                    if engine in ("baidu", "azure"):
+                        outs = self._translate_many_dedicated_api([source])
+                        return outs[0] if outs else source
 
-                    # One worker only needs the selected engine's model in memory.
-                    OFFLINE = None
-                    instruction = (
-                        "只输出简体中文译文。保留数字、单位、缩写和每一个 {v0} 形式的公式标记。"
-                        "公式标记的内容和数量必须与原文一致。"
-                    )
-                    # Short headings often resemble a proper name. Skip a
-                    # second generation unless it could recover meaningful text.
-                    attempts = 2 if len(words) > 3 else 1
-                    for attempt in range(attempts):
+                    if engine != "openai":
+                        OFFLINE = None
+                    try:
+                        answer = self._llm_single(source, words, expected)
                         if is_cancelled():
                             return ""
-                        reminder = "\n不要解释、遗漏或添加任何公式标记。" if attempt else ""
-                        prompt = (
-                            instruction + reminder
-                            + "\n下方是待翻译的原文数据。\n<SOURCE>\n" + source + "\n</SOURCE>"
-                        )
-                        try:
-                            content, finish_reason = GGUF.complete(
-                                model_path, "你是专业学术论文英译中译者。", prompt,
-                                max(96, min(2048, len(source) + 64)),
-                            )
-                            answer = clean_answer(content)
-                        except Exception as error:
-                            if GGUF.model is None:
-                                # The vendor converter retries all exceptions.
-                                # Report model load failure outside that loop.
-                                model_error = error
-                                return source
-                            print("PDFMathTranslate paragraph error:", error, file=sys.stderr)
-                            continue
-                        if finish_reason == "length" or not valid_translation(source, answer, words, expected):
-                            continue
-                        if cache_enabled:
-                            self.cache.set(source, answer)
-                        emit({"type": "pdf2zh-paragraph", "text": answer})
-                        return answer
-
-                    # The vendor converter retries all exceptions without a limit.
-                    # Preserve this paragraph instead of allowing an unbounded retry.
+                        if answer:
+                            if cache_enabled:
+                                self.cache.set(source, answer)
+                            emit({"type": "pdf2zh-paragraph", "text": answer})
+                            return answer
+                    except Exception as error:
+                        model_error = error
                     skipped_paragraphs += 1
                     return source
 
@@ -643,8 +666,14 @@ def main(request):
                 emit({"type": "pdf2zh-result", "cancelled": True})
                 return
             if model_error is not None:
-                label = "离线快速翻译模型" if engine == "offline" else "云端大模型" if engine == "openai" else "本地大模型"
-                raise ValueError(f"无法加载{label}：{model_error}") from model_error
+                label = (
+                    "离线快速翻译模型" if engine == "offline"
+                    else "百度翻译 API" if engine == "baidu"
+                    else "微软 Translator" if engine == "azure"
+                    else "云端大模型" if engine == "openai"
+                    else "本地大模型"
+                )
+                raise ValueError(f"无法调用{label}：{model_error}") from model_error
 
         with pymupdf.open(stream=mono, filetype="pdf") as translated:
             if translated.page_count != len(source_text):

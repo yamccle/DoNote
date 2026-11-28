@@ -162,6 +162,7 @@
       if (el && window.desktopTranslation?.label) {
         el.textContent = '当前引擎：' + window.desktopTranslation.label();
       }
+      window.desktopAiHub?.ready?.().catch(() => {});
     };
     const setCaptionFields = () => {
       const value = captionValue();
@@ -229,7 +230,7 @@
 
     panel.addEventListener('click', event => {
       const button = event.target.closest('button');
-      if (!button || button.disabled || button.hasAttribute('data-settings-group') || button.id === 'desktopSettingsClose' || button.id === 'aboutVersion' || button.id === 'settingsOpenAsrFolder' || button.id === 'settingsCheckOnlineUpdate') return;
+      if (!button || button.disabled || button.hasAttribute('data-settings-group') || button.hasAttribute('data-hub-scene') || button.id === 'desktopSettingsClose' || button.id === 'aboutVersion' || button.id === 'settingsOpenAsrFolder' || button.id === 'settingsCheckOnlineUpdate') return;
       const { control, command } = button.dataset;
       if (!control && !command) return;
       if (control === 'themeToggle') {

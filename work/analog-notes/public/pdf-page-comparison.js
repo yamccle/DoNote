@@ -1,90 +1,10 @@
 /**
- * [INPUT]: 读取当前 PDF 阅读会话和 PdfMathTranslate 整页翻译。
- * [OUTPUT]: 安装原文与译文对照，并把正在翻译的文件编号交给任务中心。
- * [POS]: PDF 阅读器里的整页对照。完成后从任务中心点回这份文档。
+ * [INPUT]: 读取当前 PDF 阅读会话、pdf-compare-prefetch.js 预译调度器与 PdfMathTranslate 桥。
+ * [OUTPUT]: 提供 installPdfPageComparison，渲染原文与译文双栏虚拟滚动画布并同步阅读位置。
+ * [POS]: PDF 阅读器整页对照视图控制器，支持多档模型与版面模式即时热切换。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 'use strict';
-
-let activeCompareBgJob = null;
-
-function windowPagesAround(center, maxPage, radius = 5) {
-  const pages = [center];
-  for (let delta = 1; delta <= radius; delta++) {
-    if (center + delta <= maxPage) pages.push(center + delta);
-    if (center - delta >= 1) pages.push(center - delta);
-  }
-  return pages;
-}
-
-async function stopCompareBgJob() {
-  const job = activeCompareBgJob;
-  if (!job) return;
-  activeCompareBgJob = null;
-  job.abort();
-  await job.done.catch(() => {});
-}
-
-function startCompareBgPrefetch({exitPage, total, translation, opening, blob, docController, fileId, fileName, profileId, fingerprint}) {
-  const pages = windowPagesAround(exitPage, total, 5);
-  const minP = Math.min(...pages), maxP = Math.max(...pages);
-  const taskId = 'pdf2zh:doc:' + (fileId || fingerprint);
-  const title = fileName ? fileName + ' · 整页翻译' : 'PDF 整页双语翻译';
-  const bgController = new AbortController();
-  let userCancelled = false;
-  const putTask = patch => window.DoNoteTasks?.upsert?.(taskId, {
-    kind: 'translate', fileId: fileId || null, profileId: profileId || null, page: exitPage, title, onCancel: null, ...patch
-  });
-  const cancel = () => {
-    userCancelled = true;
-    bgController.abort();
-    docController.abort();
-    putTask({detail: '已停止后台预译', percent: null, state: 'cancelled'});
-  };
-  const done = (async () => {
-    try {
-      let finished = 0;
-      const todo = [];
-      for (const p of pages) {
-        if (bgController.signal.aborted) return;
-        const cached = await PdfPreviewCache.get('page', translation.key(p)).catch(() => null);
-        if (cached?.blob instanceof Blob) finished++;
-        else todo.push(p);
-      }
-      if (!todo.length || bgController.signal.aborted) {
-        if (!userCancelled) putTask({detail: `第 ${minP}–${maxP} 页（±5 页）均已预缓存，点击打开文档`, percent: 100, state: 'done'});
-        return;
-      }
-      const doc = await (opening || window.PdfMathTranslate.open(blob, {signal: docController.signal}));
-      for (const p of todo) {
-        if (bgController.signal.aborted) return;
-        putTask({
-          page: p, openWhileRunning: true, onCancel: cancel, state: 'running',
-          percent: Math.round((finished / pages.length) * 100),
-          detail: `后台预译第 ${p} 页（已完成 ${finished} / ${pages.length} · 范围 ${minP}–${maxP} 页）`
-        });
-        const result = await doc.translate(p, {
-          preference: translation.preference, mode: translation.mode, silentTask: true,
-          signal: bgController.signal, source: {fileId, page: p, name: fileName}
-        });
-        if (bgController.signal.aborted) return;
-        await PdfPreviewCache.put('page', translation.key(p), result).catch(() => {});
-        finished++;
-      }
-      if (!bgController.signal.aborted && !userCancelled) {
-        putTask({detail: `已完成第 ${minP}–${maxP} 页（退出页 ±5 页）预缓存，点击打开文档`, percent: 100, state: 'done'});
-      }
-    } catch (error) {
-      if (!bgController.signal.aborted && !userCancelled) {
-        putTask({detail: '后台预译未完成：' + (error?.message || '请重试'), percent: null, state: 'error'});
-      }
-    } finally {
-      docController.abort();
-      if (activeCompareBgJob?.done === done) activeCompareBgJob = null;
-    }
-  })();
-  activeCompareBgJob = {abort: () => { bgController.abort(); docController.abort(); }, done};
-}
 
 function installPdfPageComparison(session, {button, layout, originalBar, tools, bar, leaveReflow}) {
   if (!window.PdfMathTranslate?.available) {
@@ -108,7 +28,8 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
     + '<option value="tiny">本地极速 · 0.6B</option>'
     + '<option value="compact">本地均衡 · 1.7B</option>'
     + '<option value="large">本地精译 · 4B</option>'
-    + '<option value="openai">云端大模型</option></select>'
+    + '<option value="api">专用翻译 API（百度 / 微软）</option>'
+    + '<option value="openai">AI 大模型</option></select>'
     + '<select aria-label="对照排版模式" title="极速版面跳过复杂版面检测与全量字库裁剪，速度提升数倍；公式较多时可切至公式精排">'
     + '<option value="fast">极速版面（推荐）</option>'
     + '<option value="full">公式精排</option></select>'
@@ -154,21 +75,10 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
 
   const enginePreferenceKey = 'donote.pdf.comparison.engine';
   const layoutPreferenceKey = 'donote.pdf.comparison.layout';
-
-  function createTranslation(run, choice, layoutMode = 'fast') {
-    const settings = window.desktopTranslation;
-    const mode = layoutMode === 'full' ? 'full' : 'fast';
-    const preference = choice === 'offline' ? 'offline' :
-      choice === 'openai' ? 'openai' :
-      (['tiny', 'compact', 'large'].includes(choice) ? choice : (settings?.localModelPreference?.() || 'compact'));
-    const modelKey = preference === 'offline' ? 'offline-ct2-v2' :
-      preference === 'openai' ? (settings?.modelCacheKey?.('openai') || 'openai') :
-      (settings?.modelCacheKey?.(preference) || preference);
-    return {
-      preference, mode, records: new Map(),
-      key(number) { return JSON.stringify([run.fingerprint, modelKey, 'pdf2zh-' + mode + '-v2-en-zh', number]); }
-    };
-  }
+  const createTranslation = createCompareTranslationSpec;
+  const placeholder = comparePlaceholder;
+  const showError = compareShowError;
+  const showSnippet = compareShowSnippet;
 
   function translationRecord(run, number) {
     const records = run.translation.records;
@@ -214,13 +124,6 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
       else last = middle - 1;
     }
     return first;
-  }
-
-  function placeholder(node, text) {
-    const message = document.createElement('p');
-    message.className = 'pdf-compare-message';
-    message.textContent = text;
-    node.replaceChildren(message);
   }
 
   function updateStatus(run) {
@@ -274,36 +177,6 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
         } else placeholder(node, '暂时无法显示原页。');
       });
     }
-  }
-
-  function showError(slot, message) {
-    const runtimeError = /ONNXRuntimeError|NCHWc|ReorderOutput/i.test(message);
-    if (!slot.snippets?.childElementCount) {
-      placeholder(slot.target, runtimeError
-        ? 'PDFMathTranslate 的版面分析失败，可重试。'
-        : (message && message.length <= 100 ? message : '译文暂不可用，请重试。'));
-    }
-    if (message && (runtimeError || message.length > 100)) {
-      const details = document.createElement('details');
-      details.className = 'pdf-compare-error-details';
-      const summary = document.createElement('summary');
-      summary.textContent = '错误详情';
-      const body = document.createElement('pre');
-      body.textContent = message;
-      details.append(summary, body);
-      slot.target.append(details);
-    }
-  }
-
-  function showSnippet(slot, text) {
-    if (!slot.snippets) {
-      slot.snippets = document.createElement('div');
-      slot.snippets.className = 'pdf-compare-snippets';
-      slot.target.replaceChildren(slot.snippets);
-    }
-    const paragraph = document.createElement('p');
-    paragraph.textContent = text.replace(/\{v\d+\}/gi, '［公式］');
-    slot.snippets.append(paragraph);
   }
 
   function markTranslated(run, record, result) {
@@ -382,6 +255,7 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
       const result = await document.translate(number, {
         preference: translation.preference,
         mode: translation.mode,
+        glossary: translation.glossary,
         silentTask: true,
         signal,
         source: { fileId: session.file?.id, page: number, name: session.file?.name },
@@ -663,7 +537,7 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
     } catch {}
     const comboKey = engine.value + ':' + layoutSelect.value;
     if (!run.engines.has(comboKey)) {
-      run.engines.set(comboKey, createTranslation(run, engine.value, layoutSelect.value));
+      run.engines.set(comboKey, createTranslation(run, engine.value, layoutSelect.value, session.profileId));
     }
     clearTimeout(run.timer);
     run.job?.controller.abort();
@@ -676,8 +550,14 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
   layoutSelect.onchange = switchTranslationOption;
   window.addEventListener('donote-translation-settings-change', event => {
     if (!state) return;
-    const next = event.detail?.provider === 'openai' ? 'openai' : (event.detail?.localModel || 'compact');
-    if (['offline', 'tiny', 'compact', 'large', 'openai'].includes(next)) engine.value = next;
+    const prov = event.detail?.provider;
+    const next = prov === 'openai' ? 'openai' : (prov === 'baidu' || prov === 'azure') ? 'api' : (event.detail?.localModel || 'compact');
+    if (['offline', 'tiny', 'compact', 'large', 'api', 'openai'].includes(next)) engine.value = next;
+    state.engines.clear();
+    switchTranslationOption();
+  }, {signal: session.controller.signal});
+  window.addEventListener('donote-glossary-change', () => {
+    if (!state) return;
     state.engines.clear();
     switchTranslationOption();
   }, {signal: session.controller.signal});
@@ -744,9 +624,10 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
       } catch {}
       if (choice === 'gguf') choice = window.desktopTranslation?.localModelPreference?.() || 'compact';
       const configuredProvider = window.desktopTranslation?.provider?.();
-      const defaultChoice = configuredProvider === 'openai' && window.desktopTranslation?.openaiConfigured?.() ? 'openai' :
+      const defaultChoice = (configuredProvider === 'baidu' && window.desktopTranslation?.baiduConfigured?.()) || (configuredProvider === 'azure' && window.desktopTranslation?.azureConfigured?.()) ? 'api' :
+        configuredProvider === 'openai' && window.desktopTranslation?.openaiConfigured?.() ? 'openai' :
         (window.desktopTranslation?.localConfigured?.() ? (window.desktopTranslation?.localModelPreference?.() || 'compact') : 'offline');
-      engine.value = ['offline', 'tiny', 'compact', 'large', 'openai'].includes(choice) ? choice : defaultChoice;
+      engine.value = ['offline', 'tiny', 'compact', 'large', 'api', 'openai'].includes(choice) ? choice : defaultChoice;
       layoutSelect.value = savedLayout === 'full' ? 'full' : 'fast';
       const fragment = document.createDocumentFragment();
       const rows = Array.from({length: total}, (_, index) => {
@@ -764,7 +645,7 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
         width: 0, rows, mounted: new Map(), engines: new Map(), controller: new AbortController()
       };
       const comboKey = engine.value + ':' + layoutSelect.value;
-      state.translation = createTranslation(state, engine.value, layoutSelect.value);
+      state.translation = createTranslation(state, engine.value, layoutSelect.value, session.profileId);
       state.engines.set(comboKey, state.translation);
       stack.style.setProperty('--compare-default-ratio', viewport.width / viewport.height);
       pages.style.removeProperty('--compare-last-ratio');
@@ -783,7 +664,8 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
 
   session.comparisonPosition = () => state ? position(state) : null;
   session.controller.signal.addEventListener('abort', () => {
-    stop({background: true});
+    stop({background: false});
+    void stopCompareBgJob();
     resize.disconnect();
     memo.clear();
   }, {once: true});

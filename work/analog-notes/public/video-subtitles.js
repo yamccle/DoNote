@@ -466,13 +466,13 @@ function mountVideoSubtitles(session,blob,content){
   if (!free) {
    const trigger=root.querySelector('[data-method="api"]');
    trigger.disabled=true;
-   try{config=await getAiModelConfig(job.profileId);}
+   try{config=await getAiModelConfig(job.profileId, 'subtitle');}
    catch(error){videoSubtitleJobStatus(job,error.message);return;}
    finally{trigger.disabled=!!job.kind;}
    if(signal.aborted||job.kind||job.profileId!==appState.activeId)return;
    if(!config?.model){
     videoSubtitleJobStatus(job,'请在模型设置填写 API 地址、模型名和所需密钥，保存后再翻译。');
-    void openAiModelSettings();return;
+    void openAiModelSettings('subtitle');return;
    }
    const replacement = job.cues.some(cue => cue.zh?.trim()) ? '已有中文字幕将重新翻译。' : '';
    if (!confirm('将英文字幕文本发送至你配置的 AI / API 服务。' + replacement + '继续吗？')) return;

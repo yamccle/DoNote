@@ -63,6 +63,8 @@ try {
     $setup = Join-Path $temp $setupName
 
     & (Join-Path $desktop 'build.ps1') -RuntimeArchive $runtime -Output $stage -ReleaseVersion $Version -SourceCommit $sourceCommit
+    & (Join-Path $stage 'ai-bridge/node.exe') (Join-Path $tests 'test-static-gate.mjs')
+    if ($LASTEXITCODE -ne 0) { throw '前端静态符号与体量门禁验证失败。' }
     & (Join-Path $desktop 'make-update-patch.ps1') -Baseline $baseline -Target $stage -Destination $patch -BaseVersion $base.version -ReleaseVersion $Version
     & (Join-Path $stage 'ai-bridge/node.exe') (Join-Path $tests 'test-workspace.mjs') (Join-Path $stage 'workspace')
     if ($LASTEXITCODE -ne 0) { throw '工作台回归验证失败。' }
@@ -84,7 +86,7 @@ try {
         baseVersion = $base.version
         previousArchiveSha256 = (Get-FileHash -LiteralPath $previous).Hash.ToLowerInvariant()
         provenance = $manifest.provenance
-        checks = @('workspace', 'cloud-backup-transport', 'translation-acceleration', 'upgrade-and-rollback', 'online-update-chain', 'setup-installer', 'package-checksums')
+        checks = @('static-gate', 'workspace', 'cloud-backup-transport', 'translation-acceleration', 'upgrade-and-rollback', 'online-update-chain', 'setup-installer', 'package-checksums')
         artifacts = @(foreach ($item in $patch,$full,$setup) {
             @{ name = [IO.Path]::GetFileName($item); sha256 = (Get-FileHash -LiteralPath $item).Hash.ToLowerInvariant() }
         })

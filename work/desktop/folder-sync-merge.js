@@ -4,6 +4,7 @@
  * [POS]: 云盘文件夹对齐的比较规则。不读写磁盘。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
+/* global module */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;

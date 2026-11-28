@@ -3,7 +3,7 @@
 // Translate numbered subtitle batches with context while preserving the original timing.
 async function translateVideoSubtitles(cues,{signal,onProgress=()=>{},onTranslated=()=>{},glossary='',profileId=appState?.activeId,config}={}){
  if(!Array.isArray(cues))throw new Error('字幕数据无效。');
- config??=await getAiModelConfig(profileId);
+ config??=await getAiModelConfig(profileId, 'subtitle');
  if(!config?.model)throw new Error('请先在 AI 模型设置中配置模型，字幕文本会发送到该服务。');
  const terms=typeof circuitGlossaryMatches==='function'?
   circuitGlossaryMatches(cues.map(cue=>cue.en).join(' '),profileId).map(row=>row.join(' = ')).join('\n'):'';

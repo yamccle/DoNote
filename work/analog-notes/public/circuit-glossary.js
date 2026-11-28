@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 读取当前工作台的专业术语词库与翻译面板原文。
- * [OUTPUT]: 提供 circuitGlossaryMatches、openCircuitGlossary 与 bindCircuitGlossary。
- * [POS]: 嵌入翻译双栏卡片中段，命中专业术语时展示一键插入胶囊，未命中时收敛为轻量词库入口。
+ * [OUTPUT]: 提供 circuitGlossary、circuitGlossaryMatches、circuitGlossarySignature、formatCircuitGlossaryHint、applyCircuitGlossaryPreAlign、openCircuitGlossary 与 bindCircuitGlossary。
+ * [POS]: 嵌入翻译双栏卡片中段，并为划词即翻、整页对照与智能排版提供跨引擎术语注入与预对齐。
  * [PROTOCOL]: Update this header on change, then check AGENTS.md
  */
 'use strict';
@@ -34,12 +34,39 @@ function circuitGlossary(profileId=appState.activeId){
 }
 function circuitGlossaryMatches(text,profileId){
  return circuitGlossary(profileId).filter(([english])=>new RegExp(
-  '(?<![A-Za-z0-9])'+english.replace(/[.*+?^$(){}|[\]\\]/g,'\\$&')+'(?![A-Za-z0-9])','i').test(text));
+  '(?<![A-Za-z0-9_-])'+english.replace(/[.*+?^$(){}|[\]\\]/g,'\\$&')+'(?![A-Za-z0-9_-])','i').test(text));
+}
+function circuitGlossarySignature(profileId=appState?.activeId){
+ const rows=circuitGlossary(profileId);
+ let hash=2166136261;
+ for(const [en,zh] of rows){
+  const item=en.toLowerCase()+'='+zh;
+  for(let i=0;i<item.length;i++){hash^=item.charCodeAt(i);hash=Math.imul(hash,16777619);}
+ }
+ return 'g'+(hash>>>0).toString(36);
+}
+function formatCircuitGlossaryHint(text,profileId=appState?.activeId,limit=40){
+ const matched=[...circuitGlossaryMatches(text,profileId)].sort((a,b)=>b[0].length-a[0].length).slice(0,limit);
+ return matched.length?'专业术语约束（若原文出现请严格采用指定译名）：'+matched.map(([en,zh])=>en+'='+zh).join('；')+'。':'';
+}
+function applyCircuitGlossaryPreAlign(text,profileId=appState?.activeId){
+ const raw=String(text||'');
+ if(!raw)return raw;
+ const matched=circuitGlossaryMatches(raw,profileId).filter(([en])=>en.length>=3).sort((a,b)=>b[0].length-a[0].length);
+ if(!matched.length)return raw;
+ const compiled=matched.map(([en,zh])=>[new RegExp('(?<![A-Za-z0-9_-])'+en.replace(/[.*+?^$(){}|[\]\\]/g,'\\$&')+'(?![A-Za-z0-9_-])','gi'),zh]);
+ const parts=raw.split(/(\$\$[\s\S]*?\$\$|(?<!\\)\$[^$\n]+(?<!\\)\$|`[^`\n]+`|[｛{]\s*v\s*\d+\s*[｝}])/g);
+ for(let i=0;i<parts.length;i+=2){
+  let seg=parts[i];if(!seg)continue;
+  for(const [re,zh] of compiled)seg=seg.replace(re,()=>zh);
+  parts[i]=seg;
+ }
+ return parts.join('');
 }
 function openCircuitGlossary(profileId,onSave){
  const dialog=document.createElement('dialog');
  dialog.className='circuit-glossary-dialog';
- dialog.innerHTML='<form method="dialog"><div class="modalhead"><h2>专业术语词库</h2><button type="submit" class="icon-button" value="cancel" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">可自定义本学科/本领域的双语对照词表，每行填写一组术语，外文与中文之间用等号（=）或制表符分隔。</p><textarea aria-label="术语库" rows="13" style="width:100%"></textarea><p class="form-message" role="status"></p></div><div class="modalfoot"><button type="button" class="secondary" data-default>恢复默认表</button><button type="submit" class="secondary" value="cancel">取消</button><button type="button" class="primary" data-save>保存术语</button></div></form>';
+ dialog.innerHTML='<form method="dialog"><div class="modalhead"><h2>专业术语词库</h2><button type="submit" class="icon-button" value="cancel" aria-label="关闭">✕</button></div><div class="modalbody"><p class="section-note">可自定义本学科/本领域的双语对照词表，每行填写一组术语，外文与中文之间用等号（=）或制表符分隔。保存后自动在划词即翻、整页对照与排版翻译中生效。</p><textarea aria-label="术语库" rows="13" style="width:100%"></textarea><p class="form-message" role="status"></p></div><div class="modalfoot"><button type="button" class="secondary" data-default>恢复默认表</button><button type="submit" class="secondary" value="cancel">取消</button><button type="button" class="primary" data-save>保存术语</button></div></form>';
  const input=dialog.querySelector('textarea'),status=dialog.querySelector('[role=status]');
  const fill=rows=>{input.value=rows.map(row=>row.join(' = ')).join('\n');};
  fill(circuitGlossary(profileId));
@@ -54,6 +81,7 @@ function openCircuitGlossary(profileId,onSave){
   try{localStorage.setItem(circuitGlossaryKey(profileId),JSON.stringify(rows));}
   catch(error){status.textContent='保存术语库失败。';return;}
   dialog.close();onSave();
+  window.dispatchEvent(new CustomEvent('donote-glossary-change',{detail:{profileId}}));
  };
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
  document.body.append(dialog);dialog.showModal();

@@ -25,6 +25,11 @@ export async function testPdfTranslationBridges(page) {
               type: 'translation-settings',
               provider: req.provider || 'openai',
               openaiConfigured: true,
+              baiduConfigured: req.provider === 'baidu' || Boolean(req.appId),
+              baiduId: req.appId || '20261128002724674',
+              baiduQpsMode: req.baiduQpsMode === 'pro' ? 'pro' : 'standard',
+              baiduCustomDict: req.baiduCustomDict === 'true',
+              azureConfigured: req.provider === 'azure',
               openaiBaseUrl: req.openaiBaseUrl || 'https://api.deepseek.com',
               openaiModel: req.openaiModel || 'deepseek-chat',
               openaiConcurrency: Number(req.openaiConcurrency) || 8,
@@ -80,6 +85,42 @@ export async function testPdfTranslationBridges(page) {
             untranslatedPages: [],
             skippedParagraphs: 0
           });
+        });
+        return;
+      }
+      if (message?.type === 'donote-ai-hub') {
+        queueMicrotask(() => {
+          const mockState = {
+            providers: [
+              { id: 'prov-ds', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', defaultModel: 'deepseek-chat', hasKey: true, isLocal: false, maskedKey: 'sk-ab••••cdef' },
+              { id: 'prov-qw', name: '通义千问 · 百炼', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen-vl-max', hasKey: true, isLocal: false, maskedKey: 'sk-qw••••9988' }
+            ],
+            primaryProviderId: 'prov-ds',
+            translateMode: 'cloud',
+            translateProviderId: '',
+            translateModel: '',
+            translateConcurrency: 8,
+            localModel: 'large',
+            reader: { providerId: '', model: 'deepseek-reasoner' },
+            vision: { providerId: 'prov-qw', model: 'qwen-vl-max' },
+            subtitle: { providerId: '', model: '' },
+            summaries: {
+              translate: 'DeepSeek · deepseek-chat',
+              reader: 'DeepSeek · deepseek-reasoner',
+              vision: '通义千问 · 百炼 · qwen-vl-max',
+              subtitle: 'DeepSeek · deepseek-chat'
+            }
+          };
+          if (message.action === 'resolve') {
+            const map = {
+              reader: { providerId: 'prov-ds', providerName: 'DeepSeek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-reasoner', key: 'sk-secret-ds' },
+              vision: { providerId: 'prov-qw', providerName: '通义千问 · 百炼', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-vl-max', key: 'sk-secret-qw' },
+              subtitle: { providerId: 'prov-ds', providerName: 'DeepSeek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat', key: 'sk-secret-ds' }
+            };
+            window.qaRelease.post({ type: 'donote-ai-hub-result', id: message.id, config: map[message.scene] || map.reader });
+          } else {
+            window.qaRelease.post({ type: 'donote-ai-hub-result', id: message.id, state: mockState, message: '✓ 连接正常（0.3s · deepseek-chat）' });
+          }
         });
         return;
       }
@@ -142,10 +183,47 @@ export async function testPdfTranslationBridges(page) {
       const keyLabel = document.getElementById('translationKeyLabelText')?.textContent || '';
       document.getElementById('translationSettings')?.close();
 
+      await window.desktopAiHub.open('vision');
+      const hubCardCount = document.querySelectorAll('#aiHubProviderList .ai-hub-provider-card').length;
+      const hubCardText = document.getElementById('aiHubProviderList')?.innerText || '';
+      const hubHasLegacyTranslateSelect = Boolean(document.getElementById('aiHubTranslateMode'));
+      document.getElementById('aiProviderHubDialog')?.close();
+
+      await window.desktopTranslation.request({
+        action: 'save',
+        provider: 'baidu',
+        appId: '20261128002724674',
+        baiduQpsMode: 'pro',
+        baiduCustomDict: 'true',
+        key: 'baidu-test-key'
+      });
+      const baiduProviderAfterSave = window.desktopTranslation.provider();
+      const baiduQpsAfterSave = window.desktopTranslation.baiduQpsMode();
+      const baiduCacheKey = window.desktopTranslation.modelCacheKey('api');
+      const baiduOnlineText = await translatePdfOnline('Low phase noise in phase-locked loop with $x_0$', 'en', 'zh', new AbortController().signal, () => {}, 'ctx', 'baidu');
+      await window.desktopTranslation.request({
+        action: 'save',
+        provider: 'openai',
+        openaiBaseUrl: 'https://api.deepseek.com',
+        openaiModel: 'deepseek-chat',
+        openaiConcurrency: '8',
+        key: 'sk-test'
+      });
+
+      const resolvedReader = await getAiModelConfig('prof-hub-test', 'reader');
+      const resolvedVision = await getAiModelConfig('prof-hub-test', 'vision');
+      const normEndpoint1 = aiEndpoint('https://api.deepseek.com');
+      const normEndpoint2 = aiEndpoint('https://dashscope.aliyuncs.com/compatible-mode/v1');
+
       return {
         provider: window.desktopTranslation.provider(),
         openaiConfigured: window.desktopTranslation.openaiConfigured(),
         cacheKey: window.desktopTranslation.modelCacheKey('openai'),
+        baiduProviderAfterSave,
+        baiduQpsAfterSave,
+        baiduCacheKey,
+        baiduOnlineText,
+        hubHasLegacyTranslateSelect,
         blobSize: pageOut.blob.size,
         expectedSize: outBytes.byteLength,
         progresses,
@@ -157,6 +235,12 @@ export async function testPdfTranslationBridges(page) {
         testConnMsg,
         keyPlaceholder,
         keyLabel,
+        hubCardCount,
+        hubCardText,
+        resolvedReaderModel: resolvedReader?.model,
+        resolvedVisionModel: resolvedVision?.model,
+        normEndpoint1,
+        normEndpoint2,
         pdf2zhTaskCount: pdf2zhTasks.length,
         pdf2zhTaskPage: pdf2zhTasks[0]?.page,
         pdf2zhTaskState: pdf2zhTasks[0]?.state
@@ -179,6 +263,17 @@ export async function testPdfTranslationBridges(page) {
   assert.ok(result.testConnMsg.includes('连接可用'));
   assert.ok(result.keyPlaceholder.includes('密钥已保存'));
   assert.ok(result.keyLabel.includes('已加密保存'));
+  assert.equal(result.hubCardCount, 2);
+  assert.equal(result.hubHasLegacyTranslateSelect, false);
+  assert.equal(result.baiduProviderAfterSave, 'baidu');
+  assert.equal(result.baiduQpsAfterSave, 'pro');
+  assert.equal(result.baiduCacheKey, 'api:baidu:dict');
+  assert.equal(result.baiduOnlineText, '[baidu] 译：Low 相位噪声 in 锁相环 with $x_0$');
+  assert.ok(result.hubCardText.includes('sk-ab••••cdef'));
+  assert.equal(result.resolvedReaderModel, 'deepseek-reasoner');
+  assert.equal(result.resolvedVisionModel, 'qwen-vl-max');
+  assert.equal(result.normEndpoint1, 'https://api.deepseek.com/v1/chat/completions');
+  assert.equal(result.normEndpoint2, 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
   assert.equal(result.pdf2zhTaskCount, 1);
   assert.equal(result.pdf2zhTaskPage, 2);
   assert.equal(result.pdf2zhTaskState, 'done');

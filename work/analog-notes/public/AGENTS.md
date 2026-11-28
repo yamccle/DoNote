@@ -35,19 +35,19 @@
 - `pdf-research-notes.js` 把摘录与原文片段写进目标记录的 `pdfSource` / `pdfEvidence`。详情「引用资料」展示摘录预览并按页码和选区回跳原 PDF。
 - `pdf-backlinks.js` 汇总当前 PDF 被哪些记录引用，在页面右上角显示「被引用 N」角标并在侧栏「引用」页签提供反向打开与选区定位。
 - `pdf-ocr.js` 离线识别扫描页框选区域，将识别文本交给翻译/摘录侧栏并写入 `pdf-search.js` 持久化检索索引。
-- `pdf-translation.js` 以「原文 → 电路术语胶囊 → 译文」无嵌套双栏衔接选区/识字翻译（选中即翻自动跟随已保存的云端/本地翻译源，同时保留显式「本地翻译」与「在线翻译」入口）、复制译文、保存批注、存为研究笔记与追加到记录；手动校对文字时保留原页面与选区坐标。整页翻译任务按文档维度聚合单张任务卡（`pdf2zh:doc:*`）并在取消时自动清理。
-- `pdf-page-comparison.js` 在 PDF 阅读器中做原文与译文对照（支持 `0.6B / 1.7B / 4B / 快速离线 / 云端大模型` 与 `极速版面 / 公式精排` 独立切换、退出页 `±5` 页后台预译及翻译源保存热切换），并把正在翻译的文件编号交给任务中心。
+- `pdf-translation-bridges.js` 和 `pdf-translation.js` 分别承载底层 `PdfMathTranslate` / `BilingualBook` 流式分块协议桥，以及「原文 → 电路术语胶囊 → 译文」无嵌套双栏选区/识字翻译面板（选中即翻自动跟随已保存的云端/本地翻译源，同时保留显式「本地翻译」与「在线翻译」入口）、复制译文、保存批注、存为研究笔记与追加到记录。整页翻译任务按文档维度聚合单张任务卡（`pdf2zh:doc:*`）并在取消时自动清理。
+- `pdf-compare-prefetch.js` 和 `pdf-page-comparison.js` 分离整页对照的退出页 `±5` 页后台预译调度器与双栏虚拟画布视图控制器（支持 `0.6B / 1.7B / 4B / 快速离线 / 云端大模型` 与 `极速版面 / 公式精排` 独立切换及翻译源保存热切换），并把正在翻译的文件编号交给任务中心。
 - `circuit-glossary.js` 匹配跨学科与专业双语术语，在翻译双栏中段展示命中胶囊并支持一键插入译文或自定义词库。
 - `translate-lang.js` 管理翻译源语言与目标语言偏好，支持副栏一键互换语向。
-- `pdf-annotations.js`、`pdf-annotation-export.js` 和 `pdf-reflow.js` 提供紧凑批注卡片、页签计数、仅当前页过滤、渐进式批注展开、圆点换色、闪烁回跳，以及支持向上回滚预加载与任意页跳转的排版重流控制。
-- `reader-ai.js` 提供工程精读快捷提问、SSE 流式回答、Markdown + KaTeX 公式防转义排版、可点击页码胶囊回跳与沉淀笔记。
+- `pdf-annotations.js`、`pdf-annotation-export.js`、`pdf-reflow-layout.js` 和 `pdf-reflow.js` 提供紧凑批注卡片、页签计数、仅当前页过滤、渐进式批注展开、圆点换色、闪烁回跳，以及分离无状态几何分栏重排算法与向上回滚预加载/任意页跳转的智能排版双语控制器。
+- `reader-ai.js` 提供工程精读快捷提问、SSE 流式回答、Markdown + KaTeX 公式防转义排版、可点击页码胶囊回跳与沉淀笔记；支持自动衔接桌面端统一 AI 服务商中心，并在勾选「附带本页截图」时自动切换多模态视觉场景模型。
+- `video-frame-notes.js`、`video-ai.js` 和 `video-frame-notes.css` 提供视频右侧「定格批注 / AI 助教问答」双页签面板，按是否勾选当前画面自动匹配多模态/文本场景模型，支持公式渲染、`[MM:SS]` 时间码跳播与一键沉淀定格批注或研究笔记。
 - `reader-toolbar.css` 和 `reader-panels.css` 统一布局工具菜单、右侧四页签面板、双栏翻译卡、紧凑批注卡与公式级 AI 问答界面。
-- `presentation-preview.js`、`presentation-handout.js` 和 `presentation-preview.css` 提供 PPT / PPTX 资料库级工作台：胶片导航、网格总览、沉浸全屏放映、原片讲义自动提取、逐页批注防抖保存、一键导出双栏图文复习讲义 (.html / .md)、全文检索索引构建与首页封面缩略图生成。
+- `presentation-core.js`、`presentation-preview.js`、`presentation-handout.js` 和 `presentation-preview.css` 分离 PPT/PPTX 底层 SVG 解析栅格化核心与资料库级交互工作台：胶片导航、网格总览、沉浸全屏放映、原片讲义自动提取、逐页批注防抖保存、一键导出双栏图文复习讲义 (.html / .md)、全文检索索引构建与首页封面缩略图生成。
 - `pdf-search.js` 和 `workspace-search.js` 共用持久化分段页面索引，提供跨记录、PDF 正文/OCR、PPT 讲义/备注/批注与视频字幕/定格批注的全局全文检索。
 - `web-capture.js`、`web-library.js` 和 `web-reader.js` 衔接单进程并发网页抓取、极速纯正文模式与离线网页阅读；选中正文或已有标注可保存为研究笔记并经 `webSource` 回跳定位。
 - `video-subtitles.js` 同步播放位置和当前字幕。识别和离线翻译可并行。字幕任务记录状态、视频编号和所属工作台。
 - `video-subtitles.css` 提供字幕操作、任务进度和当前字幕的状态样式。
-- `video-frame-notes.js`、`video-ai.js` 和 `video-frame-notes.css` 提供视频右侧「定格批注 / AI 助教问答」双页签面板，支持当前帧视觉快照 + 双语字幕上下文多模态问答、公式渲染、`[MM:SS]` 时间码跳播与一键沉淀定格批注或研究笔记。
 - `video-player-learning.js` 在学习控制栏保留字幕显示开关。
 - `topic-curation.js` 拦截日期串、附件文件名与组会周报标签污染研究方向，并在「管理研究方向」弹窗提供搜索分类筛选、一键无损收纳杂项（保留原记录标签）与空方向清理。
 - `achievement-cards.js` 记录每日打开/使用活跃足迹与专注分钟数 (`DoNoteUsage`)，驱动成就殿宇 10 张里程碑卡牌、3D 翻面预览及设置页显隐开关 (`isEnabled` / `setEnabled`)。

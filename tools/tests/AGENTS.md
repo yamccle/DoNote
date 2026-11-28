@@ -2,6 +2,7 @@
 
 > L2 | 项目规则来自根目录 AGENTS.md。
 
+- `test-static-gate.mjs` 零构建侵入前置静态门禁：校验 `work/` 全量自研文件 `≤ 800` 行红线、跨经典脚本顶层 `let/const/class` 重名冲突、`ESLint 9`（`no-undef` / `no-const-assign` / `no-dupe-keys` 等）AST 规则，以及 `TypeScript --allowJs` 语法与绑定诊断（内置未声明符号金丝雀自检）。
 - `test-release-update.ps1` 调用桌面更新器，验证真实版本替换和中断回退。
 - `test-update-chain.ps1` 编译 `UpdateChainProbe.cs`。验证最小下载路径、缺包桥接和多步回退。
 - `test-setup-installer.ps1` 调用 `make-installer.ps1`，在隔离目录与测试注册表键下验证安装器自检、全新用户级安装、覆盖升级保留 `Data`/`models`、安全卸载保留资料与完全卸载清理。

@@ -324,6 +324,7 @@ internal sealed partial class WorkspaceWindow : Form
             if (await HandleCloudBackupMessage(web, objectMessage)) return;
             if (await HandleOnlineUpdateMessage(web, objectMessage)) return;
             if (HandleLargeBackupMessage(web, objectMessage)) return;
+            if (await HandleAiHubMessage(web, objectMessage)) return;
             if (HandleAiModelMessage(web, args.WebMessageAsJson)) return;
             if (await HandleAiCredentialMessage(web, args.WebMessageAsJson)) return;
             await HandleWebCapture(web, args.WebMessageAsJson);

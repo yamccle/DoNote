@@ -112,9 +112,9 @@ $index = Join-Path $assets 'index.html'
 $settings = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'desktop-settings.html')).Replace('{{DONOTE_VERSION}}',$ReleaseVersion)
 $html = [IO.File]::ReadAllText($index)
 $html = $html.Insert($html.IndexOf('</head>', [StringComparison]::Ordinal), '<link rel="stylesheet" href="startup-splash.css"><link rel="stylesheet" href="desktop-settings.css">')
-$html = $html.Insert($html.LastIndexOf('</body>', [StringComparison]::Ordinal), $settings + '<script src="startup-wordmark.js"></script><script src="startup-splash.js"></script><script src="desktop-settings.js"></script><script src="desktop-translation.js"></script><script src="desktop-large-backup.js"></script><script src="desktop-cloud-backup.js"></script><script src="folder-sync-merge.js"></script><script src="folder-sync.js"></script>')
+$html = $html.Insert($html.LastIndexOf('</body>', [StringComparison]::Ordinal), $settings + '<script src="startup-wordmark.js"></script><script src="startup-splash.js"></script><script src="desktop-settings.js"></script><script src="desktop-translation.js"></script><script src="desktop-ai-hub.js"></script><script src="desktop-large-backup.js"></script><script src="desktop-cloud-backup.js"></script><script src="folder-sync-merge.js"></script><script src="folder-sync.js"></script>')
 [IO.File]::WriteAllText($index, $html)
-foreach ($file in 'startup-splash.css','startup-wordmark.js','startup-splash.js','desktop-settings.css','desktop-settings.js','desktop-translation.js','desktop-large-backup.js','desktop-cloud-backup.js','folder-sync-merge.js','folder-sync.js') {
+foreach ($file in 'startup-splash.css','startup-wordmark.js','startup-splash.js','desktop-settings.css','desktop-settings.js','desktop-translation.js','desktop-ai-hub.js','desktop-large-backup.js','desktop-cloud-backup.js','folder-sync-merge.js','folder-sync.js') {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $assets
 }
 Copy-Item -LiteralPath (Join-Path $project 'public/NotoSansSC-OFL.txt') -Destination $legal

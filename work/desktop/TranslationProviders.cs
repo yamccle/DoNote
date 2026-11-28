@@ -40,6 +40,8 @@ internal sealed partial class WorkspaceWindow
         public string provider { get; set; }
         public string baiduId { get; set; }
         public string baiduSecret { get; set; }
+        public string baiduQpsMode { get; set; }
+        public bool baiduCustomDict { get; set; }
         public string azureKey { get; set; }
         public string azureRegion { get; set; }
         public string localModel { get; set; }
@@ -58,6 +60,16 @@ internal sealed partial class WorkspaceWindow
     }
 
     private TranslationSettings LoadTranslationSettings(out bool recovered)
+    {
+        if (!File.Exists(TranslationSettingsPath) && File.Exists(AiHubSettingsPath))
+        {
+            recovered = false;
+            return BuildTranslationSettingsFromHub(LoadAiHubSettings());
+        }
+        return LoadTranslationSettingsRaw(out recovered);
+    }
+
+    private TranslationSettings LoadTranslationSettingsRaw(out bool recovered)
     {
         recovered = false;
         if (!File.Exists(TranslationSettingsPath)) return new TranslationSettings { provider = "localai", localModel = "large" };
@@ -101,6 +113,8 @@ internal sealed partial class WorkspaceWindow
             provider = provider,
             baiduId = baseSettings.baiduId,
             baiduSecret = baseSettings.baiduSecret,
+            baiduQpsMode = string.IsNullOrEmpty(baseSettings.baiduQpsMode) ? "standard" : baseSettings.baiduQpsMode,
+            baiduCustomDict = baseSettings.baiduCustomDict,
             azureKey = baseSettings.azureKey,
             azureRegion = baseSettings.azureRegion,
             localModel = baseSettings.localModel,
@@ -125,7 +139,10 @@ internal sealed partial class WorkspaceWindow
                 throw new InvalidOperationException("请输入有效的模型名称（如 deepseek-chat）。");
             if (key.Length > 512)
                 throw new InvalidOperationException("API 密钥长度超出限制。");
+            var sameEndpoint = !string.IsNullOrEmpty(baseSettings.openaiBaseUrl) &&
+                string.Equals(NormalizeOpenAiChatUrl(baseSettings.openaiBaseUrl), NormalizeOpenAiChatUrl(baseUrl), StringComparison.OrdinalIgnoreCase);
             if (key.Length != 0) settings.openaiKey = key;
+            else if (!sameEndpoint) settings.openaiKey = parsedUri.IsLoopback ? "local" : "";
             if (string.IsNullOrEmpty(settings.openaiKey) && parsedUri.IsLoopback)
                 settings.openaiKey = "local";
             if (string.IsNullOrEmpty(settings.openaiKey))
@@ -138,8 +155,12 @@ internal sealed partial class WorkspaceWindow
         {
             var appId = ReadTranslationValue(request, "appId");
             var secret = NormalizeApiKeyInput(ReadTranslationValue(request, "key"));
+            var qpsMode = ReadTranslationValue(request, "baiduQpsMode");
+            var customDict = ReadTranslationValue(request, "baiduCustomDict");
             if (appId.Length != 0) settings.baiduId = appId;
             if (secret.Length != 0) settings.baiduSecret = secret;
+            if (qpsMode == "pro" || qpsMode == "standard") settings.baiduQpsMode = qpsMode;
+            if (customDict == "true" || customDict == "false") settings.baiduCustomDict = customDict == "true";
             if (!Regex.IsMatch(settings.baiduId ?? "", @"\A[0-9]{1,40}\z") || !ValidTranslationKey(settings.baiduSecret))
                 throw new InvalidOperationException("请输入有效的百度翻译 APP ID 和密钥。");
         }
@@ -157,11 +178,8 @@ internal sealed partial class WorkspaceWindow
         return settings;
     }
 
-    private void SaveTranslationSettings(Dictionary<string, string> request)
+    private void PersistTranslationSettingsRaw(TranslationSettings settings, bool recovered)
     {
-        bool recovered;
-        var current = LoadTranslationSettings(out recovered);
-        var settings = ApplyTranslationRequestToSettings(current, request);
         var bytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(translationJson.Serialize(settings)), null, DataProtectionScope.CurrentUser);
         var temporary = TranslationSettingsPath + ".new";
         File.WriteAllBytes(temporary, bytes);
@@ -171,6 +189,64 @@ internal sealed partial class WorkspaceWindow
             File.Replace(temporary, TranslationSettingsPath, backup);
         }
         else File.Move(temporary, TranslationSettingsPath);
+    }
+
+    private void SaveTranslationSettings(Dictionary<string, string> request)
+    {
+        bool recovered;
+        var current = LoadTranslationSettings(out recovered);
+        var settings = ApplyTranslationRequestToSettings(current, request);
+        PersistTranslationSettingsRaw(settings, recovered);
+        if (File.Exists(AiHubSettingsPath))
+        {
+            var hub = LoadAiHubSettings();
+            hub.localModel = settings.localModel;
+            hub.baiduId = settings.baiduId;
+            hub.baiduSecret = settings.baiduSecret;
+            hub.azureKey = settings.azureKey;
+            hub.azureRegion = settings.azureRegion;
+            if (settings.provider == "openai")
+            {
+                hub.translateMode = "cloud";
+                hub.translateConcurrency = settings.openaiConcurrency > 0 ? settings.openaiConcurrency : 8;
+                AiProviderEntry matched = null;
+                foreach (var p in hub.providers)
+                {
+                    if (string.Equals(NormalizeOpenAiChatUrl(p.baseUrl), NormalizeOpenAiChatUrl(settings.openaiBaseUrl), StringComparison.OrdinalIgnoreCase))
+                    {
+                        matched = p;
+                        break;
+                    }
+                }
+                if (matched != null)
+                {
+                    matched.baseUrl = settings.openaiBaseUrl;
+                    matched.apiKey = settings.openaiKey;
+                    hub.translateProviderId = matched.id;
+                    hub.translateModel = string.Equals(matched.defaultModel, settings.openaiModel, StringComparison.Ordinal) ? "" : settings.openaiModel;
+                }
+                else
+                {
+                    var added = new AiProviderEntry
+                    {
+                        id = "prov-" + Guid.NewGuid().ToString("N").Substring(0, 10),
+                        name = InferProviderDisplayName(settings.openaiBaseUrl),
+                        baseUrl = settings.openaiBaseUrl,
+                        apiKey = settings.openaiKey,
+                        defaultModel = settings.openaiModel
+                    };
+                    hub.providers.Add(added);
+                    hub.translateProviderId = added.id;
+                    hub.translateModel = "";
+                    if (string.IsNullOrEmpty(hub.primaryProviderId)) hub.primaryProviderId = added.id;
+                }
+            }
+            else
+            {
+                hub.translateMode = settings.provider;
+            }
+            PersistAiHubSettingsOnly(hub);
+        }
     }
 
     private static bool ValidTranslationKey(string value)
@@ -184,6 +260,9 @@ internal sealed partial class WorkspaceWindow
         var settings = LoadTranslationSettings(out recovered);
         PostWorkspaceMessage(web, new { type = "translation-settings", settings.provider,
             recovered,
+            baiduId = settings.baiduId ?? "",
+            baiduQpsMode = settings.baiduQpsMode == "pro" ? "pro" : "standard",
+            baiduCustomDict = settings.baiduCustomDict,
             baiduConfigured = ValidTranslationKey(settings.baiduSecret), azureConfigured = ValidTranslationKey(settings.azureKey),
             openaiConfigured = !string.IsNullOrEmpty(settings.openaiKey),
             openaiBaseUrl = string.IsNullOrEmpty(settings.openaiBaseUrl) ? "https://api.deepseek.com" : settings.openaiBaseUrl,
@@ -317,7 +396,7 @@ internal sealed partial class WorkspaceWindow
     {
         if (settings == null || string.IsNullOrWhiteSpace(settings.openaiBaseUrl) ||
             string.IsNullOrWhiteSpace(settings.openaiModel) || string.IsNullOrWhiteSpace(settings.openaiKey))
-            throw new InvalidOperationException("云端大模型设置不完整，请在「设置 → 翻译服务」中补全接口地址、模型名和密钥。");
+            throw new InvalidOperationException("云端大模型设置不完整，请在「AI 大模型服务商中心」添加并保存接口地址、模型名和密钥。");
         return new Dictionary<string, object>
         {
             { "baseUrl", settings.openaiBaseUrl },
@@ -325,6 +404,35 @@ internal sealed partial class WorkspaceWindow
             { "model", settings.openaiModel },
             { "concurrency", settings.openaiConcurrency > 0 ? settings.openaiConcurrency : 8 }
         };
+    }
+
+    private Dictionary<string, object> BuildDedicatedApiWorkerConfig(TranslationSettings settings, out string apiEngine)
+    {
+        if (settings != null && settings.provider == "baidu")
+        {
+            if (!Regex.IsMatch(settings.baiduId ?? "", @"\A[0-9]{1,40}\z") || !ValidTranslationKey(settings.baiduSecret))
+                throw new InvalidOperationException("百度翻译凭证不完整，请在「翻译服务设置」中填写有效的百度 APP ID 和密钥。");
+            apiEngine = "baidu";
+            return new Dictionary<string, object>
+            {
+                { "appId", settings.baiduId },
+                { "secret", settings.baiduSecret },
+                { "qpsMode", settings.baiduQpsMode == "pro" ? "pro" : "standard" },
+                { "customDict", settings.baiduCustomDict }
+            };
+        }
+        if (settings != null && settings.provider == "azure")
+        {
+            if (!ValidTranslationKey(settings.azureKey))
+                throw new InvalidOperationException("微软 Translator 凭证不完整，请在「翻译服务设置」中填写有效密钥。");
+            apiEngine = "azure";
+            return new Dictionary<string, object>
+            {
+                { "key", settings.azureKey },
+                { "region", settings.azureRegion ?? "" }
+            };
+        }
+        throw new InvalidOperationException("请先在「翻译服务设置」中配置百度翻译或微软 Translator API。");
     }
 
     private string FormatHttpProviderError(string provider, HttpStatusCode statusCode, string rawBody)
@@ -397,18 +505,20 @@ internal sealed partial class WorkspaceWindow
         }
         else if (settings.provider == "baidu")
         {
-            if (Encoding.UTF8.GetByteCount(text) > 1000 || !ValidTranslationKey(settings.baiduSecret))
-                throw new InvalidOperationException("请检查百度翻译凭证或缩短原文。");
+            if (Encoding.UTF8.GetByteCount(text) > 6000 || !ValidTranslationKey(settings.baiduSecret))
+                throw new InvalidOperationException("请检查百度翻译凭证或缩短单次选中文本（不超过 6000 字节）。");
             var salt = Guid.NewGuid().ToString("N");
             string sign;
             using (var md5 = MD5.Create())
                 sign = BitConverter.ToString(md5.ComputeHash(Encoding.UTF8.GetBytes(settings.baiduId + text + salt + settings.baiduSecret))).Replace("-", "").ToLowerInvariant();
-            request = new HttpRequestMessage(HttpMethod.Post, "https://fanyi-api.baidu.com/api/trans/vip/translate");
-            request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            var formFields = new Dictionary<string, string>
             {
                 {"q", text}, {"from", source == "fr" ? "fra" : source}, {"to", target},
                 {"appid", settings.baiduId}, {"salt", salt}, {"sign", sign}
-            });
+            };
+            if (settings.baiduCustomDict) formFields["action"] = "1";
+            request = new HttpRequestMessage(HttpMethod.Post, "https://fanyi-api.baidu.com/api/trans/vip/translate");
+            request.Content = new FormUrlEncodedContent(formFields);
         }
         else if (settings.provider == "azure" && ValidTranslationKey(settings.azureKey))
         {

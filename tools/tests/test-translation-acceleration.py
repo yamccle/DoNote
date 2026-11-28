@@ -121,7 +121,88 @@ def main():
         server.shutdown()
         server.server_close()
 
-    print("PASS: test-translation-acceleration (URL norm, batch JSON parse, GPU probe, OpenAI concurrent loopback)")
+    # 5. Dedicated Translation API batching checks (Baidu multi-line MD5 + 54003 retry, Azure JSON array)
+    import io
+    import urllib.parse
+    import urllib.request
+
+    orig_urlopen = urllib.request.urlopen
+    baidu_calls = []
+    azure_calls = []
+
+    class DummyResp:
+        def __init__(self, obj):
+            self._raw = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+
+        def read(self):
+            return self._raw
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_urlopen(req, timeout=25):
+        url = req.full_url
+        if "fanyi-api.baidu.com" in url:
+            form = urllib.parse.parse_qs(req.data.decode("utf-8"))
+            q = form["q"][0]
+            action_flag = form.get("action", [""])[0]
+            baidu_calls.append((q, action_flag))
+            if len(baidu_calls) == 1:
+                return DummyResp({"error_code": "54003", "error_msg": "Invalid Access Limit"})
+            lines = q.split("\n")
+            return DummyResp({"trans_result": [{"src": line, "dst": "百度译：" + line} for line in lines]})
+        if "microsofttranslator.com" in url:
+            arr = json.loads(req.data.decode("utf-8"))
+            azure_calls.append(len(arr))
+            return DummyResp([{"translations": [{"text": "微软译：" + item["Text"]}]} for item in arr])
+        return orig_urlopen(req, timeout=timeout)
+
+    urllib.request.urlopen = fake_urlopen
+    try:
+        b_out = pgt.baidu_translate_batch(
+            {"appId": "20261128002724674", "key": "secret", "qpsMode": "standard", "customDict": True},
+            ["First {v0} line", "", "Second line"],
+            "en",
+            "zh",
+        )
+        assert b_out == ["百度译：First {v0} line", "", "百度译：Second line"], f"Unexpected Baidu batch: {b_out}"
+        assert len(baidu_calls) == 2 and baidu_calls[1][1] == "1", f"Expected retry + action=1, got {baidu_calls}"
+
+        # Pro QPS concurrent multi-batch check (no 1.05s serial delay across >5200B groups)
+        long_items = [("Paragraph " + str(i) + " " + ("terahertz " * 45)).strip() for i in range(26)]
+        pro_out = pgt.baidu_translate_batch(
+            {"appId": "20261128002724674", "secret": "secret", "qpsMode": "pro", "customDict": False},
+            long_items,
+            "en",
+            "zh",
+        )
+        assert len(pro_out) == 26 and all(item.startswith("百度译：Paragraph ") for item in pro_out)
+
+        az_in = [f"Item {i}" for i in range(25)]
+        az_out = pgt.azure_translate_batch({"key": "az-key", "region": "eastasia"}, az_in, "en", "zh")
+        assert len(az_out) == 25 and az_out[0] == "微软译：Item 0" and az_out[24] == "微软译：Item 24"
+        assert azure_calls == [20, 5], f"Expected 20+5 chunking, got {azure_calls}"
+    finally:
+        urllib.request.urlopen = orig_urlopen
+
+    # 6. Glossary alignment & formula protection checks
+    glossary = pgt.normalize_glossary_pairs([
+        ["phase noise", "相位噪声"],
+        ["phase-locked loop", "锁相环"],
+        ["v0", "不应替换公式"],
+    ])
+    aligned = pgt.apply_glossary_to_text(
+        "The Phase-Locked Loop reduces phase noise in {v0} and $phase noise + x_1$.",
+        glossary,
+    )
+    assert aligned == "The 锁相环 reduces 相位噪声 in {v0} and $phase noise + x_1$.", f"Unexpected glossary align: {aligned}"
+    hint = pgt.format_glossary_prompt_hint(["Low phase noise in phase-locked loop."], glossary)
+    assert "phase-locked loop=锁相环" in hint and "phase noise=相位噪声" in hint
+
+    print("PASS: test-translation-acceleration (URL norm, batch JSON, GPU probe, OpenAI, Baidu Pro QPS & Glossary)")
 
 
 if __name__ == "__main__":

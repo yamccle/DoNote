@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "ES2024",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"]
+  },
+  "include": [
+    "work/analog-notes/public/*.js",
+    "work/analog-notes/scripts/*.mjs",
+    "work/desktop/*.js",
+    "work/desktop/*.mjs",
+    "tools/tests/*.mjs"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "work/analog-notes/public/pdfjs/**",
+    "work/analog-notes/public/katex/**",
+    "work/analog-notes/public/ocr/**",
+    "work/analog-notes/public/pdf-assets.js",
+    "work/analog-notes/public/*.min.js",
+    "work/analog-notes/public/marked.umd.js",
+    "work/analog-notes/public/readability.js",
+    "work/analog-notes/public/citation-engine.js",
+    "work/desktop/startup-wordmark.js"
+  ]
+}

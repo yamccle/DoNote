@@ -32,9 +32,14 @@ function aiModelRequest(action,profileId,config){
   catch(error){finish({error:error.message});}
  });
 }
-async function getAiModelConfig(profileId){
+async function getAiModelConfig(profileId,scene='reader'){
  const current=aiCredentials.get(profileId);
- if(current||!aiModelHost)return current;
+ if(current)return current;
+ if(window.desktopAiHub){
+  const resolved=await window.desktopAiHub.resolve(scene);
+  return aiCredentials.get(profileId)||resolved;
+ }
+ if(!aiModelHost)return current;
  const stored=await aiModelRequest('read',profileId);
  const latest=aiCredentials.get(profileId);
  if(latest||!stored?.model)return latest;
@@ -42,16 +47,33 @@ async function getAiModelConfig(profileId){
  aiCredentials.set(profileId,config);
  return config;
 }
-function aiEndpoint(base){const url=new URL(base);if(!['https:','http:'].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw new Error('请填写没有查询参数或账户信息的服务地址。');if(url.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(url.hostname))throw new Error('远程服务请使用 HTTPS；本地服务可使用 HTTP。');return url.href.replace(/\/$/,'').replace(/\/chat\/completions$/,'')+'/chat/completions'}
+function aiEndpoint(base){
+ const url=new URL(String(base||'').trim());
+ if(!['https:','http:'].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw new Error('请填写没有查询参数或账户信息的服务地址。');
+ if(url.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(url.hostname))throw new Error('远程服务请使用 HTTPS；本地服务可使用 HTTP。');
+ const clean=url.href.replace(/\/+$/,'');
+ if(/\/chat\/completions$/i.test(clean))return clean;
+ if(/\/(?:v\d+|compatible-mode\/v\d+)$/i.test(clean))return clean+'/chat/completions';
+ return clean+'/v1/chat/completions';
+}
 function aiStoredSettings(profileId){try{return JSON.parse(localStorage.getItem('analog-ai-settings/'+profileId)||'{}')}catch{return {}}}
-function aiSettingsLabel(){const config=aiCredentials.get(appState?.activeId);return config?.model?config.model:'配置问答模型'}
+function aiSettingsLabel(scene='reader'){
+ const override=aiCredentials.get(appState?.activeId);
+ if(override?.model)return override.model;
+ const hubLabel=window.desktopAiHub?.summaryLabel?.(scene);
+ return hubLabel||'配置问答模型';
+}
 function syncAiModelPill(){
  const pill=$('readerAiOpenSettings'),label=$('readerAiModelLabel');
- const ready=!!aiCredentials.get(appState?.activeId)?.model;
- if(label)label.textContent=aiSettingsLabel();
+ const useVision=!!$('readerAiImage')?.checked;
+ const scene=useVision?'vision':'reader';
+ const ready=!!(aiCredentials.get(appState?.activeId)?.model||window.desktopAiHub?.summaryLabel?.(scene));
+ if(label)label.textContent=aiSettingsLabel(scene);
  pill?.classList.toggle('is-ready',ready);
 }
-async function openAiModelSettings(){
+window.addEventListener('donote-ai-hub-change',()=>syncAiModelPill());
+async function openAiModelSettings(scene='reader'){
+ if(window.desktopAiHub){await window.desktopAiHub.open(typeof scene==='string'?scene:'reader');return;}
  const dialog=$('aiModelDialog');if(!dialog||dialog.open||!appState)return;
  const profileId=appState.activeId,stored=aiStoredSettings(profileId);
  const status=$('aiModelStatus'),save=$('saveReaderAiSettings');
@@ -213,8 +235,9 @@ function installReaderAi(session){
  side.append(panel);session.aiHistory=[];
  session.controller.signal.addEventListener('abort',()=>session.aiController?.abort(),{once:true});
  syncAiModelPill();
- void getAiModelConfig(session.profileId).then(()=>{if(readingSession===session)syncAiModelPill()}).catch(()=>{});
- $('readerAiOpenSettings').onclick=()=>openAiModelSettings();
+ $('readerAiImage')?.addEventListener('change',syncAiModelPill);
+ void getAiModelConfig(session.profileId,'reader').then(()=>{if(readingSession===session)syncAiModelPill()}).catch(()=>{});
+ $('readerAiOpenSettings').onclick=()=>openAiModelSettings($('readerAiImage')?.checked?'vision':'reader');
 
  const emptyState=panel.querySelector('#readerAiEmpty');
  const chipHost=panel.querySelector('.ai-prompt-chips');
@@ -230,7 +253,7 @@ function installReaderAi(session){
   chip.type='button';chip.className='ai-prompt-chip';chip.textContent=label;
   chip.onclick=()=>{
    questionBox.value=prompt;fitQuestion();
-   if(aiCredentials.get(session.profileId)?.model)void ask(prompt);
+   if(aiCredentials.get(session.profileId)?.model||window.desktopAiHub?.summaryLabel?.($('readerAiImage')?.checked?'vision':'reader'))void ask(prompt);
    else questionBox.focus();
   };
   chipHost.append(chip);
@@ -310,11 +333,13 @@ function installReaderAi(session){
  async function ask(rawQuestion){
   if(session.aiController)return;
   const question=String(rawQuestion||'').trim();if(!question){toast('请输入问题。');return}
+  const wantVision=!!$('readerAiImage')?.checked;
+  const targetScene=wantVision?'vision':'reader';
   let config;
-  try{config=await getAiModelConfig(session.profileId);}
+  try{config=await getAiModelConfig(session.profileId,targetScene);}
   catch(error){if(readingSession===session)$('readerAiStatus').textContent=error.message;return;}
   if(readingSession!==session)return;
-  if(!config){$('readerAiStatus').textContent='请先点击左上角配置模型地址与密钥。';openAiModelSettings();return}
+  if(!config){$('readerAiStatus').textContent='请先在 AI 服务商中心配置模型与密钥。';openAiModelSettings(targetScene);return}
   const pageNumber=session.page;let controller,timer,pendingWrap=null;
   try{
    const includeImage=$('readerAiImage').checked,{text,pages}=await contextText(pageNumber,includeImage);

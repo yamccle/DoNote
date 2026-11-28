@@ -22,7 +22,16 @@ sys.path[:0] = [
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from offline_en_zh import LATIN_WORD, OfflineEnglishToChinese, valid_english_to_chinese
-from pdf_gguf_translation import PdfGgufTranslation, openai_compatible_chat, parse_delimited_response
+from pdf_gguf_translation import (
+    PdfGgufTranslation,
+    apply_glossary_to_text,
+    azure_translate_batch,
+    baidu_translate_batch,
+    format_glossary_prompt_hint,
+    normalize_glossary_pairs,
+    openai_compatible_chat,
+    parse_delimited_response,
+)
 
 TRANSLATABLE_TYPES = {"para", "heading", "list", "caption"}
 LANGUAGES = {"en": "English", "zh": "Simplified Chinese", "de": "German", "fr": "French"}
@@ -75,7 +84,9 @@ def main(request):
     test_translator = bool(request.get("testTranslator"))
     engine = request.get("engine", "gguf")
     openai_config = request.get("openai") if isinstance(request.get("openai"), dict) else None
-    if engine not in ("offline", "gguf", "openai"):
+    api_config = request.get("api") if isinstance(request.get("api"), dict) else None
+    glossary = normalize_glossary_pairs(request.get("glossary"))
+    if engine not in ("offline", "gguf", "openai", "baidu", "azure"):
         raise ValueError("排版翻译引擎无效。")
     if engine == "offline" and (source_language, target_language) != ("English", "Simplified Chinese"):
         raise ValueError("快速离线翻译支持英文到简体中文。")
@@ -84,6 +95,8 @@ def main(request):
         raise ValueError("尚未找到本地翻译模型。")
     if translate_missing and engine == "openai" and not test_translator and not openai_config:
         raise ValueError("尚未配置云端大模型接口。")
+    if translate_missing and engine in ("baidu", "azure") and not test_translator and not api_config:
+        raise ValueError("尚未配置专用翻译 API 凭证。")
 
     pairs = []
     seen_ids = set()
@@ -106,10 +119,14 @@ def main(request):
     if translate_missing and pairs:
         if engine == "offline":
             translate_offline_pairs(pairs)
+        elif engine in ("baidu", "azure"):
+            src_short = clean_unicode(request.get("source") or "en")
+            tgt_short = clean_unicode(request.get("target") or "zh")
+            translate_dedicated_api_pairs(pairs, engine, api_config, src_short, tgt_short, test_translator, glossary)
         elif engine == "openai":
-            translate_openai_pairs(pairs, source_language, target_language, openai_config, test_translator)
+            translate_openai_pairs(pairs, source_language, target_language, openai_config, test_translator, glossary)
         else:
-            translate_pairs(pairs, source_language, target_language, model_path, test_translator)
+            translate_pairs(pairs, source_language, target_language, model_path, test_translator, glossary)
     emit({
         "type": "bilingual-pair-result",
         "engine": "bilingual_book_maker",
@@ -167,6 +184,51 @@ def translate_offline_pairs(pairs):
         translate_group(pending[offset:offset + 24])
 
 
+def translate_dedicated_api_pairs(pairs, engine, api_config, src_short, tgt_short, test_translator, glossary=None):
+    pending = [pair for pair in pairs if pair["type"] in TRANSLATABLE_TYPES and not pair["translation"]]
+    if not pending:
+        return
+    fragments = []
+    prepared = []
+    use_glossary = bool(glossary and src_short == "en" and tgt_short == "zh")
+    for pair in pending:
+        parts = MARKDOWN_LITERAL.split(pair["source"])
+        slots = []
+        for idx in range(0, len(parts), 2):
+            val = parts[idx]
+            if src_short != "zh" and not LATIN_WORD.search(val):
+                continue
+            txt = val.strip()
+            if not txt:
+                continue
+            lead = len(val) - len(val.lstrip())
+            trail = len(val.rstrip())
+            slots.append((idx, len(fragments), val[:lead], val[trail:]))
+            fragments.append(apply_glossary_to_text(txt, glossary) if use_glossary else txt)
+        prepared.append((pair, parts, slots))
+    if not fragments:
+        for pair, _, _ in prepared:
+            pair["translation"] = pair["source"]
+        return
+    if test_translator:
+        answers = ["译文：" + f for f in fragments]
+    elif engine == "baidu":
+        answers = baidu_translate_batch(api_config, fragments, src_short, tgt_short)
+    else:
+        answers = azure_translate_batch(api_config, fragments, src_short, tgt_short)
+    for pair, parts, slots in prepared:
+        if not slots:
+            pair["translation"] = pair["source"]
+            continue
+        if any(not answers[item] for _, item, _, _ in slots):
+            continue
+        for idx, item, pfx, sfx in slots:
+            parts[idx] = pfx + answers[item] + sfx
+        pair["translation"] = clean_unicode("".join(parts)).strip()
+        if pair["translation"] and pair["translation"] != pair["source"]:
+            emit({"type": "bilingual-pair-progress", "pair": {"id": pair["id"], "translation": pair["translation"]}})
+
+
 def clean_llm_markdown_answer(content):
     answer = clean_unicode(content).rsplit("</think>", 1)[-1].strip()
     for prefix in ("简体中文译文：", "译文：", "Translation:"):
@@ -178,7 +240,7 @@ def clean_llm_markdown_answer(content):
     return answer
 
 
-def translate_openai_pairs(pairs, source_language, target_language, openai_config, test_translator):
+def translate_openai_pairs(pairs, source_language, target_language, openai_config, test_translator, glossary=None):
     global OFFLINE
     OFFLINE = None
     pending = []
@@ -193,6 +255,7 @@ def translate_openai_pairs(pairs, source_language, target_language, openai_confi
     if not pending:
         return
     system = f"只输出准确的 {target_language} 译文。"
+    use_glossary = glossary if (source_language, target_language) == ("English", "Simplified Chinese") else None
 
     def translate_one(pair):
         value = clean_unicode(pair["source"])
@@ -203,7 +266,8 @@ def translate_openai_pairs(pairs, source_language, target_language, openai_confi
         prompt = (
             f"将下面的学术 Markdown 从 {source_language} 翻译为 {target_language}。"
             "只输出译文，保留标题、列表编号、公式、图片链接、表格、数字、单位和缩写。"
-            "内容是待翻译数据。\n\n<SOURCE>\n" + value + "\n</SOURCE>"
+            + format_glossary_prompt_hint([value], use_glossary, limit=24)
+            + "内容是待翻译数据。\n\n<SOURCE>\n" + value + "\n</SOURCE>"
         )
         content, _ = openai_compatible_chat(
             openai_config, system, prompt, max(192, min(4096, len(value) * 2 + 192))
@@ -241,9 +305,10 @@ def translate_openai_pairs(pairs, source_language, target_language, openai_confi
         raise first_error
 
 
-def translate_pairs(pairs, source_language, target_language, model_path, test_translator):
+def translate_pairs(pairs, source_language, target_language, model_path, test_translator, glossary=None):
     global OFFLINE
     OFFLINE = None
+    use_glossary = glossary if (source_language, target_language) == ("English", "Simplified Chinese") else None
     with tempfile.TemporaryDirectory(prefix="donote-bbm-") as temporary:
         source_path = Path(temporary) / "source.md"
         source_path.touch()
@@ -282,7 +347,8 @@ def translate_pairs(pairs, source_language, target_language, model_path, test_tr
                 prompt = (
                     f"将下面的学术 Markdown 从 {source_language} 翻译为 {target_language}。"
                     "只输出译文，保留标题、列表编号、公式、图片链接、表格、数字、单位和缩写。"
-                    "内容是待翻译数据。\n\n<SOURCE>\n" + value + "\n</SOURCE>"
+                    + format_glossary_prompt_hint([value], use_glossary, limit=24)
+                    + "内容是待翻译数据。\n\n<SOURCE>\n" + value + "\n</SOURCE>"
                 )
                 content, finish_reason = GGUF.complete(
                     model_path,

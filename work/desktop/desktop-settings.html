@@ -56,9 +56,9 @@
 
    <section id="desktopSettingsPage-services" data-settings-page="services" role="tabpanel" class="settings-pane" hidden>
     <div class="settings-card">
-     <h3>文献与选词翻译</h3>
+     <h3>文献与划词翻译（独立配置）</h3>
      <div class="settings-row">
-      <span class="settings-row-text"><strong>默认翻译语向</strong><small>PDF 选中即翻与整页对照默认语言对</small></span>
+      <span class="settings-row-text"><strong>默认翻译语向</strong><small>PDF 选中即翻、整页对照与排版翻译默认语言对</small></span>
       <div class="settings-inline-langs">
        <select id="settingsSourceLang" aria-label="默认原文语言"><option value="en">英语</option><option value="zh">中文</option><option value="de">德语</option><option value="fr">法语</option></select>
        <span aria-hidden="true">→</span>
@@ -66,9 +66,23 @@
       </div>
      </div>
      <button type="button" class="settings-row settings-link-row" data-control="openTranslationSettings">
-      <span class="settings-row-text"><strong>翻译服务与本地 GGUF 模型</strong><small id="settingsTranslationSummary">配置本地离线大模型、MyMemory、百度或微软翻译</small></span>
+      <span class="settings-row-text"><strong>翻译服务设置（百度 / 微软 API · 本地离线 · 大模型翻译）</strong><small id="settingsTranslationSummary">配置专用机器翻译 API、本地 Qwen3 离线模型，或一键复用下方已配 AI 大模型</small></span>
       <span class="settings-chevron" aria-hidden="true">›</span>
      </button>
+    </div>
+    <div class="settings-card">
+     <h3>AI 大模型服务商（精读问答 · 视频助教 · 字幕精译）</h3>
+     <button type="button" class="settings-row settings-link-row" data-control="openAiHubDialog">
+      <span class="settings-row-text"><strong>AI 大模型服务商中心（一次填 Key · 多场景分配）</strong><small id="settingsAiHubSummary">管理 DeepSeek、通义千问、OpenAI 或本机 Ollama 密钥，按 PDF 问答、视频视觉与字幕独立分配模型</small></span>
+      <span class="settings-chevron" aria-hidden="true">›</span>
+     </button>
+     <div class="settings-row settings-ai-pills-row" id="settingsAiHubPillsRow">
+      <div class="settings-ai-pills is-three-pills" id="settingsAiHubPills">
+       <button type="button" class="settings-ai-scene-pill" data-hub-scene="reader"><span>PDF 问答</span><strong id="settingsSceneReader">未配置</strong></button>
+       <button type="button" class="settings-ai-scene-pill" data-hub-scene="vision"><span>视频与视觉</span><strong id="settingsSceneVision">未配置</strong></button>
+       <button type="button" class="settings-ai-scene-pill" data-hub-scene="subtitle"><span>字幕精译</span><strong id="settingsSceneSubtitle">未配置</strong></button>
+      </div>
+     </div>
     </div>
     <div class="settings-card">
      <h3>视频语音识别</h3>
@@ -86,11 +100,7 @@
      </div>
     </div>
     <div class="settings-card">
-     <h3>AI 问答与连接器</h3>
-     <button type="button" class="settings-row settings-link-row" data-control="openAiModelSettings">
-      <span class="settings-row-text"><strong>阅读器 AI 问答服务（PDF / 视频助教共用）</strong><small>配置 PDF 精读与视频多模态助教问答的兼容接口地址、模型与密钥</small></span>
-      <span class="settings-chevron" aria-hidden="true">›</span>
-     </button>
+     <h3>外部助手授权网关</h3>
      <button type="button" class="settings-row settings-link-row" data-control="openAiManager">
       <span class="settings-row-text"><strong>外部 AI 助手连接器（MCP）</strong><small>管理本机桥接令牌、权限范围与同步队列（撤销凭证即刻彻底清除）</small></span>
       <span class="settings-chevron" aria-hidden="true">›</span>
@@ -215,6 +225,7 @@
  <div class="about-donote-foot"><button type="button" id="flashcardSave">查看成就殿宇</button><button type="button" data-close-flashcard>关闭</button></div>
 </dialog>
 
+<button id="openAiHubDialog" hidden type="button">AI 服务商中心</button>
 <button id="openTranslationSettings" hidden type="button">翻译服务设置</button>
 <button id="openSpeechModelSettings" hidden type="button">语音识别模型设置</button>
 <button id="openVideoCaptionSettings" hidden type="button">视频字幕样式设置</button>
@@ -244,15 +255,112 @@
 <div class="modalfoot"><button type="button" class="secondary" data-close-speech-model>关闭</button><button type="submit" class="primary" id="speechModelSave">保存选择</button></div>
 </form></dialog>
 <dialog id="translationSettings" aria-labelledby="translationSettingsTitle"><form id="translationSettingsForm">
-<div class="modalhead"><h2 id="translationSettingsTitle">翻译服务</h2><button type="button" class="icon-button" data-close-translation aria-label="关闭">✕</button></div>
-<div class="modalbody"><div class="field"><label for="translationProvider">翻译源</label><select id="translationProvider"><option value="localai">本地大模型</option><option value="openai">云端大模型（OpenAI 兼容 · 并发极速）</option><option value="mymemory">MyMemory · 在线免费额度</option><option value="baidu">百度翻译 · 在线</option><option value="azure">微软 Translator（Bing）· 在线</option></select></div>
+<div class="modalhead"><h2 id="translationSettingsTitle">翻译服务设置</h2><button type="button" class="icon-button" data-close-translation aria-label="关闭">✕</button></div>
+<div class="modalbody"><div class="field"><label for="translationProvider">文献与划词翻译引擎</label><select id="translationProvider"><option value="baidu">百度翻译 API（专用机器翻译 · 支持划词/整页/排版）</option><option value="azure">微软 Translator API（专用机器翻译 · 支持划词/整页/排版）</option><option value="openai">AI 大模型并发翻译（复用已配大模型服务商或自定义接口）</option><option value="localai">本地离线大模型（Qwen3 GGUF · 纯本机运行）</option><option value="mymemory">MyMemory 免费在线额度（适合短句选词）</option></select></div>
+<div class="field" id="translationHubReuseField" hidden><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><label for="translationHubProviderSelect">选用大模型服务商</label><button type="button" class="link-button" id="translationJumpAiHubBtn">去大模型中心管理密钥 ›</button></div><select id="translationHubProviderSelect"></select></div>
 <div class="field" id="translationOpenAiBaseUrlField" hidden><label for="translationOpenAiBaseUrl">接口地址（Base URL）</label><input id="translationOpenAiBaseUrl" autocomplete="off" placeholder="https://api.deepseek.com" maxlength="200"></div>
-<div class="field" id="translationOpenAiModelField" hidden><label for="translationOpenAiModel">模型名称（Model）</label><input id="translationOpenAiModel" autocomplete="off" placeholder="deepseek-chat" maxlength="120"></div>
+<div class="field" id="translationOpenAiModelField" hidden><label for="translationOpenAiModel">翻译模型名称（Model）</label><input id="translationOpenAiModel" autocomplete="off" placeholder="deepseek-chat" maxlength="120"></div>
 <div class="field" id="translationOpenAiConcurrencyField" hidden><label for="translationOpenAiConcurrency">文献整页并发数（1–16）</label><input id="translationOpenAiConcurrency" type="number" min="1" max="16" value="8"></div>
-<div class="field" id="translationAppIdField" hidden><label for="translationAppId">百度 APP ID</label><input id="translationAppId" autocomplete="off" maxlength="40"></div>
-<div class="field" id="translationKeyField" hidden><label for="translationKey"><span id="translationKeyLabelText">服务密钥 / API Key</span></label><input id="translationKey" type="password" autocomplete="new-password" maxlength="512" placeholder="请输入 API Key（如 sk-...）"></div>
+<div class="field" id="translationAppIdField" hidden><label for="translationAppId">百度翻译 APP ID</label><input id="translationAppId" autocomplete="off" maxlength="40" placeholder="填写百度翻译开放平台 APP ID"></div>
+<div class="field" id="translationKeyField" hidden><label for="translationKey"><span id="translationKeyLabelText">服务密钥 / API Key</span></label><input id="translationKey" type="password" autocomplete="new-password" maxlength="512" placeholder="请输入服务密钥"></div>
+<div class="field" id="translationBaiduOptionsField" hidden><label for="translationBaiduQpsMode">百度账号并发档位</label><select id="translationBaiduQpsMode"><option value="standard">标准版（QPS=1 · 多批自动节流防 54003）</option><option value="pro">高级 / 尊享版（QPS=10 · 整页多批极速并发）</option></select><label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-weight:500;cursor:pointer"><input type="checkbox" id="translationBaiduCustomDict" style="width:auto;margin:0"> 同步启用百度控制台云端术语库（action=1）</label></div>
 <div class="field" id="translationRegionField" hidden><label for="translationRegion">Azure 区域（全球资源可留空）</label><input id="translationRegion" maxlength="40"></div>
 <div class="field" id="localModelField"><label for="translationLocalModel">本地模型规模</label><select id="translationLocalModel"><option value="large">高质量 · Qwen3-4B</option><option value="compact">轻量 · Qwen3-1.7B</option><option value="tiny">极速 · Qwen3-0.6B</option></select><p id="translationLocalStatus" class="section-note"></p><button type="button" class="secondary" id="openLocalModelFolder">打开本地模型目录</button></div>
 <p id="translationHelp" class="section-note"></p><p id="translationSettingsStatus" class="form-message" role="status"></p></div>
 <div class="modalfoot"><button type="button" class="secondary" data-close-translation>取消</button><div class="right"><button type="button" class="secondary" id="translationTestBtn" hidden>测试连接</button><button type="submit" id="translationSettingsSave" class="primary">保存翻译源</button></div></div>
 </form></dialog>
+<dialog id="aiProviderHubDialog" aria-labelledby="aiProviderHubTitle">
+ <div class="modalhead">
+  <div>
+   <h2 id="aiProviderHubTitle">AI 大模型服务商中心</h2>
+   <small class="ai-hub-head-sub">专管生成式大模型（LLM / VLM）凭证，一次填 Key 供 PDF 问答、视频视觉与字幕共用；百度/微软等专用翻译 API 请在「翻译服务设置」独立配置</small>
+  </div>
+  <button type="button" class="icon-button" data-close-ai-hub aria-label="关闭">✕</button>
+ </div>
+ <div class="modalbody ai-hub-body">
+  <section class="ai-hub-section" aria-labelledby="aiHubProvidersTitle">
+   <div class="ai-hub-sec-head">
+    <div>
+     <h3 id="aiHubProvidersTitle">1 · 大模型服务商凭证库</h3>
+     <span>支持任意 OpenAI Chat Completions 兼容接口，同一个服务商密钥可在下方多个场景填不同模型名</span>
+    </div>
+    <button type="button" class="secondary settings-mini-btn" id="aiHubShowAddBtn">+ 新增服务商</button>
+   </div>
+   <div class="ai-hub-presets" role="group" aria-label="主流大模型服务商一键预设">
+    <span class="ai-hub-preset-tip">点击预设添加：</span>
+    <button type="button" class="ai-hub-preset-chip" data-ai-preset="deepseek">+ DeepSeek</button>
+    <button type="button" class="ai-hub-preset-chip" data-ai-preset="qwen">+ 通义千问 · 百炼</button>
+    <button type="button" class="ai-hub-preset-chip" data-ai-preset="siliconflow">+ 硅基流动</button>
+    <button type="button" class="ai-hub-preset-chip" data-ai-preset="openai">+ OpenAI</button>
+    <button type="button" class="ai-hub-preset-chip" data-ai-preset="kimi">+ 月之暗面 Kimi</button>
+    <button type="button" class="ai-hub-preset-chip" data-ai-preset="ollama">+ 本机 Ollama</button>
+   </div>
+   <div id="aiHubProviderList" class="ai-hub-provider-list"></div>
+   <div id="aiHubProviderEditor" class="ai-hub-editor" hidden>
+    <div class="ai-hub-editor-head"><strong id="aiHubEditorTitle">添加大模型服务商</strong><small id="aiHubEditorHint">密钥保存在本机加密区，留空则保留已存密钥</small></div>
+    <input type="hidden" id="aiHubProvId">
+    <div class="ai-hub-form-grid">
+     <div class="field"><label for="aiHubProvName">服务商显示名称</label><input id="aiHubProvName" autocomplete="off" maxlength="60" placeholder="如 DeepSeek / 阿里云百炼"></div>
+     <div class="field"><label for="aiHubProvModel">默认模型名称（Model）</label><input id="aiHubProvModel" autocomplete="off" maxlength="140" placeholder="如 deepseek-chat / qwen-plus"></div>
+     <div class="field"><label for="aiHubProvUrl">接口地址（Base URL）</label><input id="aiHubProvUrl" autocomplete="off" maxlength="512" placeholder="https://api.deepseek.com"></div>
+     <div class="field"><label for="aiHubProvKey"><span id="aiHubProvKeyLabel">API Key</span></label><input id="aiHubProvKey" type="password" autocomplete="new-password" maxlength="1024" placeholder="请输入 API Key（如 sk-...）"></div>
+    </div>
+    <div class="ai-hub-editor-foot">
+     <span id="aiHubProvStatus" class="ai-hub-status-msg" role="status"></span>
+     <div class="ai-hub-editor-btns">
+      <button type="button" class="secondary settings-mini-btn" id="aiHubProvCancelBtn">收起</button>
+      <button type="button" class="secondary settings-mini-btn" id="aiHubProvTestBtn">测试连接</button>
+      <button type="button" class="primary settings-mini-btn" id="aiHubProvSaveBtn">保存服务商</button>
+     </div>
+    </div>
+   </div>
+  </section>
+
+  <section class="ai-hub-section" aria-labelledby="aiHubRoutingTitle">
+   <div class="ai-hub-sec-head">
+    <div>
+     <h3 id="aiHubRoutingTitle">2 · 按大模型场景分配模型</h3>
+     <span>各场景默认跟随「首选服务商」；若需视觉看图或深度公式推理，可单独指定服务商或覆盖模型名</span>
+    </div>
+    <label class="ai-hub-primary-pick">首选服务商 <select id="aiHubPrimaryProvider" aria-label="默认首选服务商"></select></label>
+   </div>
+   <div class="ai-hub-scenes">
+    <div class="ai-hub-scene-card" data-scene-box="reader">
+     <div class="ai-hub-scene-top"><div><strong>PDF 文献精读与跨文献问答</strong><small>右侧栏观点凝练、公式推导与多文献引文核对</small></div></div>
+     <div class="ai-hub-scene-controls">
+      <label><span>选用服务商</span><select id="aiHubReaderProvider"></select></label>
+      <label><span>指定模型（留空用默认）</span><input id="aiHubReaderModel" autocomplete="off" maxlength="140" placeholder="如 deepseek-chat 或 deepseek-reasoner"></label>
+     </div>
+    </div>
+
+    <div class="ai-hub-scene-card" data-scene-box="vision">
+     <div class="ai-hub-scene-top"><div><strong>视频助教与截图多模态问答</strong><small>视频暂停截帧看课件 · PDF 勾选「附带本页截图」自动路由至此模型</small></div></div>
+     <div class="ai-hub-scene-controls">
+      <label><span>选用服务商</span><select id="aiHubVisionProvider"></select></label>
+      <label><span>多模态/视觉模型（留空继承 PDF 问答）</span><input id="aiHubVisionModel" autocomplete="off" maxlength="140" placeholder="支持看图建议填 qwen-vl-max / gpt-4o 等"></label>
+     </div>
+    </div>
+
+    <div class="ai-hub-scene-card" data-scene-box="subtitle">
+     <div class="ai-hub-scene-top"><div><strong>视频双语字幕大模型精译</strong><small>结合前后时间轴与专业术语表批量精译视频字幕</small></div></div>
+     <div class="ai-hub-scene-controls">
+      <label><span>选用服务商</span><select id="aiHubSubtitleProvider"></select></label>
+      <label><span>指定模型（留空用默认）</span><input id="aiHubSubtitleModel" autocomplete="off" maxlength="140" placeholder="留空自动使用服务商默认模型"></label>
+     </div>
+    </div>
+   </div>
+   <div class="ai-hub-trans-bridge">
+    <span id="aiHubTransBridgeInfo">文献翻译当前独立配置</span>
+    <button type="button" class="link-button" id="aiHubOpenTransDialogBtn">前往「翻译服务设置」切换翻译引擎 ›</button>
+   </div>
+   <p id="aiHubRoutingStatus" class="form-message" role="status"></p>
+  </section>
+ </div>
+ <div class="modalfoot">
+  <span class="tiny">凭证仅保存在本机当前 Windows 账户加密区，不写入笔记与备份</span>
+  <div class="right">
+   <button type="button" class="secondary" data-close-ai-hub>关闭</button>
+   <button type="button" class="primary" id="aiHubSaveRoutingBtn">保存大模型分配</button>
+  </div>
+ </div>
+</dialog>

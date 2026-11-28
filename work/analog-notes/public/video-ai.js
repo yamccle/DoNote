@@ -193,13 +193,20 @@
     let controller = null;
     session.controller.signal.addEventListener('abort', () => controller?.abort(), { once: true });
 
+    function activeVideoScene() {
+      return visionCheck?.checked ? 'vision' : 'reader';
+    }
     function refreshModelBadge() {
-      const cfg = typeof aiCredentials !== 'undefined' ? aiCredentials.get(appState?.activeId) : null;
-      modelLabel.textContent = cfg?.model || '配置问答模型';
-      modelBtn.classList.toggle('is-ready', !!cfg?.model);
+      const override = typeof aiCredentials !== 'undefined' ? aiCredentials.get(appState?.activeId) : null;
+      const hubSummary = window.desktopAiHub?.summaryLabel?.(activeVideoScene()) || '';
+      const labelText = override?.model || hubSummary;
+      modelLabel.textContent = labelText || '配置问答模型';
+      modelBtn.classList.toggle('is-ready', !!labelText);
     }
     refreshModelBadge();
-    void getAiModelConfig(session.profileId).then(refreshModelBadge).catch(() => {});
+    visionCheck?.addEventListener('change', refreshModelBadge);
+    window.addEventListener('donote-ai-hub-change', refreshModelBadge, { signal: session.controller.signal });
+    void getAiModelConfig(session.profileId, activeVideoScene()).then(refreshModelBadge).catch(() => {});
 
     tabBar.querySelectorAll('[data-video-tab]').forEach(btn => {
       btn.onclick = () => {
@@ -215,7 +222,7 @@
       };
     });
 
-    modelBtn.onclick = () => openAiModelSettings();
+    modelBtn.onclick = () => openAiModelSettings(activeVideoScene());
     document.getElementById('aiModelDialog')?.addEventListener('close', refreshModelBadge);
 
     for (const [label, prompt] of VIDEO_AI_PROMPTS) {
@@ -226,8 +233,8 @@
       chip.onclick = () => {
         inputEl.value = prompt;
         const cfg = aiCredentials.get(session.profileId);
-        if (cfg?.model) void askVideoAi(prompt);
-        else { openAiModelSettings(); }
+        if (cfg?.model || window.desktopAiHub?.summaryLabel?.(activeVideoScene())) void askVideoAi(prompt);
+        else { openAiModelSettings(activeVideoScene()); }
       };
       chipsHost.append(chip);
     }
@@ -331,12 +338,12 @@
       const question = String(rawQuestion || '').trim();
       if (!question) { toast('请输入提问内容。'); return; }
       let config;
-      try { config = await getAiModelConfig(session.profileId); }
+      try { config = await getAiModelConfig(session.profileId, activeVideoScene()); }
       catch (err) { statusEl.textContent = err.message; return; }
       refreshModelBadge();
       if (!config?.model) {
-        statusEl.textContent = '请先配置阅读与视频共用的 AI 模型服务。';
-        openAiModelSettings();
+        statusEl.textContent = '请先在 AI 服务商中心配置模型与密钥。';
+        openAiModelSettings(activeVideoScene());
         return;
       }
 

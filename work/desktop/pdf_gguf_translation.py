@@ -1,15 +1,21 @@
-# [INPUT]: 读取本地 GGUF 模型或 OpenAI-Compatible API 配置，接收系统提示词与待翻译指令。
-# [OUTPUT]: 提供 GPU 自适应的 Llama 实例工厂、GGUF 推理封装、批量 JSON 解析与云端大模型并发请求函数。
-# [POS]: 桌面端本地与云端大模型翻译共享引擎，供 local-llm-translate.py、pdfmathtranslate.py 与 bilingual-book-worker.py 复用。
+# [INPUT]: 读取本地 GGUF 模型、OpenAI-Compatible API、百度/微软专用翻译 API 配置及学科术语词表。
+# [OUTPUT]: 提供 GPU 自适应的 Llama 实例工厂、流式批译解析、百度 QPS 自适应并发/词库请求及保公式术语对齐函数。
+# [POS]: 桌面端多引擎翻译与术语对齐共享底座，供 local-llm-translate.py、pdfmathtranslate.py 与 bilingual-book-worker.py 复用。
 # [PROTOCOL]: Update this header on change, then check AGENTS.md
+import ast
+from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import inspect
 import json
 import os
+import random
 import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 
 DELIM_PATTERN = re.compile(r"@@(\d+)@@")
@@ -200,6 +206,226 @@ def openai_compatible_chat(config, system, instruction, max_tokens=2048, timeout
     content = message.get("content") or ""
     finish_reason = choices[0].get("finish_reason") or "stop"
     return content, finish_reason
+
+
+def normalize_glossary_pairs(raw):
+    if not isinstance(raw, list):
+        return []
+    seen = set()
+    cleaned = []
+    for row in raw[:500]:
+        if isinstance(row, (list, tuple)) and len(row) >= 2:
+            en, zh = str(row[0] or "").strip(), str(row[1] or "").strip()
+        elif isinstance(row, dict):
+            en = str(row.get("en") or row.get("source") or "").strip()
+            zh = str(row.get("zh") or row.get("target") or "").strip()
+        else:
+            continue
+        key = en.lower()
+        if len(en) < 2 or len(en) > 120 or not zh or len(zh) > 120 or key in seen:
+            continue
+        seen.add(key)
+        cleaned.append((en, zh))
+    cleaned.sort(key=lambda item: len(item[0]), reverse=True)
+    return cleaned
+
+
+def match_glossary_for_texts(texts, glossary, limit=48):
+    if not glossary or not texts:
+        return []
+    joined = "\n".join(str(t or "") for t in texts)
+    matched = []
+    for en, zh in glossary:
+        pat = re.compile(r"(?<![A-Za-z0-9_-])" + re.escape(en) + r"(?![A-Za-z0-9_-])", re.IGNORECASE)
+        if pat.search(joined):
+            matched.append((en, zh))
+            if len(matched) >= limit:
+                break
+    return matched
+
+
+def format_glossary_prompt_hint(texts, glossary, limit=48):
+    matched = match_glossary_for_texts(texts, glossary, limit=limit)
+    if not matched:
+        return ""
+    pairs_str = "；".join(f"{en}={zh}" for en, zh in matched)
+    return f"\n专业术语约束（若原文出现以下术语，请严格采用指定中文译名）：{pairs_str}。"
+
+
+_FORMULA_SPLIT_RE = re.compile(r"([｛{]\s*v\s*\d+(?:\s+\d+)*\s*[｝}]|\$\$[\s\S]*?\$\$|(?<!\\)\$[^$\n]+(?<!\\)\$|`[^`\n]+`)")
+
+
+def apply_glossary_to_text(text, glossary):
+    raw = str(text or "")
+    if not raw or not glossary:
+        return raw
+    matched = [pair for pair in match_glossary_for_texts([raw], glossary, limit=64) if len(pair[0]) >= 3]
+    if not matched:
+        return raw
+    compiled = [
+        (re.compile(r"(?<![A-Za-z0-9_-])" + re.escape(en) + r"(?![A-Za-z0-9_-])", re.IGNORECASE), zh)
+        for en, zh in matched
+    ]
+    segments = _FORMULA_SPLIT_RE.split(raw)
+    for idx in range(0, len(segments), 2):
+        seg = segments[idx]
+        if not seg:
+            continue
+        for pat, zh in compiled:
+            seg = pat.sub(lambda _, rep=zh: rep, seg)
+        segments[idx] = seg
+    return "".join(segments)
+
+
+def baidu_translate_batch(config, texts, source="en", target="zh", timeout=25):
+    if not isinstance(config, dict):
+        raise ValueError("百度翻译配置无效。")
+    app_id = str(config.get("appId") or "").strip()
+    secret = str(config.get("secret") or config.get("key") or "").strip()
+    qps_mode = "pro" if str(config.get("qpsMode") or "").strip().lower() == "pro" else "standard"
+    custom_dict = bool(config.get("customDict"))
+    if not app_id or not secret:
+        raise ValueError("尚未填写百度翻译 APP ID 或密钥。")
+    clean_lines = [re.sub(r"[\r\n]+", " ", str(t or "")).strip() for t in texts]
+    if not clean_lines:
+        return []
+    src_code = "fra" if source == "fr" else source
+    tgt_code = target
+    outputs = [""] * len(clean_lines)
+
+    groups = []
+    cur_indices = []
+    cur_bytes = 0
+    byte_cap = 5200 if qps_mode == "pro" else 4200
+    for idx, line in enumerate(clean_lines):
+        if not line:
+            continue
+        b_len = len(line.encode("utf-8")) + 1
+        if cur_indices and (len(cur_indices) >= 22 or cur_bytes + b_len > byte_cap):
+            groups.append(cur_indices)
+            cur_indices = []
+            cur_bytes = 0
+        cur_indices.append(idx)
+        cur_bytes += b_len
+    if cur_indices:
+        groups.append(cur_indices)
+    if not groups:
+        return outputs
+
+    def translate_group(indices):
+        query = "\n".join(clean_lines[i] for i in indices)
+        for attempt in range(4):
+            salt = uuid.uuid4().hex
+            sign = hashlib.md5((app_id + query + salt + secret).encode("utf-8")).hexdigest()
+            fields = {
+                "q": query,
+                "from": src_code,
+                "to": tgt_code,
+                "appid": app_id,
+                "salt": salt,
+                "sign": sign,
+            }
+            if custom_dict:
+                fields["action"] = "1"
+            form_data = urllib.parse.urlencode(fields).encode("utf-8")
+            req = urllib.request.Request(
+                "https://fanyi-api.baidu.com/api/trans/vip/translate",
+                data=form_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "DoNote-Desktop/1.0"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    payload = json.loads(resp.read().decode("utf-8", errors="replace"))
+            except (urllib.error.URLError, TimeoutError, OSError) as err:
+                if attempt < 2:
+                    time.sleep(0.8 * (attempt + 1))
+                    continue
+                raise RuntimeError(f"无法连接百度翻译接口：{err}")
+            err_code = str(payload.get("error_code") or "")
+            if err_code == "54003" and attempt < 3:
+                time.sleep(1.1 * (attempt + 1) + random.uniform(0.05, 0.35))
+                continue
+            if err_code and err_code != "52000":
+                err_msg = str(payload.get("error_msg") or "")
+                raise RuntimeError(f"百度翻译返回错误 ({err_code})：{err_msg or '请检查 APP ID、密钥或免费额度'}")
+            rows = payload.get("trans_result") or []
+            mapped = {}
+            if len(rows) == len(indices):
+                for idx, row in zip(indices, rows):
+                    mapped[idx] = str(row.get("dst") or "").strip()
+            elif rows and len(indices) == 1:
+                mapped[indices[0]] = "\n".join(str(r.get("dst") or "").strip() for r in rows)
+            return mapped
+        return {}
+
+    if qps_mode == "pro" and len(groups) > 1:
+        with ThreadPoolExecutor(max_workers=min(6, len(groups))) as pool:
+            for mapped in pool.map(translate_group, groups):
+                for idx, val in mapped.items():
+                    outputs[idx] = val
+    else:
+        for g_pos, indices in enumerate(groups):
+            if g_pos > 0:
+                time.sleep(1.05)
+            for idx, val in translate_group(indices).items():
+                outputs[idx] = val
+    return outputs
+
+
+def azure_translate_batch(config, texts, source="en", target="zh", timeout=25):
+    if not isinstance(config, dict):
+        raise ValueError("微软 Translator 配置无效。")
+    key = str(config.get("key") or "").strip()
+    region = str(config.get("region") or "").strip()
+    if not key:
+        raise ValueError("尚未填写微软 Translator 密钥。")
+    if not texts:
+        return []
+    src_code = "zh-Hans" if source == "zh" else source
+    tgt_code = "zh-Hans" if target == "zh" else target
+    endpoint = f"https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from={src_code}&to={tgt_code}"
+    headers = {
+        "Content-Type": "application/json; charset=UTF-8",
+        "Ocp-Apim-Subscription-Key": key,
+        "User-Agent": "DoNote-Desktop/1.0",
+    }
+    if region:
+        headers["Ocp-Apim-Subscription-Region"] = region
+    outputs = [""] * len(texts)
+    for start in range(0, len(texts), 20):
+        chunk = texts[start:start + 20]
+        body = json.dumps([{"Text": str(t or "")} for t in chunk], ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            rows = json.loads(resp.read().decode("utf-8", errors="replace"))
+        for offset, row in enumerate(rows):
+            trans = row.get("translations") or []
+            if trans:
+                outputs[start + offset] = str(trans[0].get("text") or "").strip()
+    return outputs
+
+
+def load_onnx_doclayout_model(model_path):
+    from pdf2zh.doclayout import OnnxModel, onnxruntime
+
+    if not model_path.is_file():
+        raise ValueError("PDFMathTranslate 版面模型缺失，请更新完整版本。")
+
+    class DoNoteLayoutModel(OnnxModel):
+        def __init__(self):
+            options = onnxruntime.SessionOptions()
+            options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
+            options.intra_op_num_threads = max(2, min(8, os.cpu_count() or 4))
+            self.model_path = str(model_path)
+            self.model = onnxruntime.InferenceSession(
+                self.model_path, options, providers=["CPUExecutionProvider"]
+            )
+            metadata = self.model.get_modelmeta().custom_metadata_map
+            self._stride = ast.literal_eval(metadata["stride"])
+            self._names = ast.literal_eval(metadata["names"])
+
+    return DoNoteLayoutModel()
 
 
 class PdfGgufTranslation:
