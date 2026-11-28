@@ -1,17 +1,17 @@
-# DoNote · 本地优先、零信任多端协同的知识精读与课题研究工作台
+# DoNote · 本地优先的知识精读与课题研究工作台
 
-[![Latest Release](https://img.shields.io/badge/Release-r141%20(26.1141.0087)-2e5984?style=flat-square)](https://github.com/yamccle/DoNote/releases/tag/r141)
+[![Latest Release](https://img.shields.io/badge/Release-r143%20(26.1143.0089)-2e5984?style=flat-square)](https://github.com/yamccle/DoNote/releases/tag/r143)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20x64-35639c?style=flat-square)](https://github.com/yamccle/DoNote/releases/latest)
 [![Architecture](https://img.shields.io/badge/Stack-WinForms%20%2B%20WebView2%20%2B%20Node%20%2B%20Python-28785a?style=flat-square)](#系统架构与仓库导览)
-[![Sync Security](https://img.shields.io/badge/Sync-CRDT%20%2B%20SSE%20%2B%20AES--256--GCM%20E2EE-6d529e?style=flat-square)](#5-零信任多端在线协同批注级-crdt--sse-实时推送--端到端加密)
+[![Folder Sync](https://img.shields.io/badge/Sync-Cloud%20folder-6d529e?style=flat-square)](#5-云盘文件夹多端协同)
 
 **DoNote** 是一款面向跨学科文献精读、课程学习与工程/科研课题攻关的 **Windows 桌面端知识工作台**。项目最初诞生于模拟与混合信号集成电路（IC）硬核论文推导与设计问题排查场景，现已全面演进为覆盖理工科研、方法学综述与专业研发的通用研究底座。
 
-它将 **文献 PDF、课程讲义 PPT/PPTX、学术研讨视频与公开网页** 统一纳入本机自主可控的资料库，围绕 **「拖拽分拣入库 → 多模态精读与离线双语对照 → 公式级 AI 推导问答 → 关联课题问题与实验日志 → 原文选区双向回跳 → 零信任跨设备加密同步」** 这一完整研究闭环组织日常知识工作。
+它将 **文献 PDF、课程讲义 PPT/PPTX、学术研讨视频与公开网页** 统一纳入本机自主可控的资料库，围绕 **「拖拽分拣入库 → 多模态精读与三级加速双语对照 → 公式级 AI 推导问答 → 关联课题问题与实验日志 → 原文选区双向回跳 → 云盘文件夹跨设备接力」** 这一完整研究闭环组织日常知识工作。
 
-- **本地优先，数据自主可控**：桌面端基于 C# WinForms 与 Microsoft Edge WebView2 构建，工作台采用零框架依赖的原生 JavaScript。所有记录、原始附件（单文件支持最大 `2 GB`）、阅读进度、批注、离线 OCR、全文检索、本地语音识别与本地大模型翻译均在本机完成，绝不篡改原始 PDF 与媒体文件；程序升级自动隔离保护 `Data/` 与 `models/` 目录。
-- **平滑演进至零信任在线协同**：支持局域网直连或自建轻量同步节点（`/api/sync/v1`），具备 **SHA-256 内容寻址附件去重**、**PDF / PPT 单条批注级 CRDT 无冲突合并**、**SSE 毫秒级实时变更推送** 以及 **`PBKDF2 + AES-256-GCM` 端到端加密（E2EE）**——同步服务端仅存储不可读密文。
-- **当前正式程序基线**：**[`r141`](https://github.com/yamccle/DoNote/releases/tag/r141)**（版本号 `26.1141.0087`，源码标签 `r141` / 提交 `878f853`；基础完整包为 [`r140`](https://github.com/yamccle/DoNote/releases/tag/r140)）。
+- **本地优先**。记录、原始附件和阅读进度默认保存在本机。支持离线 OCR、全文检索、本地语音识别和本地/云端加速翻译。程序安装、覆盖升级与默认卸载均完整保留用户资料与本地模型。
+- **云盘文件夹多端协同**。两台电脑选择同一个云盘同步文件夹，就能对齐资料目录。附件在打开时读取并核对 SHA-256。
+- **当前正式版**为 **[r143 · 26.1143.0089](https://github.com/yamccle/DoNote/releases/tag/r143)**。该版本新增 **「用户级安装向导 `.exe` + 便携绿色 `.zip` 双轨分发」** 与 **「文献大模型翻译三级加速（轻模型级联与多段打包批译、可选 Vulkan GPU 加速、OpenAI 兼容并发 API）」**。构建源码见 [r143 标签](https://github.com/yamccle/DoNote/tree/r143)。
 
 ---
 
@@ -33,12 +33,12 @@
 | --- | --- |
 | **总览与组织架构** | 低饱和莫兰迪四色继续阅读进度环（PDF / 视频 / PPT / 网页）、行动导向动态计数（仅统计**进行中计划 / 剩余未解决问题 / 近 7 天新增文献**）、每日打开即留痕活跃图、全栏目常驻 `快捷指令 Ctrl+K` 聚光灯检索、问题与计划多列拖拽看板。 |
 | **批量入库与治理** | 篮板式全局拖拽投递浮层与「投递归档分拣台」（一键清洗论文文件名冗余前后缀、即时建多级目录树、套用标签）、严格 `60px` 等高目录卡片、文献库默认按「最近打开 ↓」排序、研究方向自动拦截日期/课件文件名污染并支持一键无损收纳杂项。 |
-| **PDF 深度精读** | 多标签并行阅读、`1 GB+` 超长文档按区间流式读取、选中即翻与专业双语术语胶囊、MinerU 智能单栏重排与段落双语对照、PDFMathTranslate 整页公式保护对照、扫描页框选离线 OCR 直入全文检索、六色紧凑批注与图表框选摘录、**「被引用 N」角标与双向选区回跳**、流式 KaTeX 公式 AI 问答。 |
+| **PDF 深度精读** | 多标签并行阅读、`1 GB+` 超长文档按区间流式读取、选中即翻与专业双语术语胶囊、MinerU 智能单栏重排与段落双语对照、PDFMathTranslate 整页公式保护对照（支持轻模型级联路由、GGUF 多段打包批译、可选 Vulkan GPU 加速与 OpenAI 兼容并发 API）、扫描页框选离线 OCR 直入全文检索、六色紧凑批注与图表框选摘录、**「被引用 N」角标与双向选区回跳**、流式 KaTeX 公式 AI 问答。 |
 | **视频多模态学习** | 本地 `faster-whisper` 分段语音识别、「识别时同步离线翻译」边看边出双语字幕、画面原生双语字幕轨与可编辑时间轴、框选画面定格批注，以及 **「✦ AI 助教问答」多模态面板**（自动截取当前视频帧 + 附近/全片字幕上下文、KaTeX 公式推导、点击 `[MM:SS]` 时间码一键跳播与沉淀笔记）。 |
 | **PPT 讲义与网页收藏** | PPT / PPTX 胶片导航、网格总览、沉浸放映、原片讲义自动提取、逐页批注保存及一键导出双栏图文复习讲义（`.html` / `.md`）；单进程 8 路并发防 SSRF 极速收藏公开网页（支持极速纯正文模式）与原文摘录高亮回跳。 |
-| **多端加密同步** | 稳定设备节点标识与单调版本戳 `syncMeta`、SHA-256 内容寻址去重传输、**PDF / PPT 批注元素级 CRDT 合并**（同页幻灯片离线并发批注自动无损归并）、**SSE 实时推送自动拉取**、**`PBKDF2 (210k) + HKDF + AES-256-GCM` 零信任端到端加密**。 |
+| **多端协同** | 通过 Google Drive 桌面版、坚果云或 Nextcloud 同步文件夹对齐目录。按内容指纹保存附件，打开时读取和校验。 |
 | **外部 AI 与任务中心** | 内置 AI Bridge 与 **MCP（Model Context Protocol）** 授权网关（8 项细粒度读写权限，撤销凭证即刻彻底清除）；顶栏与全屏阅读器浮标统一汇总更新下载、语音识别、离线翻译、备份恢复、网页抓取与同步进度。 |
-| **系统体验与典藏** | 四栏自适应偏好设置中心（`外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统`）、启动静默新版本温和圆点提示与一键在线增量升级、十张里程碑卡牌「成就殿宇」（第 01 卡致敬模拟 IC 初心，支持在设置中自由隐藏）。 |
+| **系统体验与典藏** | 四栏自适应偏好设置中心（`外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统`）、启动静默检查和一次确认的多步在线更新、十张里程碑卡牌「成就殿宇」（第 01 卡致敬模拟 IC 初心，支持在设置中自由隐藏）。 |
 
 ---
 
@@ -68,7 +68,7 @@
 ### 3. 视频双语同步字幕与多模态 AI 助教问答
 
 将课程讲座或学术报告视频导入资料库后，可在学习工作台中实现音视频、双语字幕与视觉课件的深度联动：
-- **边识别边翻译的双语字幕流**：调用本地 `faster-whisper` 模型分段提取英文字幕，默认开启「识别时同步翻译」，每识别出一批字幕即并行调用内置离线翻译模型生成中文；即使关闭视频窗口，后台任务仍持续运行并在右上角「任务中心」实时汇报进度。
+- **边识别边翻译的双语字幕流**：调用本地 `faster-whisper` 模型分段提取英文字幕，默认开启「识别时同步翻译」，每识别出一批字幕即并行调用内置离线翻译模型生成中文；即使关闭视频窗口，后台任务仍持续运行并在右上角「任务中心」实时汇报进度。生成中或完成后，点任务或「打开视频」即可返回原视频。
 - **「定格批注 | ✦ AI 助教问答」双页签面板**：遇到复杂课件推导时暂停视频，切换至 **「✦ AI 助教问答」**，系统自动截取**当前视频画面帧**并附带**附近 ±3 分钟（或全片）双语字幕时间轴**发送给多模态大模型；回答支持完整 Markdown 与 KaTeX 数学公式渲染，点击回答中的 `[MM:SS]` 时间码胶囊即可直接跳播对应讲解片段，并支持一键存为定格批注或研究笔记。
 
 ![视频多模态 AI 助教问答：当前画面帧解析、KaTeX 公式推导与时间码胶囊跳播](docs/screenshots/video-ai-qa.png)
@@ -85,15 +85,15 @@
 | --- | --- |
 | ![拖拽归档分拣工作台](docs/screenshots/drop-triage.png) | ![网页离线阅读与原文摘录回跳](docs/screenshots/web-excerpt.png) |
 
-### 5. 零信任多端在线协同（批注级 CRDT · SSE 实时推送 · 端到端加密）
+### 5. 云盘文件夹多端协同
 
-在四栏自适应「偏好设置 → **多端协同**」页签中，DoNote 为实验室台式机与随身笔记本之间的无缝接力提供了完整的零信任同步架构：
-- **SHA-256 内容寻址附件去重**：所有文献与媒体附件按内容哈希寻址，跨设备或跨记录引用同一份大型 PDF / 视频时仅传输一次。
-- **PDF / PPT 批注级细粒度无冲突合并（CRDT）**：打破传统整文件覆盖局限，按单条高亮、手绘笔迹、文字框与 PPT 幻灯片页批注的唯一 ID 及删除墓碑进行元素级合并；即便两台设备离线在同一页 PPT 上各自撰写了不同批注，同步时也会自动无损归并双端内容。
-- **SSE 实时变更推送（`/api/sync/v1/events`）**：开启「实时变更推送」后保持轻量事件流长连接，任一设备提交新笔记或新批注，在线设备在数秒内自动唤醒完成增量同步。
-- **端到端加密（`PBKDF2-SHA256` 210,000 次迭代 + `HKDF` + `AES-256-GCM`）**：设置多端一致的同步加密口令后，口令仅留在本机派生 256 位密钥；所有记录标题、正文、目录标签、PDF/PPT 批注与原始附件均在上传前完成认证加密，自建或局域网同步节点磁盘上仅保存不可读密文。
+两台电脑使用同一个云盘客户端同步目录。打开「设置 → 多端协同 → 云盘文件夹」，选择该目录。DoNote 在所选文件夹下建立 `DoNote` 子目录，云盘客户端负责上传和下载。
 
-![四栏自适应偏好设置：多端协同、批注 CRDT 合并、SSE 实时推送与 AES-256-GCM 端到端加密](docs/screenshots/multi-device-sync.png)
+- **先同步目录**。另一台电脑先看到资料记录。记录更新和删除标记会随目录对齐。
+- **按需打开附件**。阅读时才读取所选附件，并核对 SHA-256。云盘客户端还在传输时，阅读器会提示等待该文件。资料库封面使用本机已有的附件。
+- **访问由云盘管理**。同步文件保存在所选云盘目录中，按云盘客户端的权限共享。
+
+![r142 设置中心的多端协同页。选择文件夹后可立即对齐](docs/screenshots/multi-device-sync.png)
 
 ### 6. 成就殿宇十卡体系与外部 AI 助手（MCP）连接器
 
@@ -106,32 +106,25 @@
 
 ## 下载、安装与在线自动升级
 
-> **版本下载指引**：最新正式增量发布页为 **[DoNote `r141` Release](https://github.com/yamccle/DoNote/releases/tag/r141)**（[GitHub Latest](https://github.com/yamccle/DoNote/releases/latest) 指向该版本），完整独立安装包位于 **[DoNote `r140` Release](https://github.com/yamccle/DoNote/releases/tag/r140)**。仓库同时独立托管离线语音与翻译大模型分卷包（[`models-2026-11-23`](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)）。
+### 正式版下载
 
-### 1. 正式版程序包下载（最新 `r141` · `26.1141.0087`）
+[GitHub 最新发行版](https://github.com/yamccle/DoNote/releases/latest)包含 **用户级安装向导**、**便携绿色压缩包**、**增量补丁** 与 **SHA-256 校验清单**。离线模型分卷可从[模型包发行页](https://github.com/yamccle/DoNote/releases/tag/models-2026-11-23)单独下载。
 
-| 资产文件 | 适用场景 | 精确大小 | SHA-256 校验摘要 |
+| 文件 | 用途 | 大小 | SHA-256 |
 | --- | --- | ---: | --- |
-| [`DoNote-Update-26.1140.0086-to-r141.zip`](https://github.com/yamccle/DoNote/releases/download/r141/DoNote-Update-26.1140.0086-to-r141.zip) | **极速增量升级**（本机当前为 `r140` / `26.1140.0086`，亦可在软件内点「检查在线更新」自动升级） | 491,000 字节（约 479 KB） | `1e179901127fc930cf1b6ed3a81cba414e9b0fd00ae9c9093eafae11c0fefab3` |
-| [`DoNote-r141-release.json`](https://github.com/yamccle/DoNote/releases/download/r141/DoNote-r141-release.json) | `r141` 发布溯源清单（源码提交 `878f853`、依赖锁与四项自动化门禁记录） | 984 字节 | `c97ad12cf30bb9d18aa4046d5b0c6ed7bbeaa0229bfad0e6f40c9d2623fe22df` |
-| [`DoNote-Windows-x64-r140.zip`](https://github.com/yamccle/DoNote/releases/download/r140/DoNote-Windows-x64-r140.zip) | **首次安装基础完整包**（或早于 `r140` 跨版本升级；解压运行后点一次「检查在线更新」即升至 `r141`） | 1,070,552,134 字节（约 1.00 GiB） | `e1dea0697fb71cb4736f4e25b4f4bc9bce7e088e814a6a1b59e29768cf0be7ca` |
+| [Windows x64 安装向导](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Setup-x64-r143.exe) | **推荐首次安装或无损覆盖升级**（免管理员权限，自动建快捷方式与注册卸载项） | 1,070,742,580 字节 | `f44a02ff0464508fea84455413e001abecdbc1e36049efc97fc5ab44cbcff8b0` |
+| [Windows x64 便携完整包](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Windows-x64-r143.zip) | 绿色免安装解压即用（适合 U 盘或自定义路径） | 1,070,574,588 字节 | `a5cc42ec01d8d7c9aa7c7f0e94b53a474190793a2d1f34f7f2f5ba25df42fff9` |
+| [r142 → r143 增量包](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Update-26.1142.0088-to-r143.zip) | 本机已安装 `r142`（亦可软件内自动检查更新） | 516,480 字节 | `3c21f03cc93fc4249140ef17469d0cd3c6e6c0189fcad603e5bec87d288a8d69` |
+| [r143 发布记录](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-r143-release.json) | 源码提交、依赖锁与全量门禁结果 | 1,212 字节 | `a34771649fcc740d20e146de06393ed69d5d00c6cf1a80eefe41e77b6e906868` |
+| [SHA256SUMS.txt](https://github.com/yamccle/DoNote/releases/download/r143/SHA256SUMS.txt) | 发行产物公开 SHA-256 校验文本 | 382 字节 | 核对上述 4 项下载指纹 |
 
-### 2. 运行环境、双轨安装与无损升级
+### 双轨安装、校验提示与无损升级
 
-- **运行环境**：Windows 10 / 11 x64，需具备 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)（Windows 11 与主流 Windows 10 系统均已内置）。
-- **双轨安装（二选一，与内置在线更新完全互通）**：
-  - **方式 A · 用户级安装向导（推荐普通用户）**：下载对应版本的 `DoNote-Setup-x64-<rev>.exe` 双击运行，无需管理员权限（默认安装至 `%LocalAppData%\Programs\DoNote`），自动创建桌面与开始菜单快捷方式并在 Windows「设置 → 应用」注册标准卸载入口；覆盖安装与默认卸载均完整保留 `Data/` 资料库与 `models/` 模型。
-  - **方式 B · 便携绿色压缩包（推荐 U 盘 / 自定义目录）**：将 `DoNote-Windows-x64-<rev>.zip` 解压至任意拥有读写权限的目录（例如 `D:\DoNote`），双击 `DoNote.exe` 即可开箱使用（无需安装额外数据库或配置环境变量）。
-- **Windows SmartScreen 提示与 SHA-256 完整性校验**：
-  - 当前阶段 `.exe` 安装向导暂未接入商业代码签名证书，首次从网络下载运行时 Windows Defender SmartScreen 可能弹出「Windows 已保护你的电脑」，点击 **「更多信息」→「仍要运行」** 即可继续安装。
-  - 每次正式发布均附带公开的 `SHA256SUMS.txt` 与 `DoNote-<rev>-release.json`，可在 PowerShell 中运行以下命令核对下载文件指纹是否与 Release 页完全一致：
-    ```powershell
-    Get-FileHash .\DoNote-Setup-x64-r142.exe -Algorithm SHA256
-    ```
-- **静默提示与一键在线自动升级（保留全部资料与模型）**：
-  1. **启动静默检测**：软件启动后会在后台静默查询 GitHub 最新正式版；若发现新版，仅在窗口顶部「设置」入口亮起温和琥珀色小圆点，绝不弹窗打断阅读思路。
-  2. **自动优选增量补丁**：打开「偏好设置 → 资料与系统 → **检查在线更新**」，DoNote 会自动根据本机当前版本号优先下载百 KB 级增量补丁（跨版本时自动回退完整包），流式核验 SHA-256 与文件清单无误后，交由独立 `DoNoteUpdater.exe` 备份旧程序至上级 `DoNote-Backups`、原子替换并自动重启。
-  3. **离线本地包升级**：在无外网环境点击「本地更新包…」选取下载好的增量或完整 ZIP 即可执行同等校验与回滚保护流程；**任何升级操作均严格隔离保护用户的 `Data/`、`data-location.txt` 与 `models/` 目录**。
+1. **方式 A · 用户级安装向导（推荐）**：在 Windows 10 或 11 x64 上双击 `DoNote-Setup-x64-r143.exe`，默认安装到 `%LocalAppData%\Programs\DoNote`（无需管理员权限），支持覆盖升级保留 `Data/` 与 `models/`，默认安全卸载亦完整保留个人资料库与模型。
+   - **SmartScreen 提示与 SHA-256 核对**：现阶段安装包暂未接入商业代码签名，从网络下载后首次运行如遇 Windows SmartScreen 拦截，点击 **「更多信息」→「仍要运行」** 即可；安装前可在 PowerShell 运行 `Get-FileHash .\DoNote-Setup-x64-r143.exe -Algorithm SHA256` 对照上表与 `SHA256SUMS.txt` 确认文件未被篡改。
+2. **方式 B · 便携绿色压缩包**：解压 `DoNote-Windows-x64-r143.zip` 至任意读写目录，双击 `DoNote.exe` 即可运行（依赖系统内置 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)）。
+3. **软件内一键在线升级**：打开「设置 → 资料与系统 → 检查在线更新」（或点「选择本地 ZIP…」选增量包），DoNote 会自动计算最短更新路径、校验全部文件哈希、暂存编辑状态并按序无损升级（完整保留 `Data/` 与 `models/`）。
+4. **失败后继续**：某一步安装失败时，更新器会回退该步。再次检查更新时会从最后成功的版本选包。
 
 ---
 
@@ -144,10 +137,13 @@
 - **云端版本化快照（Google Drive / WebDAV）**：支持绑定桌面版 [Google 云端硬盘同步目录](https://support.google.com/drive/answer/13401938?hl=zh-Hans) 或 HTTPS WebDAV 服务器（亦可搭配 [rclone serve webdav](https://rclone.org/commands/rclone_serve_webdav/)），生成带完成标记与 SHA-256 校验值的版本化归档，支持自动保留最近 `3 / 5 / 10 / 20` 份快照并安全清理超限旧版本。
 - **轻量单文件导出与增量无损恢复**：总附件 `500 MB` 内支持一键导出 ZIP / JSON，或仅导出纯文本 Markdown 大纲；恢复导入时自动按记录编号与内容指纹跳过重复项并重映射文献引用关系，绝不覆盖既有笔记。
 
-### 2. 自建局域网 / 云端多设备同步节点
+### 2. 在另一台电脑继续阅读
 
-1. **局域网双机直连**：在主机打开「AI 管理 → 启动并连接本机服务」（或运行 `ai-bridge\Start-Local.cmd`），在另一台电脑打开「偏好设置 → **多端协同**」，填入主机局域网地址与管理令牌即可握手同步。
-2. **Docker 容器化常驻节点**：仓库 `work/ai-bridge/Dockerfile` 提供轻量级零依赖 Node.js 同步与桥接镜像，挂载持久化数据卷并设置管理令牌后，多台电脑开启 **「实时变更推送（SSE）」** 并填入相同的 **「同步加密口令（AES-256-GCM）」**，即可获得端到端加密的实时多端工作台。
+1. 在两台电脑上安装同一云盘客户端，例如 Google Drive 桌面版、坚果云或 Nextcloud，并同步同一个文件夹。
+2. 在 DoNote 的「设置 → 多端协同」分别选择该文件夹，点击「立即对齐」。
+3. 在第一台电脑加一份资料。目录同步后，在第二台打开该附件。云盘文件夹中的资料可随使用需要逐份读取。
+
+云端备份用于保留可恢复的版本。多端协同用于对齐两台电脑的资料目录。
 
 ---
 
@@ -179,7 +175,11 @@
 | 均衡 · `large-v3-turbo` | `models\asr\large-v3-turbo` | [hf-mirror · turbo](https://hf-mirror.com/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf) | [HF · turbo](https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf) | 1,617,884,929 字节<br>`e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da` |
 | 高准确 · `large-v3` | `models\asr\large-v3` | [hf-mirror · large-v3](https://hf-mirror.com/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478) | [HF · large-v3](https://huggingface.co/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478) | 3,087,284,237 字节<br>`69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1` |
 
-### 2. 本地大模型翻译（`Qwen3` GGUF，按需选装一档）
+### 2. 文献翻译三级加速：离线 GGUF、可选 Vulkan GPU 与云端并发 API
+
+- **自动级联与多段打包批译（开箱即用）**：使用本地 `Qwen3` GGUF 翻译论文时，短句与无公式块自动分流到内置 `opus-mt-en-zh` 快速直译，长难段与公式段按批打包为编号 JSON 一次推理。
+- **可选 Vulkan GPU 加速**：可在 DoNote 安装目录执行 `pwsh -File .\tools\enable-vulkan-gpu.ps1 -InstallDir <你的安装目录>` 安装独立的 `vulkan-dependencies` 加速层（支持 AMD / NVIDIA / Intel 核显与独显；传入 `-Disable` 可一键回退 CPU）。
+- **云端大模型并发 API（1–3 秒整页）**：在「设置 → AI 与翻译 → 翻译服务」选择「云端大模型（OpenAI 兼容 · 并发极速）」，配置 DeepSeek、通义千问、OpenAI 或本地 Ollama 接口与并发数（1–16）即可并发加速划词、整页对照与智能排版翻译。
 
 安装包已内置 `llama.cpp` 推理后端，下载任一 GGUF 权重按「保存目标文件名」放入 `models\translation\`（注意从 `bartowski` 下载 4B / 1.7B 时去掉文件名前缀 `Qwen_`），在「偏好设置 → AI 与翻译」将翻译源切换为「本地大模型」即可离线使用：
 
@@ -197,10 +197,10 @@
 
 ```
 DoNote/
-├── work/desktop/              # Windows 桌面宿主 (C# WinForms + WebView2)、四栏设置中心、静默/在线更新器、云备份与本地进程桥
-├── work/analog-notes/public/  # 工作台前端核心：莫兰迪总览、拖拽分拣台、研究方向治理、PDF/PPT/网页/视频多模态阅读器与 E2EE/CRDT 同步内核
+├── work/desktop/              # Windows 桌面宿主 (C# WinForms + WebView2)、四栏设置中心、静默/在线更新器、文件夹协同、云备份与本地进程桥
+├── work/analog-notes/public/  # 工作台前端核心：莫兰迪总览、拖拽分拣台、研究方向治理、PDF/PPT/网页/视频多模态阅读器与后台任务中心
 ├── work/analog-notes/scripts/ # 桌面分文件工作台打包与单文件便携离线 HTML 构建脚本
-├── work/ai-bridge/            # 本机与自建节点服务：MCP 外部助手授权网关 + /api/sync/v1 (去重块存储 / CRDT 批注 / SSE 推送 / E2EE 信封)
+├── work/ai-bridge/            # 本机与自建节点服务：MCP 外部助手授权网关与同步服务接口
 ├── work/video-runtime-build/  # 纳入版本控制的定制双语排版翻译源码子模块（Python 运行时由锁定归档提供）
 ├── tools/                     # 确定性发布流水线 tools/release.ps1 与全链路隔离回归测试套件 tools/tests/
 └── docs/                      # 发布溯源与依赖锁 (docs/releases/)、工程交接指南 (docs/HANDOFF.md) 与界面截图
@@ -208,16 +208,18 @@ DoNote/
 
 ### 从源码构建与发布校验
 
-构建环境需准备 Windows x64、PowerShell 7、.NET Framework 4.x `csc.exe`、Node.js（≥ 22）、Git、Microsoft Edge Stable 与 Playwright，并放置 [docs/releases/runtime-lock.json](docs/releases/runtime-lock.json) 锁定的 `r122` 运行依赖归档：
+重建该版本请先检出 `r143` 标签。构建环境需准备 Windows x64、PowerShell 7、.NET Framework 4.x `csc.exe`、Node.js（≥ 22）、Git、Microsoft Edge Stable 与 Playwright，并放置 [docs/releases/runtime-lock.json](docs/releases/runtime-lock.json) 锁定的 `r122` 运行依赖归档：
 
 ```powershell
-# 1. 运行隔离工作台全链路回归（含 1 GiB 大 PDF 区间读取、双向引用、PPT 讲义、视频 AI 问答、E2EE + CRDT + SSE 同步验证）
+# 验证工作台、更新链、安装向导及文献翻译加速
 node tools/tests/test-workspace.mjs <候选构建目录>/workspace
+pwsh -File tools/tests/test-update-chain.ps1
+pwsh -File tools/tests/test-setup-installer.ps1
 
-# 2. 从干净的 Git 提交一键构建并核验下一版完整包、增量包、升级回滚保护与发布清单
-pwsh -File tools/release.ps1 -Revision r141 -Version 26.1141.0087 `
+# 已有锁定的运行依赖和本地 r142 完整包时，可重建 r143（同步产出安装向导 .exe + 便携 .zip + 增量包 + SHA256SUMS.txt）
+pwsh -File tools/release.ps1 -Revision r143 -Version 26.1143.0089 `
   -RuntimeArchive .\outputs\DoNote-Windows-x64-2026-11-21-r122-交互优化.zip `
-  -PreviousReleaseZip .\outputs\r140\DoNote-Windows-x64-r140.zip `
+  -PreviousReleaseZip .\outputs\r142\DoNote-Windows-x64-r142.zip `
   -OutputDirectory .\outputs
 ```
 
@@ -251,4 +253,4 @@ DoNote 基于以下优秀的开源软件与公开模型权重构建（各组件�
 - **Noto Sans SC / Source Han Serif CN（思源黑体 / 思源宋体）**：SIL Open Font License 1.1（见 `docs/licenses/NotoSansSC-OFL.txt`）
 
 ### 4. DoNote 自身权利与合规说明
-当前仓库尚未对 DoNote 原创代码与文档单独授予开源许可证，在维护者补充仓库级 `LICENSE` 前默认保留所有权利；仓库内随附的第三方修改源码子目录及发布包集成的各开源组件均各自继续适用其上游开源许可证条款。如涉及署名或许可合规疑问，欢迎通过 [GitHub Issues](https://github.com/yamccle/DoNote/issues) 联系维护者。
+当前仓库尚未对 DoNote 原创代码与文档单独授予开源许可证，在维护者补充仓库级 `LICENSE` 前默认保留所有权利；仓库内随附的第三方修改源码子目录及发布包集成的各开源组件均各自继续适用其上游开源许可证条款。如认为项目中的内容侵犯了您的权利，请通过 [GitHub Issues](https://github.com/yamccle/DoNote/issues) 联系维护者。核实后会更正或移除相关内容。
