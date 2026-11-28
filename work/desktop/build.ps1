@@ -183,6 +183,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination $Outpu
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '开始使用.md'),(Join-Path $PSScriptRoot '视频字幕使用说明.md'),(Join-Path $PSScriptRoot '视频模型下载说明.md'),(Join-Path $PSScriptRoot '本地离线翻译模型说明.md'),(Join-Path $PSScriptRoot '模型目录说明.md'),(Join-Path $PSScriptRoot 'MinerU智能排版说明.md'),(Join-Path $PSScriptRoot '../ai-bridge/AI接入指南.md') -Destination $docs
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '使用说明.md') -Destination $docs
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '重置为初始状态.cmd') -Destination $tools -ErrorAction SilentlyContinue
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'enable-vulkan-gpu.ps1') -Destination $tools -ErrorAction SilentlyContinue
 
 $hasher = [Security.Cryptography.SHA256]::Create()
 try {

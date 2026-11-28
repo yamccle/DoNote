@@ -19,6 +19,7 @@
    $('translationOpenAiBaseUrlField').hidden=value!=='openai';
    $('translationOpenAiModelField').hidden=value!=='openai';
    $('translationOpenAiConcurrencyField').hidden=value!=='openai';
+   $('translationOpenAiConcurrency').disabled=value!=='openai';
    $('translationAppIdField').hidden=value!=='baidu';
    $('translationKeyField').hidden=value!=='baidu'&&value!=='azure'&&value!=='openai';
    $('translationRegionField').hidden=value!=='azure';

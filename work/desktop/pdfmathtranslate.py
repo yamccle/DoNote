@@ -176,6 +176,7 @@ def main(request):
                         "公式标记的内容和数量必须与原文一致。"
                     )
                     attempts = 2 if len(words) > 3 else 1
+                    last_error = None
                     for attempt in range(attempts):
                         reminder = "\n不要解释、遗漏或添加任何公式标记。" if attempt else ""
                         prompt = (
@@ -196,13 +197,17 @@ def main(request):
                                     max(96, min(2048, len(source) + 64)),
                                 )
                             answer = clean_answer(content)
+                            last_error = None
                         except Exception as error:
                             if engine == "gguf" and GGUF.model is None:
                                 raise
+                            last_error = error
                             print("PDFMathTranslate paragraph error:", error, file=sys.stderr)
                             continue
                         if finish_reason != "length" and valid_translation(source, answer, words, expected):
                             return answer
+                    if engine == "openai" and last_error is not None:
+                        raise last_error
                     return ""
 
                 def _llm_batch(self, group):
@@ -479,6 +484,19 @@ def main(request):
                         skipped_paragraphs += 1
                         return source
 
+                    if engine == "openai":
+                        try:
+                            answer = self._llm_single(source, words, expected)
+                            if answer:
+                                if cache_enabled:
+                                    self.cache.set(source, answer)
+                                emit({"type": "pdf2zh-paragraph", "text": answer})
+                                return answer
+                        except Exception as error:
+                            model_error = error
+                        skipped_paragraphs += 1
+                        return source
+
                     # One worker only needs the selected engine's model in memory.
                     OFFLINE = None
                     instruction = (
@@ -540,7 +558,7 @@ def main(request):
                 mono_only=True,
             )
             if model_error is not None:
-                label = "离线快速翻译模型" if engine == "offline" else "本地大模型"
+                label = "离线快速翻译模型" if engine == "offline" else "云端大模型" if engine == "openai" else "本地大模型"
                 raise ValueError(f"无法加载{label}：{model_error}") from model_error
 
         with pymupdf.open(stream=mono, filetype="pdf") as translated:
