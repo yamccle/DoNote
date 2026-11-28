@@ -337,6 +337,10 @@
   cursor: pointer;
 }
 
+.reader-task-pill[hidden] {
+  display: none !important;
+}
+
 .task-center-popover {
   margin: 0;
   padding: 0;

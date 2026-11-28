@@ -26,6 +26,9 @@ internal sealed partial class WorkspaceWindow
     private int pdf2zhNextChunk;
     private Process pdf2zhProcess;
     private string pdf2zhRequestId;
+    private string pdf2zhCancelFile;
+    private CancellationTokenSource pdf2zhKillFallback;
+    private readonly SemaphoreSlim pdf2zhWorkerGate = new SemaphoreSlim(1, 1);
     private System.Windows.Forms.Timer pdf2zhIdleTimer;
     private readonly Dictionary<Process, string> pdf2zhWorkerDirectories = new Dictionary<Process, string>();
     private readonly Dictionary<Process, StringBuilder> documentWorkerDiagnostics = new Dictionary<Process, StringBuilder>();
@@ -113,97 +116,114 @@ internal sealed partial class WorkspaceWindow
                 var documentId = request.TryGetValue("documentId", out value) ? Convert.ToString(value) : "";
                 if (type == "pdf2zh-cancel-page")
                 {
-                    if (documentId == pdf2zhDocumentId && id == pdf2zhRequestId) StopPdf2zhPage();
+                    if (documentId == pdf2zhDocumentId && id == pdf2zhRequestId) RequestCancelPdf2zhPage();
                     return true;
                 }
-                if (pdf2zhRequestId != null) throw new InvalidOperationException("已有 PDFMathTranslate 任务在运行。");
-                if (pdf2zhStream != null || String.IsNullOrEmpty(pdf2zhPath) || documentId != pdf2zhDocumentId || !File.Exists(pdf2zhPath))
-                    throw new InvalidOperationException("PDF 尚未准备完成。");
-                var start = request.TryGetValue("start", out value) ? Convert.ToInt32(value) : 0;
-                var end = request.TryGetValue("end", out value) ? Convert.ToInt32(value) : 0;
-                var preference = request.TryGetValue("preference", out value) ? Convert.ToString(value) : "large";
-                var mode = request.TryGetValue("mode", out value) ? Convert.ToString(value) : "fast";
-                if (start < 1 || end != start) throw new InvalidDataException("整页对照每次处理一页。");
-                if (mode != "fast" && mode != "full") throw new InvalidDataException("PDFMathTranslate 模式无效。");
-                var offline = preference == "offline";
-                string model;
-                Dictionary<string, object> openaiConfig;
-                var engine = ResolveDocumentTranslationEngine(preference, out model, out openaiConfig);
-                if (bilingualPairRequestId == null) StopBilingualPairWorker();
-                var directory = pdf2zhDirectory;
-                var output = Path.Combine(directory, "page-" + Guid.NewGuid().ToString("N"));
-                var payload = documentTranslationJson.Serialize(CleanDocumentTranslationValue(new
-                {
-                    source = pdf2zhPath,
-                    output,
-                    start,
-                    end,
-                    model,
-                    mode,
-                    engine,
-                    openai = openaiConfig
-                }));
-                var process = EnsureDocumentWorker(ref pdf2zhProcess, "pdfmathtranslate.py",
-                    "pdfmathtranslate-dependencies", "PDFMathTranslate");
-                pdf2zhRequestId = id;
-                pdf2zhWorkerDirectories.Add(process, directory);
+                if (pdf2zhRequestId != null) RequestCancelPdf2zhPage();
+                await pdf2zhWorkerGate.WaitAsync();
                 try
                 {
-                    PostWorkspaceMessage(web, new { type = "pdf2zh-progress", id,
-                        status = (offline ? "离线快速翻译" : engine == "openai" ? "云端大模型并发翻译" : "本地大模型翻译") + " · 第 " + start + " 页…" });
-                    Dictionary<string, object> result;
+                    if (pdf2zhStream != null || String.IsNullOrEmpty(pdf2zhPath) || documentId != pdf2zhDocumentId || !File.Exists(pdf2zhPath))
+                        return true;
+                    var start = request.TryGetValue("start", out value) ? Convert.ToInt32(value) : 0;
+                    var end = request.TryGetValue("end", out value) ? Convert.ToInt32(value) : 0;
+                    var preference = request.TryGetValue("preference", out value) ? Convert.ToString(value) : "large";
+                    var mode = request.TryGetValue("mode", out value) ? Convert.ToString(value) : "fast";
+                    if (start < 1 || end != start) throw new InvalidDataException("整页对照每次处理一页。");
+                    if (mode != "fast" && mode != "full") throw new InvalidDataException("PDFMathTranslate 模式无效。");
+                    var offline = preference == "offline";
+                    string model;
+                    Dictionary<string, object> openaiConfig;
+                    var engine = ResolveDocumentTranslationEngine(preference, out model, out openaiConfig);
+                    if (bilingualPairRequestId == null) StopBilingualPairWorker();
+                    var directory = pdf2zhDirectory;
+                    var output = Path.Combine(directory, "page-" + Guid.NewGuid().ToString("N"));
+                    var cancelFile = output + ".cancel";
+                    var payload = documentTranslationJson.Serialize(CleanDocumentTranslationValue(new
+                    {
+                        source = pdf2zhPath,
+                        output,
+                        cancelFile,
+                        start,
+                        end,
+                        model,
+                        mode,
+                        engine,
+                        openai = openaiConfig
+                    }));
+                    var process = EnsureDocumentWorker(ref pdf2zhProcess, "pdfmathtranslate.py",
+                        "pdfmathtranslate-dependencies", "PDFMathTranslate");
+                    pdf2zhRequestId = id;
+                    pdf2zhCancelFile = cancelFile;
+                    pdf2zhWorkerDirectories[process] = directory;
                     try
                     {
-                        result = await RunDocumentWorker(process, payload, "pdf2zh-result", TimeSpan.FromMinutes(25),
-                            "整页翻译超时，请重试。", message =>
+                        PostWorkspaceMessage(web, new { type = "pdf2zh-progress", id,
+                            status = (offline ? "离线快速翻译" : engine == "openai" ? "云端大模型并发翻译" : "本地大模型翻译") + " · 第 " + start + " 页…" });
+                        Dictionary<string, object> result;
+                        try
                         {
-                            if (process == pdf2zhProcess && message["type"] as string == "pdf2zh-paragraph")
-                                PostDocumentWorkerMessage(web, new { type = "pdf2zh-paragraph", id, text = message["text"] });
-                        });
-                    }
-                    catch
-                    {
-                        if (process != pdf2zhProcess) return true;
-                        StopPdf2zhPage();
-                        throw;
-                    }
-                    if (process != pdf2zhProcess) return true;
-                    if (result.ContainsKey("error"))
-                        throw new InvalidOperationException(Convert.ToString(result["error"]));
-                    var monoPath = Path.GetFullPath(Convert.ToString(result["mono"]));
-                    var expectedRoot = Path.GetFullPath(output).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-                    if (!monoPath.StartsWith(expectedRoot, StringComparison.OrdinalIgnoreCase) || !File.Exists(monoPath))
-                        throw new InvalidDataException("译文 PDF 无效。");
-                    using (var stream = File.OpenRead(monoPath))
-                    {
-                        if (stream.Length <= 0 || stream.Length > 80L * 1024 * 1024)
-                            throw new InvalidDataException("译文 PDF 大小超出预览限制。");
-                        var buffer = new byte[Pdf2zhChunkBytes];
-                        var seq = 0;
-                        int count;
-                        while ((count = stream.Read(buffer, 0, buffer.Length)) != 0)
-                        {
-                            if (process != pdf2zhProcess || IsDisposed || Disposing) return true;
-                            if (string.Equals(web.Source, WorkspaceUrl, StringComparison.Ordinal))
-                                web.PostWebMessageAsJson(documentTranslationJson.Serialize(new {
-                                    type = "pdf2zh-output", id, seq = seq++, data = Convert.ToBase64String(buffer, 0, count)
-                                }));
-                            await Task.Yield();
+                            result = await RunDocumentWorker(process, payload, "pdf2zh-result", TimeSpan.FromMinutes(25),
+                                "整页翻译超时，请重试。", message =>
+                            {
+                                if (process == pdf2zhProcess && message["type"] as string == "pdf2zh-paragraph")
+                                    PostDocumentWorkerMessage(web, new { type = "pdf2zh-paragraph", id, text = message["text"] });
+                            });
                         }
-                        if (process != pdf2zhProcess || IsDisposed || Disposing) return true;
-                        PostWorkspaceMessage(web, new { type = "pdf2zh-result", id, start, end, size = stream.Length,
-                            untranslatedPages = result.TryGetValue("untranslatedPages", out value) ? value : null,
-                            skippedParagraphs = result.TryGetValue("skippedParagraphs", out value) ? value : null });
+                        catch
+                        {
+                            if (process != pdf2zhProcess) return true;
+                            StopPdf2zhPage();
+                            throw;
+                        }
+                        finally
+                        {
+                            ClearCancelKillFallback();
+                        }
+                        if (process != pdf2zhProcess) return true;
+                        if (result.ContainsKey("cancelled")) return true;
+                        if (result.ContainsKey("error"))
+                            throw new InvalidOperationException(Convert.ToString(result["error"]));
+                        var monoPath = Path.GetFullPath(Convert.ToString(result["mono"]));
+                        var expectedRoot = Path.GetFullPath(output).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                        if (!monoPath.StartsWith(expectedRoot, StringComparison.OrdinalIgnoreCase) || !File.Exists(monoPath))
+                            throw new InvalidDataException("译文 PDF 无效。");
+                        using (var stream = File.OpenRead(monoPath))
+                        {
+                            if (stream.Length <= 0 || stream.Length > 80L * 1024 * 1024)
+                                throw new InvalidDataException("译文 PDF 大小超出预览限制。");
+                            var buffer = new byte[Pdf2zhChunkBytes];
+                            var seq = 0;
+                            int count;
+                            while ((count = stream.Read(buffer, 0, buffer.Length)) != 0)
+                            {
+                                if (process != pdf2zhProcess || IsDisposed || Disposing) return true;
+                                if (string.Equals(web.Source, WorkspaceUrl, StringComparison.Ordinal))
+                                    web.PostWebMessageAsJson(documentTranslationJson.Serialize(new {
+                                        type = "pdf2zh-output", id, seq = seq++, data = Convert.ToBase64String(buffer, 0, count)
+                                    }));
+                                await Task.Yield();
+                            }
+                            if (process != pdf2zhProcess || IsDisposed || Disposing) return true;
+                            PostWorkspaceMessage(web, new { type = "pdf2zh-result", id, start, end, size = stream.Length,
+                                untranslatedPages = result.TryGetValue("untranslatedPages", out value) ? value : null,
+                                skippedParagraphs = result.TryGetValue("skippedParagraphs", out value) ? value : null });
+                        }
+                    }
+                    finally
+                    {
+                        if (process == pdf2zhProcess) { pdf2zhRequestId = null; pdf2zhCancelFile = null; }
+                        else process.Dispose();
+                        pdf2zhWorkerDirectories.Remove(process);
+                        try { if (File.Exists(cancelFile)) File.Delete(cancelFile); } catch { }
+                        DeletePdf2zhDirectory(output);
+                        if (directory != pdf2zhDirectory && !pdf2zhWorkerDirectories.ContainsValue(directory))
+                            DeletePdf2zhDirectory(directory);
                     }
                 }
                 finally
                 {
-                    if (process == pdf2zhProcess) pdf2zhRequestId = null;
-                    else process.Dispose();
-                    pdf2zhWorkerDirectories.Remove(process);
-                    DeletePdf2zhDirectory(output);
-                    if (directory != pdf2zhDirectory && !pdf2zhWorkerDirectories.ContainsValue(directory))
-                        DeletePdf2zhDirectory(directory);
+                    pdf2zhWorkerGate.Release();
                 }
                 return true;
             }
@@ -464,14 +484,41 @@ internal sealed partial class WorkspaceWindow
         }
     }
 
+    private void RequestCancelPdf2zhPage()
+    {
+        var cancelFile = pdf2zhCancelFile;
+        if (!String.IsNullOrEmpty(cancelFile))
+        {
+            try { File.WriteAllBytes(cancelFile, new byte[0]); } catch { }
+        }
+        ClearCancelKillFallback();
+        var fallback = new CancellationTokenSource();
+        pdf2zhKillFallback = fallback;
+        var token = fallback.Token;
+        Task.Delay(6000, token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return;
+            try { BeginInvoke((Action)(() => { if (pdf2zhKillFallback == fallback) StopPdf2zhPage(); })); }
+            catch { }
+        });
+    }
+
+    private void ClearCancelKillFallback()
+    {
+        var fallback = pdf2zhKillFallback;
+        pdf2zhKillFallback = null;
+        if (fallback == null) return;
+        try { fallback.Cancel(); fallback.Dispose(); } catch { }
+    }
+
     private void ClosePdf2zhDocument()
     {
-        if (pdf2zhRequestId != null) StopPdf2zhPage();
+        if (pdf2zhRequestId != null) RequestCancelPdf2zhPage();
         CleanupPdf2zhPdf();
         if (pdf2zhProcess == null) return;
         if (pdf2zhIdleTimer == null)
         {
-            pdf2zhIdleTimer = new System.Windows.Forms.Timer { Interval = 60000 };
+            pdf2zhIdleTimer = new System.Windows.Forms.Timer { Interval = 300000 };
             pdf2zhIdleTimer.Tick += (sender, args) => StopPdf2zhPage();
         }
         pdf2zhIdleTimer.Start();
@@ -479,10 +526,12 @@ internal sealed partial class WorkspaceWindow
 
     private void StopPdf2zhPage()
     {
+        ClearCancelKillFallback();
         if (pdf2zhIdleTimer != null) pdf2zhIdleTimer.Stop();
         var process = pdf2zhProcess;
         pdf2zhProcess = null;
         pdf2zhRequestId = null;
+        pdf2zhCancelFile = null;
         if (process == null) return;
         StopDocumentWorker(process);
         if (!pdf2zhWorkerDirectories.ContainsKey(process)) process.Dispose();

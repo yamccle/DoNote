@@ -143,6 +143,11 @@ function installPdfReflow(session,originalBar,tools,layout){
    <button type="button" id="pdfReflowTranslate" aria-pressed="false"><strong>排版翻译</strong><small>逐段对照原文与译文</small></button>
   </div>
   <button type="button" id="pdfReflowOriginal" class="secondary" hidden>返回 PDF</button>
+  <div id="pdfReflowPager" class="pdf-toolbar-group" role="group" aria-label="排版翻页" hidden>
+   <button type="button" class="secondary" id="pdfReflowPrev" aria-label="排版上一页">‹</button>
+   <input id="pdfReflowPageInput" type="number" min="1" step="1" aria-label="排版页码"><span id="pdfReflowTotal"></span>
+   <button type="button" class="secondary" id="pdfReflowNext" aria-label="排版下一页">›</button>
+  </div>
   <select id="pdfReflowZoom" aria-label="智能排版缩放" hidden></select>
   <div id="pdfBilingualControls" class="pdf-bilingual-controls" hidden>
    <select id="pdfBilingualView" aria-label="排版翻译显示方式"><option value="both">双语对照</option><option value="source">仅原文</option><option value="target">仅译文</option></select>
@@ -165,6 +170,10 @@ function installPdfReflow(session,originalBar,tools,layout){
 
  const smart=bar.querySelector('#pdfReflowSmart'),translate=bar.querySelector('#pdfReflowTranslate');
  const original=bar.querySelector('#pdfReflowOriginal'),status=view.querySelector('#pdfReflowStatus');
+ const reflowPager=bar.querySelector('#pdfReflowPager'),reflowPrev=bar.querySelector('#pdfReflowPrev');
+ const reflowNext=bar.querySelector('#pdfReflowNext'),reflowPageInput=bar.querySelector('#pdfReflowPageInput');
+ reflowPageInput.max=String(session.pdf.numPages);
+ bar.querySelector('#pdfReflowTotal').textContent='/ '+session.pdf.numPages+' 页';
  const retry=view.querySelector('#pdfReflowRetry'),scroller=view.querySelector('.pdf-reflow-scroll');
  const documentPane=view.querySelector('.pdf-reflow-document');
  const zoom=bar.querySelector('#pdfReflowZoom');
@@ -217,6 +226,7 @@ function installPdfReflow(session,originalBar,tools,layout){
   bilingualControls.hidden=exportBilingual.hidden=!run?.bilingual;
   bilingualEngine.hidden=!run?.bilingual||!window.BilingualBook?.available||run.source!=='en'||run.target!=='zh';
   original.hidden=!run;
+  reflowPager.hidden=!run;
   zoom.hidden=!run;
   view.dataset.bilingual=String(!!run?.bilingual);
  }
@@ -439,9 +449,7 @@ function installPdfReflow(session,originalBar,tools,layout){
    };
    missing.sort((left,right)=>distance(left)-distance(right));
    let chars=0;
-   const hasReady=entries.some(entry=>entry.target.dataset.ready==='true');
-   const limit=provider==='openai'?10:(hasReady?5:1);
-   const charLimit=provider==='openai'?5000:2200;
+   const limit=32,charLimit=9000;
    missing=missing.filter((entry,index)=>{
     chars+=entry.block.text.length;
     return index<limit&&(index===0||chars<=charLimit);
@@ -535,17 +543,23 @@ function installPdfReflow(session,originalBar,tools,layout){
   if(!next)return;
   state.translating=next;
   next.translating=true;
+  const rTaskId='reflow:doc:'+(session.file?.id||fingerprint);
+  window.DoNoteTasks?.upsert?.(rTaskId,{kind:'translate',fileId:session.file?.id||null,profileId:session.profileId||null,page:next.pageNumber,openWhileRunning:true,title:(session.file?.name?session.file.name+' · 排版翻译':'PDF 排版翻译'),detail:'正在并发翻译第 '+next.pageNumber+' 页（共 '+next.entries.length+' 段）…',percent:null,state:'running'});
   updateStatus();
   try{
    const error=await translatePage(next,state,true);
-   if(error)state.failures.set(next.pageNumber,'翻译未完成。'+error);
-   else{
+   if(error){
+    state.failures.set(next.pageNumber,'翻译未完成。'+error);
+    window.DoNoteTasks?.upsert?.(rTaskId,{kind:'translate',fileId:session.file?.id||null,profileId:session.profileId||null,page:next.pageNumber,title:(session.file?.name?session.file.name+' · 排版翻译':'PDF 排版翻译'),detail:'第 '+next.pageNumber+' 页：'+error,percent:null,state:'error'});
+   }else{
     next.finished=next.entries.every(entry=>entry.target.dataset.ready==='true');
     const completed=next.entries.filter(entry=>entry.target.dataset.ready==='true').length;
     next.message=next.finished?'翻译完成':'已翻译 '+completed+' / '+next.entries.length+' 段';
+    window.DoNoteTasks?.upsert?.(rTaskId,{kind:'translate',fileId:session.file?.id||null,profileId:session.profileId||null,page:next.pageNumber,title:(session.file?.name?session.file.name+' · 排版翻译':'PDF 排版翻译'),detail:'已完成第 '+next.pageNumber+' 页排版翻译',percent:100,state:'done'});
    }
   }catch(error){
    if(!state.signal.aborted)state.failures.set(next.pageNumber,error.message||'翻译失败。');
+   else window.DoNoteTasks?.remove?.(rTaskId);
   }finally{
    state.translating=null;
    next.translating=false;
@@ -561,7 +575,10 @@ function installPdfReflow(session,originalBar,tools,layout){
    state.signal.throwIfAborted();
    page.message=warning||engine+'排版完成';
    state.pages.set(pageNumber,page);
+   const aboveViewport=placeholder.getBoundingClientRect().bottom<=scroller.getBoundingClientRect().top+8;
+   const beforeHeight=aboveViewport?scroller.scrollHeight:0;
    placeholder.replaceWith(page.section);
+   if(aboveViewport)scroller.scrollTop+=scroller.scrollHeight-beforeHeight;
    if(page.figures.length)requestAnimationFrame(()=>void loadFigures(page,state.signal).catch(()=>{}));
   }catch(error){
    if(!state.signal.aborted){
@@ -575,27 +592,50 @@ function installPdfReflow(session,originalBar,tools,layout){
   }
  }
 
+ async function mountReflowPlaceholder(state,pageNumber,prepend=false){
+  const cached=pageLayouts.get(pageNumber);
+  let placeholder,basic;
+  const getBasic=()=>basic??=basicPageLayout(pageNumber);
+  if(hasMinerU&&!cached){
+   const blocks=await getBasic().catch(()=>[]);
+   state.signal.throwIfAborted();
+   placeholder=(await buildPage(pageNumber,blocks,state,{provisional:true})).section;
+   state.signal.throwIfAborted();
+  }else{
+   placeholder=document.createElement('article');
+   placeholder.dataset.reflowPage=pageNumber;
+  }
+  if(prepend){
+   const beforeHeight=scroller.scrollHeight;
+   documentPane.prepend(placeholder);
+   scroller.scrollTop+=scroller.scrollHeight-beforeHeight;
+  }else{
+   documentPane.append(placeholder);
+  }
+  state.layouts.set(pageNumber,{placeholder,getBasic});
+  return placeholder;
+ }
+
  async function appendPage(state){
   if(state.appending||state.next>session.pdf.numPages)return;
   state.appending=true;
   const pageNumber=state.next++;
-  const cached=pageLayouts.get(pageNumber);
-  let placeholder,basic;
-  const getBasic=()=>basic??=basicPageLayout(pageNumber);
   try{
-   if(hasMinerU&&!cached){
-    const blocks=await getBasic().catch(()=>[]);
-    state.signal.throwIfAborted();
-    placeholder=(await buildPage(pageNumber,blocks,state,{provisional:true})).section;
-    state.signal.throwIfAborted();
-   }else{
-    placeholder=document.createElement('article');
-    placeholder.dataset.reflowPage=pageNumber;
-   }
-   documentPane.append(placeholder);
-   state.layouts.set(pageNumber,{placeholder,getBasic});
+   await mountReflowPlaceholder(state,pageNumber,false);
   }finally{
    state.appending=false;
+   if(!state.signal.aborted)requestAnimationFrame(refresh);
+  }
+ }
+
+ async function prependPage(state){
+  if(state.prepending||state.prev<1)return null;
+  state.prepending=true;
+  const pageNumber=state.prev--;
+  try{
+   return await mountReflowPlaceholder(state,pageNumber,true);
+  }finally{
+   state.prepending=false;
    if(!state.signal.aborted)requestAnimationFrame(refresh);
   }
  }
@@ -604,10 +644,14 @@ function installPdfReflow(session,originalBar,tools,layout){
  function refresh(){
   const state=run;
   if(!state||state.signal.aborted)return;
+  const current=visiblePage();
+  if(document.activeElement!==reflowPageInput)reflowPageInput.value=String(current);
+  reflowPrev.disabled=current<=1;
+  reflowNext.disabled=current>=session.pdf.numPages;
   updateStatus();
-  const first=visiblePage(),last=visiblePage(scroller.clientHeight)+1;
+  const first=Math.max(1,current-1),last=visiblePage(scroller.clientHeight)+1;
   if(!state.parsing){
-   for(let number=first;number<=last;number++){
+   for(let number=current;number<=last;number++){
     const job=state.layouts.get(number);
     if(!job||state.failures.has(number))continue;
     state.layouts.delete(number);
@@ -615,12 +659,46 @@ function installPdfReflow(session,originalBar,tools,layout){
     void finishLayout(state,number,job.placeholder,job.getBasic);
     break;
    }
+   if(!state.parsing&&first<current){
+    const prevJob=state.layouts.get(first);
+    if(prevJob&&!state.failures.has(first)){
+     state.layouts.delete(first);
+     state.parsing=true;
+     void finishLayout(state,first,prevJob.placeholder,prevJob.getBasic);
+    }
+   }
   }
-  if(state.next===state.firstPage || scroller.scrollTop+scroller.clientHeight*2>=scroller.scrollHeight){
+  if(!documentPane.childElementCount || scroller.scrollTop+scroller.clientHeight*2>=scroller.scrollHeight){
    void appendPage(state).catch(()=>{});
+  }else if(scroller.scrollTop<=260 && state.prev>=1){
+   void prependPage(state).catch(()=>{});
   }
   void translateNext(state);
  }
+
+ async function jumpReflowPage(targetPage){
+  const state=run;
+  if(!state||state.signal.aborted)return;
+  const clamped=Math.min(session.pdf.numPages,Math.max(1,Math.round(Number(targetPage))||visiblePage()));
+  reflowPageInput.value=String(clamped);
+  const existing=documentPane.querySelector('[data-reflow-page="'+clamped+'"]');
+  if(existing){
+   scroller.scrollTop=existing.offsetTop;
+   refresh();
+   return;
+  }
+  if(clamped===state.prev&&!state.prepending){
+   const node=await prependPage(state).catch(()=>null);
+   if(node&&state===run)scroller.scrollTop=node.offsetTop;
+   refresh();
+   return;
+  }
+  start(state.bilingual,true,clamped);
+ }
+ reflowPrev.onclick=()=>{if(run)void jumpReflowPage(visiblePage()-1)};
+ reflowNext.onclick=()=>{if(run)void jumpReflowPage(visiblePage()+1)};
+ reflowPageInput.onchange=()=>{if(run)void jumpReflowPage(reflowPageInput.value)};
+ reflowPageInput.onkeydown=event=>{if(event.key==='Enter')reflowPageInput.blur()};
 
  retry.onclick=()=>{
   const state=run,number=visiblePage();
@@ -629,15 +707,15 @@ function installPdfReflow(session,originalBar,tools,layout){
   refresh();
  };
 
- function start(bilingual,restart=false){
+ function start(bilingual,restart=false,explicitPage=null){
   if(!restart&&run?.bilingual===bilingual){void leave();return}
-  const page=visiblePage(),{source,target}=storedTranslateLanguage();
+  const page=explicitPage||visiblePage(),{source,target}=storedTranslateLanguage();
   run?.abort();
   const controller=new AbortController();
   const offline=bilingual&&bilingualEngine.value==='offline'&&window.BilingualBook?.available&&source==='en'&&target==='zh';
   const configuredProvider=offline?'offline':window.desktopTranslation?.provider()||'mymemory';
   const preference=offline?'offline':(configuredProvider==='openai'?'openai':window.desktopTranslation?.localModelPreference?.()||'large');
-  run={bilingual,source,target,firstPage:page,next:page,
+  run={bilingual,source,target,firstPage:page,prev:page-1,next:page,
    provider:configuredProvider,
    preference,modelKey:offline?'offline-ct2-v2':window.desktopTranslation?.modelCacheKey?.(preference)||preference,
    signal:controller.signal,abort:()=>controller.abort(),pages:new Map(),failures:new Map(),layouts:new Map()};
@@ -650,6 +728,7 @@ function installPdfReflow(session,originalBar,tools,layout){
   try{localStorage.setItem('donote.bilingual.engine',bilingualEngine.value)}catch{}
   start(true,true);
  };
+ window.addEventListener('donote-translation-settings-change',()=>{if(run?.bilingual){bilingualEngine.value='configured';start(true,true)}},{signal:sessionSignal});
 
  async function exportBilingualDocument(){
   const state=run;

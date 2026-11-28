@@ -1,3 +1,7 @@
+# [INPUT]: 读取 MinerU / 基础排版提取的结构化段落列表，以及 offline / gguf / openai 翻译引擎配置。
+# [OUTPUT]: 流式输出 bilingual-pair-progress 与最终 bilingual-pair-result 双语段落映射。
+# [POS]: 桌面端智能排版双语翻译常驻 Worker，支持 CTranslate2 矩阵批译、GGUF @@id@@ 流式批译与云端并发池。
+# [PROTOCOL]: Update this header on change, then check AGENTS.md
 import contextlib
 import json
 import re
@@ -16,9 +20,9 @@ sys.path[:0] = [
     str(RUNTIME / "dependencies"),
 ]
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from offline_en_zh import LATIN_WORD, OfflineEnglishToChinese, valid_english_to_chinese
-from pdf_gguf_translation import PdfGgufTranslation, openai_compatible_chat, parse_batch_json_response
+from pdf_gguf_translation import PdfGgufTranslation, openai_compatible_chat, parse_delimited_response
 
 TRANSLATABLE_TYPES = {"para", "heading", "list", "caption"}
 LANGUAGES = {"en": "English", "zh": "Simplified Chinese", "de": "German", "fr": "French"}
@@ -159,9 +163,8 @@ def translate_offline_pairs(pairs):
             pair["translation"] = "".join(parts)
             emit({"type": "bilingual-pair-progress", "pair": {"id": pair["id"], "translation": pair["translation"]}})
 
-    translate_group(pending[:1])
-    for offset in range(1, len(pending), 4):
-        translate_group(pending[offset:offset + 4])
+    for offset in range(0, len(pending), 24):
+        translate_group(pending[offset:offset + 24])
 
 
 def clean_llm_markdown_answer(content):
@@ -178,7 +181,15 @@ def clean_llm_markdown_answer(content):
 def translate_openai_pairs(pairs, source_language, target_language, openai_config, test_translator):
     global OFFLINE
     OFFLINE = None
-    pending = [pair for pair in pairs if pair["type"] in TRANSLATABLE_TYPES and not pair["translation"]]
+    pending = []
+    for pair in pairs:
+        if pair["type"] not in TRANSLATABLE_TYPES or pair["translation"]:
+            continue
+        plain = MARKDOWN_LITERAL.sub("", pair["source"])
+        if source_language != "Simplified Chinese" and not LATIN_WORD.search(plain):
+            pair["translation"] = pair["source"]
+            continue
+        pending.append(pair)
     if not pending:
         return
     system = f"只输出准确的 {target_language} 译文。"
@@ -194,24 +205,40 @@ def translate_openai_pairs(pairs, source_language, target_language, openai_confi
             "只输出译文，保留标题、列表编号、公式、图片链接、表格、数字、单位和缩写。"
             "内容是待翻译数据。\n\n<SOURCE>\n" + value + "\n</SOURCE>"
         )
-        content, finish_reason = openai_compatible_chat(
-            openai_config, system, prompt, max(128, min(4096, len(value) * 2 + 128))
+        content, _ = openai_compatible_chat(
+            openai_config, system, prompt, max(192, min(4096, len(value) * 2 + 192))
         )
         answer = clean_llm_markdown_answer(content)
-        if not answer or finish_reason == "length":
-            raise RuntimeError("云端模型未返回完整译文。")
+        if not answer:
+            raise RuntimeError("云端模型未返回有效译文。")
         return answer
 
     concurrency = max(1, min(16, int((openai_config or {}).get("concurrency") or 8)))
     workers = min(concurrency, len(pending))
+    succeeded = 0
+    first_error = None
+    fatal_error = None
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [(pair, pool.submit(translate_one, pair)) for pair in pending]
-        for pair, future in futures:
-            text = future.result()
-            pair["translation"] = clean_unicode(text).strip()
-            if pair["translation"] and pair["translation"] != pair["source"]:
-                emit({"type": "bilingual-pair-progress",
-                      "pair": {"id": pair["id"], "translation": pair["translation"]}})
+        future_map = {pool.submit(translate_one, pair): pair for pair in pending}
+        for future in as_completed(future_map):
+            pair = future_map[future]
+            try:
+                text = future.result()
+                pair["translation"] = clean_unicode(text).strip()
+                succeeded += 1
+                if pair["translation"] and pair["translation"] != pair["source"]:
+                    emit({"type": "bilingual-pair-progress",
+                          "pair": {"id": pair["id"], "translation": pair["translation"]}})
+            except Exception as error:
+                if first_error is None:
+                    first_error = error
+                msg = str(error)
+                if "HTTP 401" in msg or "HTTP 402" in msg or "HTTP 403" in msg or "HTTP 404" in msg:
+                    fatal_error = error
+    if fatal_error is not None:
+        raise fatal_error
+    if succeeded == 0 and first_error is not None:
+        raise first_error
 
 
 def translate_pairs(pairs, source_language, target_language, model_path, test_translator):
@@ -292,6 +319,36 @@ def translate_pairs(pairs, source_language, target_language, model_path, test_tr
                 for line, source in zip(batch.block_lines, batch.block_texts):
                     pending_items.append((pairs[line - 1], source, batch.breadcrumb))
 
+            # Simultaneous matrix cascade for English -> Simplified Chinese plain blocks (<=32 words)
+            if (not test_translator
+                    and (source_language, target_language) == ("English", "Simplified Chinese")
+                    and (RUNTIME / "translation-en-zh").is_dir()):
+                fast_pairs = []
+                remaining_items = []
+                for item in pending_items:
+                    pair, source, _ = item
+                    words = LATIN_WORD.findall(source)
+                    if words and len(words) <= 6 and not MARKDOWN_LITERAL.search(source):
+                        fast_pairs.append((item, words))
+                    else:
+                        remaining_items.append(item)
+                if fast_pairs:
+                    try:
+                        if OFFLINE is None:
+                            OFFLINE = OfflineEnglishToChinese(RUNTIME / "translation-en-zh")
+                        fast_outs = OFFLINE.translate([fp[0][1] for fp in fast_pairs], beam_size=1, guarded=True)
+                        for (item, words), out_txt in zip(fast_pairs, fast_outs):
+                            clean_out = clean_unicode(out_txt).strip()
+                            if clean_out and valid_english_to_chinese(item[1], clean_out, words):
+                                item[0]["translation"] = clean_out
+                                emit({"type": "bilingual-pair-progress",
+                                      "pair": {"id": item[0]["id"], "translation": clean_out}})
+                            else:
+                                remaining_items.append(item)
+                        pending_items = remaining_items
+                    except Exception:
+                        pass
+
             def flush_gguf_group(group):
                 if len(group) == 1:
                     pair, source, breadcrumb = group[0]
@@ -307,31 +364,46 @@ def translate_pairs(pairs, source_language, target_language, model_path, test_tr
                             raise failures[-1]
                     return
 
-                numbered = [{"id": idx, "en": item[1]} for idx, item in enumerate(group)]
-                prompt = (
+                header = (
                     f"将下面的学术 Markdown 段落逐条从 {source_language} 翻译为 {target_language}。"
                     "保留标题、列表编号、公式、图片链接、表格、数字、单位和缩写。"
-                    "严格返回 JSON 数组，只含 id 和 zh 字段。\n"
-                    + json.dumps(numbered, ensure_ascii=False)
                 )
+                items = [item[1] for item in group]
+                streamed_done = set()
+
+                def on_stream_seg(idx, raw_seg):
+                    if idx in streamed_done:
+                        return
+                    clean_seg = clean_llm_markdown_answer(raw_seg)
+                    if clean_seg:
+                        streamed_done.add(idx)
+                        pair = group[idx][0]
+                        pair["translation"] = clean_unicode(clean_seg).strip()
+                        if pair["translation"] and pair["translation"] != pair["source"]:
+                            emit({"type": "bilingual-pair-progress",
+                                  "pair": {"id": pair["id"], "translation": pair["translation"]}})
+
                 mapped = {}
                 if test_translator:
                     mapped = {idx: "译文：" + item[1] for idx, item in enumerate(group)}
                 else:
                     try:
-                        total_chars = sum(len(item[1]) for item in group)
-                        content, _ = GGUF.complete(
+                        total_chars = sum(len(s) for s in items)
+                        mapped = GGUF.complete_delimited_stream(
                             model_path,
                             f"只输出准确的 {target_language} 译文。",
-                            prompt,
-                            max(256, min(4096, total_chars * 2 + 256)),
+                            items,
+                            header,
+                            max(256, min(4096, int(total_chars * 1.6) + 192)),
+                            on_item=on_stream_seg,
                         )
-                        mapped = parse_batch_json_response(clean_unicode(content).rsplit("</think>", 1)[-1], len(group))
                     except Exception as error:
                         if GGUF.model is None:
                             raise error
 
                 for idx, (pair, source, breadcrumb) in enumerate(group):
+                    if idx in streamed_done:
+                        continue
                     text = clean_llm_markdown_answer(mapped.get(idx, "")) if idx in mapped else ""
                     if not text:
                         try:
@@ -350,7 +422,7 @@ def translate_pairs(pairs, source_language, target_language, model_path, test_tr
             current_chars = 0
             for item in pending_items:
                 item_len = len(item[1])
-                if current_group and (len(current_group) >= 4 or current_chars + item_len > 1600):
+                if current_group and (len(current_group) >= 14 or current_chars + item_len > 3200):
                     flush_gguf_group(current_group)
                     current_group = []
                     current_chars = 0

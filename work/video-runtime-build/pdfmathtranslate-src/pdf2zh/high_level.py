@@ -143,11 +143,12 @@ def translate_patch(
                 perf.add("layout_extract", perf_counter() - started)
             inf.seek(0)
     pending_pages = []
+    use_async_pool = ultrafast and not callable(getattr(device.translator, "translate_many", None))
     with (
         tqdm.tqdm(total=total_pages) as progress,
-        ThreadPoolExecutor(max_workers=thread) if ultrafast else nullcontext() as pool,
+        ThreadPoolExecutor(max_workers=thread) if use_async_pool else nullcontext() as pool,
     ):
-        if ultrafast:
+        if use_async_pool:
             device.translation_pool = pool
             device.translation_futures = deque()
         for pageno, page in enumerate(PDFPage.create_pages(doc)):
@@ -229,7 +230,7 @@ def translate_patch(
             doc_zh.update_stream(page.page_xref, b"")
             doc_zh[page.pageno].set_contents(page.page_xref)
             interpreter.process_page(page)
-            if ultrafast:
+            if use_async_pool:
                 pending_pages.append(page)
             if perf:
                 logger.info(
@@ -237,7 +238,7 @@ def translate_patch(
                     pageno + 1,
                     perf_counter() - page_started,
                 )
-        if ultrafast:
+        if use_async_pool:
             logger.info(
                 "[ultrafast perf] document pool: %d tasks, %d workers",
                 len(device.translation_futures),

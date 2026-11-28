@@ -22,6 +22,11 @@ function wellFormedText(value){
 }
 const pdf2zhPending=new Map();
 const pdf2zhSources=new Map();
+const pdf2zhActiveDocReq=new Map();
+function pdf2zhTaskKey(id){
+ const source=pdf2zhSources.get(id);
+ return 'pdf2zh:doc:'+(source?.fileId||source?.docId||id);
+}
 function pdf2zhTaskPatch(id){
  const source=pdf2zhSources.get(id);
  return {
@@ -82,25 +87,33 @@ if(window.chrome?.webview){
   }
   if (['pdf2zh-progress', 'pdf2zh-paragraph', 'pdf2zh-output'].includes(data?.type)) {
    pdf2zhPending.get(data.type + ':' + data.id)?.(data);
-   if (data.type === 'pdf2zh-progress' && window.DoNoteTasks) {
-    window.DoNoteTasks.upsert('pdf2zh:' + data.id, {
-     kind: 'translate',
-     ...pdf2zhTaskPatch(data.id),
-     detail: data.status || data.message || data.stage || '正在排版与翻译文档…',
-     percent: Number.isFinite(data.percent) ? data.percent : null,
-     state: 'running'
-    });
+   if (data.type === 'pdf2zh-progress' && window.DoNoteTasks && pdf2zhSources.has(data.id)) {
+    const taskKey = pdf2zhTaskKey(data.id);
+    if (!pdf2zhActiveDocReq.has(taskKey) || pdf2zhActiveDocReq.get(taskKey) === data.id) {
+     window.DoNoteTasks.upsert(taskKey, {
+      kind: 'translate',
+      ...pdf2zhTaskPatch(data.id),
+      detail: data.status || data.message || data.stage || '正在排版与翻译文档…',
+      percent: Number.isFinite(data.percent) ? data.percent : null,
+      state: 'running'
+     });
+    }
    }
    return;
   }
-  if (data?.type === 'pdf2zh-result' && window.DoNoteTasks) {
-   window.DoNoteTasks.upsert('pdf2zh:' + data.id, {
-    kind: 'translate',
-    ...pdf2zhTaskPatch(data.id),
-    detail: data.error ? ('翻译未完成：' + data.error) : '整页双语对照翻译已完成，点击打开文档',
-    percent: data.error ? null : 100,
-    state: data.error ? 'error' : 'done'
-   });
+  if (data?.type === 'pdf2zh-result' && window.DoNoteTasks && pdf2zhSources.has(data.id)) {
+   const taskKey = pdf2zhTaskKey(data.id);
+   if (!pdf2zhActiveDocReq.has(taskKey) || pdf2zhActiveDocReq.get(taskKey) === data.id) {
+    const patch = pdf2zhTaskPatch(data.id);
+    const pageLabel = patch.page ? `第 ${patch.page} 页` : '整页';
+    window.DoNoteTasks.upsert(taskKey, {
+     kind: 'translate',
+     ...patch,
+     detail: data.error ? ('翻译未完成：' + data.error) : (pageLabel + '双语对照翻译已完成，点击打开文档'),
+     percent: data.error ? null : 100,
+     state: data.error ? 'error' : 'done'
+    });
+   }
   }
   if (!['pdf2zh-ack', 'pdf2zh-ready', 'pdf2zh-result'].includes(data?.type)) return;
   const resultType = data.type.slice('pdf2zh-'.length);
@@ -182,11 +195,24 @@ window.PdfMathTranslate = {
   }
   return {
    close,
-   async translate(page, {preference, signal: pageSignal, onProgress = () => {}, onParagraph = () => {}, source} = {}) {
+   async translate(page, {preference, mode = 'full', silentTask = false, signal: pageSignal, onProgress = () => {}, onParagraph = () => {}, source} = {}) {
     const requestSignal = pageSignal ? AbortSignal.any([documentSignal, pageSignal]) : documentSignal;
     requestSignal.throwIfAborted();
     const requestId = crypto.randomUUID();
-    if (source?.fileId) pdf2zhSources.set(requestId, source);
+    if (!silentTask) {
+     pdf2zhSources.set(requestId, {...(source || {}), docId: id, page});
+     const taskKey = pdf2zhTaskKey(requestId);
+     pdf2zhActiveDocReq.set(taskKey, requestId);
+     if (window.DoNoteTasks) {
+      window.DoNoteTasks.upsert(taskKey, {
+       kind: 'translate',
+       ...pdf2zhTaskPatch(requestId),
+       detail: '正在准备第 ' + page + ' 页…',
+       percent: null,
+       state: 'running'
+      });
+     }
+    }
     const parts = [];
     let bytes = 0;
     let invalidOutput = false;
@@ -209,7 +235,8 @@ window.PdfMathTranslate = {
      }
     });
     try {
-     const result = await send('translate', {id: requestId, documentId: id, start: page, end: page, preference, mode: 'full'},
+     const safeMode = mode === 'fast' ? 'fast' : 'full';
+     const result = await send('translate', {id: requestId, documentId: id, start: page, end: page, preference, mode: safeMode},
       'result', 26 * 60 * 1000, requestSignal);
      if (invalidOutput || result.start !== page || bytes !== result.size || !bytes) {
       throw new Error('译文 PDF 接收不完整，请重试。');
@@ -220,6 +247,13 @@ window.PdfMathTranslate = {
       skippedParagraphs: Number(result.skippedParagraphs) || 0,
      };
     } catch (error) {
+     if (!silentTask && requestSignal.aborted) {
+      const taskKey = pdf2zhTaskKey(requestId);
+      if (pdf2zhActiveDocReq.get(taskKey) === requestId) {
+       pdf2zhActiveDocReq.delete(taskKey);
+       window.DoNoteTasks?.remove?.(taskKey);
+      }
+     }
      if (!documentSignal.aborted) {
       try { host.postMessage({type: 'pdf2zh-cancel-page', id: requestId, documentId: id}); } catch {}
      }
@@ -346,7 +380,7 @@ function installPdfTranslationPanel(session, panel, showPanel) {
   syncChrome('');
  }
 
- async function translateSelection({automatic = false, online = false} = {}) {
+ async function translateSelection({automatic = false, online = false, forceLocal = false} = {}) {
   const text = normalizePdfTranslationText(input.value);
   if (!text) {
    if (!automatic) toast('请先选择或输入待翻译文字。');
@@ -356,7 +390,7 @@ function installPdfTranslationPanel(session, panel, showPanel) {
   if (!automatic) input.value = text;
   const {source,target} = storedTranslateLanguage();
   const bridge = window.desktopTranslation;
-  const key = JSON.stringify([source, target, text, online, bridge?.provider?.(), bridge?.modelCacheKey?.()]);
+  const key = JSON.stringify([source, target, text, online, forceLocal, bridge?.provider?.(), bridge?.modelCacheKey?.()]);
   if (automatic && session.translationKey === key) return;
 
   session.translationController?.abort();
@@ -366,7 +400,7 @@ function installPdfTranslationPanel(session, panel, showPanel) {
   session.translationKey = key;
   const active = () => !sessionSignal.aborted && !signal.aborted;
   const options = {sourceLanguage: source, targetLanguage: target};
-  let translator, translated, service;
+  let translator, translated, service, usedOnline = online;
   result.value = '';
 
   try {
@@ -385,19 +419,27 @@ function installPdfTranslationPanel(session, panel, showPanel) {
    }
    if (!active()) return;
    const configured = bridge?.provider() || 'mymemory';
-   const provider = online && configured !== 'localai' ? configured : 'mymemory';
-   const useLlm = !online && bridge?.localConfigured?.();
-   const useOffline = !online && source === 'en' && target === 'zh' && window.BilingualBook?.available;
+   const autoCloud = !forceLocal && (
+    (configured === 'openai' && bridge?.openaiConfigured?.()) ||
+    (configured === 'baidu' && bridge?.baiduConfigured?.()) ||
+    (configured === 'azure' && bridge?.azureConfigured?.())
+   );
+   const useOnline = online || autoCloud;
+   usedOnline = useOnline;
+   const provider = useOnline && configured !== 'localai' ? configured : 'mymemory';
+   const useLlm = !useOnline && bridge?.localConfigured?.();
+   const useOffline = !useOnline && source === 'en' && target === 'zh' && window.BilingualBook?.available;
 
-   const limit = online ? 5000 : 10000;
+   const limit = useOnline && provider !== 'openai' ? 5000 : 10000;
    if (text.length > limit) {
     status.textContent = '每次最多翻译 ' + limit.toLocaleString('zh-CN') + ' 字符，请缩短原文。';
     return;
    }
-   if (online) {
+   if (useOnline) {
     service = bridge?.label?.(provider) || 'MyMemory';
+    status.textContent = (provider === 'openai' ? '云端大模型正在翻译…' : '正在在线翻译…');
     translated = await translatePdfOnline(text, source, target, signal, (current, total) => {
-     if (active()) status.textContent = '正在在线翻译…' + (total > 1 ? ' ' + current + ' / ' + total : '');
+     if (active() && provider !== 'openai') status.textContent = '正在在线翻译…' + (total > 1 ? ' ' + current + ' / ' + total : '');
     }, provider === 'openai' ? pageContext() : '', provider);
    } else if (useLlm || useOffline) {
     if (useLlm) {
@@ -456,9 +498,9 @@ function installPdfTranslationPanel(session, panel, showPanel) {
    status.textContent = '翻译完成 · ' + service;
   } catch (error) {
    if (!active()) return;
-   if (online && error.name === 'TimeoutError') status.textContent = '在线翻译超时，请重试。';
-   else if (online && error instanceof TypeError) status.textContent = '无法连接在线翻译服务。';
-   else status.textContent = (online ? '在线翻译未完成：' : '本地翻译未完成：') + (error.message || '请重试。');
+   if (usedOnline && error.name === 'TimeoutError') status.textContent = '在线翻译超时，请重试。';
+   else if (usedOnline && error instanceof TypeError) status.textContent = '无法连接在线翻译服务。';
+   else status.textContent = (usedOnline ? '在线翻译未完成：' : '本地翻译未完成：') + (error.message || '请重试。');
   } finally {
    translator?.destroy();
    if (session.translationController === controller) {
@@ -562,6 +604,13 @@ function installPdfTranslationPanel(session, panel, showPanel) {
   status.textContent = '';
   if (automaticToggle.checked && normalizePdfTranslationText(input.value)) void translateSelection({automatic: true});
  }, {signal: sessionSignal});
+ window.addEventListener('donote-translation-settings-change', () => {
+  cancelQueued();
+  session.translationController?.abort();
+  session.translationController = null;
+  session.translationKey = null;
+  if (automaticToggle.checked && normalizePdfTranslationText(input.value)) void translateSelection({automatic: true});
+ }, {signal: sessionSignal});
 
  const useSelection = panel.querySelector('#pdfUseSelection');
  useSelection.onmousedown = event => {
@@ -580,7 +629,7 @@ function installPdfTranslationPanel(session, panel, showPanel) {
  };
  panel.querySelector('#pdfLocalTranslate').onclick = () => {
   cancelQueued();
-  void translateSelection();
+  void translateSelection({forceLocal: true});
  };
  panel.querySelector('#pdfOnlineTranslate').onclick = () => {
   cancelQueued();

@@ -201,6 +201,7 @@
           (running.length > 1 ? '<span class="task-trigger-badge">' + running.length + '</span>' : '');
       } else {
         readerPill.hidden = true;
+        readerPill.innerHTML = '';
       }
     }
   }

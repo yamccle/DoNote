@@ -6,6 +6,85 @@
  */
 'use strict';
 
+let activeCompareBgJob = null;
+
+function windowPagesAround(center, maxPage, radius = 5) {
+  const pages = [center];
+  for (let delta = 1; delta <= radius; delta++) {
+    if (center + delta <= maxPage) pages.push(center + delta);
+    if (center - delta >= 1) pages.push(center - delta);
+  }
+  return pages;
+}
+
+async function stopCompareBgJob() {
+  const job = activeCompareBgJob;
+  if (!job) return;
+  activeCompareBgJob = null;
+  job.abort();
+  await job.done.catch(() => {});
+}
+
+function startCompareBgPrefetch({exitPage, total, translation, opening, blob, docController, fileId, fileName, profileId, fingerprint}) {
+  const pages = windowPagesAround(exitPage, total, 5);
+  const minP = Math.min(...pages), maxP = Math.max(...pages);
+  const taskId = 'pdf2zh:doc:' + (fileId || fingerprint);
+  const title = fileName ? fileName + ' · 整页翻译' : 'PDF 整页双语翻译';
+  const bgController = new AbortController();
+  let userCancelled = false;
+  const putTask = patch => window.DoNoteTasks?.upsert?.(taskId, {
+    kind: 'translate', fileId: fileId || null, profileId: profileId || null, page: exitPage, title, onCancel: null, ...patch
+  });
+  const cancel = () => {
+    userCancelled = true;
+    bgController.abort();
+    docController.abort();
+    putTask({detail: '已停止后台预译', percent: null, state: 'cancelled'});
+  };
+  const done = (async () => {
+    try {
+      let finished = 0;
+      const todo = [];
+      for (const p of pages) {
+        if (bgController.signal.aborted) return;
+        const cached = await PdfPreviewCache.get('page', translation.key(p)).catch(() => null);
+        if (cached?.blob instanceof Blob) finished++;
+        else todo.push(p);
+      }
+      if (!todo.length || bgController.signal.aborted) {
+        if (!userCancelled) putTask({detail: `第 ${minP}–${maxP} 页（±5 页）均已预缓存，点击打开文档`, percent: 100, state: 'done'});
+        return;
+      }
+      const doc = await (opening || window.PdfMathTranslate.open(blob, {signal: docController.signal}));
+      for (const p of todo) {
+        if (bgController.signal.aborted) return;
+        putTask({
+          page: p, openWhileRunning: true, onCancel: cancel, state: 'running',
+          percent: Math.round((finished / pages.length) * 100),
+          detail: `后台预译第 ${p} 页（已完成 ${finished} / ${pages.length} · 范围 ${minP}–${maxP} 页）`
+        });
+        const result = await doc.translate(p, {
+          preference: translation.preference, mode: translation.mode, silentTask: true,
+          signal: bgController.signal, source: {fileId, page: p, name: fileName}
+        });
+        if (bgController.signal.aborted) return;
+        await PdfPreviewCache.put('page', translation.key(p), result).catch(() => {});
+        finished++;
+      }
+      if (!bgController.signal.aborted && !userCancelled) {
+        putTask({detail: `已完成第 ${minP}–${maxP} 页（退出页 ±5 页）预缓存，点击打开文档`, percent: 100, state: 'done'});
+      }
+    } catch (error) {
+      if (!bgController.signal.aborted && !userCancelled) {
+        putTask({detail: '后台预译未完成：' + (error?.message || '请重试'), percent: null, state: 'error'});
+      }
+    } finally {
+      docController.abort();
+      if (activeCompareBgJob?.done === done) activeCompareBgJob = null;
+    }
+  })();
+  activeCompareBgJob = {abort: () => { bgController.abort(); docController.abort(); }, done};
+}
 
 function installPdfPageComparison(session, {button, layout, originalBar, tools, bar, leaveReflow}) {
   if (!window.PdfMathTranslate?.available) {
@@ -24,9 +103,15 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
     + '<input type="number" min="1" step="1" aria-label="对照页码"><span data-total></span>'
     + '<button type="button" class="secondary" data-next aria-label="对照下一页">›</button></div>'
     + '<select aria-label="对照缩放"></select>'
-    + '<select aria-label="对照翻译模型"><option value="offline">快速离线</option>'
-    + '<option value="gguf">本地大模型</option>'
+    + '<select aria-label="对照翻译模型">'
+    + '<option value="offline">快速离线</option>'
+    + '<option value="tiny">本地极速 · 0.6B</option>'
+    + '<option value="compact">本地均衡 · 1.7B</option>'
+    + '<option value="large">本地精译 · 4B</option>'
     + '<option value="openai">云端大模型</option></select>'
+    + '<select aria-label="对照排版模式" title="极速版面跳过复杂版面检测与全量字库裁剪，速度提升数倍；公式较多时可切至公式精排">'
+    + '<option value="fast">极速版面（推荐）</option>'
+    + '<option value="full">公式精排</option></select>'
     + '<span role="status"></span><button type="button" class="secondary" data-retry hidden>重试</button></header>'
     + '<div class="pdf-compare-scroll" tabindex="0" aria-label="原文与译文页面">'
     + '<div class="pdf-compare-pages"><div class="pdf-compare-captions"><span>原始 PDF</span>'
@@ -37,7 +122,7 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
   const pages = get('.pdf-compare-pages');
   const stack = get('.pdf-compare-stack');
   const input = get('input');
-  const [zoom, engine] = view.querySelectorAll('select');
+  const [zoom, engine, layoutSelect] = view.querySelectorAll('select');
   addPdfZoomOptions(zoom);
   const status = get('[role="status"]');
   const retry = get('[data-retry]');
@@ -68,17 +153,20 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
   }
 
   const enginePreferenceKey = 'donote.pdf.comparison.engine';
+  const layoutPreferenceKey = 'donote.pdf.comparison.layout';
 
-  function createTranslation(run, choice) {
+  function createTranslation(run, choice, layoutMode = 'fast') {
     const settings = window.desktopTranslation;
+    const mode = layoutMode === 'full' ? 'full' : 'fast';
     const preference = choice === 'offline' ? 'offline' :
-      choice === 'openai' ? 'openai' : (settings?.localModelPreference?.() || 'large');
-    const modelKey = choice === 'offline' ? 'offline-ct2-v2' :
-      choice === 'openai' ? (settings?.modelCacheKey?.('openai') || 'openai') :
+      choice === 'openai' ? 'openai' :
+      (['tiny', 'compact', 'large'].includes(choice) ? choice : (settings?.localModelPreference?.() || 'compact'));
+    const modelKey = preference === 'offline' ? 'offline-ct2-v2' :
+      preference === 'openai' ? (settings?.modelCacheKey?.('openai') || 'openai') :
       (settings?.modelCacheKey?.(preference) || preference);
     return {
-      preference, records: new Map(),
-      key(number) { return JSON.stringify([run.fingerprint, modelKey, 'pdf2zh-full-v2-en-zh', number]); }
+      preference, mode, records: new Map(),
+      key(number) { return JSON.stringify([run.fingerprint, modelKey, 'pdf2zh-' + mode + '-v2-en-zh', number]); }
     };
   }
 
@@ -293,15 +381,22 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
       signal.throwIfAborted();
       const result = await document.translate(number, {
         preference: translation.preference,
+        mode: translation.mode,
+        silentTask: true,
         signal,
         source: { fileId: session.file?.id, page: number, name: session.file?.name },
-        onProgress: progress,
+        onProgress(text) {
+          progress(text);
+          syncCompareTask(run, text, 'running', number);
+        },
         onParagraph(text) {
           if (signal.aborted || !text?.trim()) return;
           record.paragraphs.push(text);
           const slot = mounted();
           if (slot && !slot.targetPage) showSnippet(slot, text);
-          setStatus(run, record, 'working', '第 ' + number + ' 页 · 已显示 ' + record.paragraphs.length + ' 段');
+          const msg = '第 ' + number + ' 页 · 已显示 ' + record.paragraphs.length + ' 段';
+          setStatus(run, record, 'working', msg);
+          syncCompareTask(run, msg, 'running', number);
         }
       });
       signal.throwIfAborted();
@@ -333,35 +428,94 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
     }
   }
 
+  function syncCompareTask(run, detailText, taskState = 'running', workingPage = run.page) {
+    if (!window.DoNoteTasks || state !== run) return;
+    const win = windowPagesAround(run.page, total, 5);
+    const doneCount = win.filter(p => {
+      const r = run.translation.records.get(p);
+      return r && (r.phase === 'done' || r.phase === 'partial');
+    }).length;
+    const taskId = 'pdf2zh:doc:' + (session.file?.id || run.fingerprint);
+    window.DoNoteTasks.upsert(taskId, {
+      kind: 'translate',
+      fileId: session.file?.id || null,
+      profileId: session.profileId || null,
+      page: workingPage,
+      openWhileRunning: true,
+      title: (session.file?.name ? session.file.name + ' · 整页翻译' : 'PDF 整页双语翻译'),
+      detail: detailText || (`第 ${workingPage} 页 · 邻近 ±5 页已就绪 ${doneCount} / ${win.length}`),
+      percent: taskState === 'done' ? 100 : Math.round((doneCount / Math.max(1, win.length)) * 100),
+      state: taskState,
+      onCancel: taskState === 'running' ? () => {
+        run.userCancelled = true;
+        clearTimeout(run.timer);
+        run.job?.controller.abort();
+        window.DoNoteTasks?.upsert?.(taskId, {
+          kind: 'translate', fileId: session.file?.id || null, profileId: session.profileId || null, page: run.page,
+          title: (session.file?.name ? session.file.name + ' · 整页翻译' : 'PDF 整页双语翻译'),
+          detail: '已暂停预译（翻页或点重试可继续）', percent: null, state: 'cancelled', onCancel: null
+        });
+      } : null
+    });
+  }
+
+  async function pickNextWindowRecord(run) {
+    const win = windowPagesAround(run.page, total, 5);
+    for (const num of win) {
+      const rec = translationRecord(run, num);
+      if (rec.phase === 'done' || rec.phase === 'partial' || rec.phase === 'error' || rec.phase === 'working') continue;
+      if (rec.phase === 'checking') {
+        const key = run.translation.key(num);
+        const cached = memo.get(key) || await rec.saving || await PdfPreviewCache.get('page', key).catch(() => null);
+        if (state !== run) return null;
+        if (cached?.blob instanceof Blob) {
+          remember(key, cached);
+          markTranslated(run, rec, cached);
+          const mountedSlot = run.mounted.get(num);
+          if (mountedSlot) void renderTranslation(run, mountedSlot, cached);
+          continue;
+        }
+        rec.phase = 'pending';
+      }
+      if (rec.phase === 'pending') return rec;
+    }
+    return null;
+  }
+
   function queueTranslation(run) {
-    if (state !== run) return;
-    const current = run.mounted.get(run.page)?.record;
-    if (!current) return;
+    if (state !== run || run.userCancelled) return;
+    const current = translationRecord(run, run.page);
     if (run.job) {
-      // Keep useful nearby work, but a newly visible uncached page has priority
-      // over a speculative translation several pages away.
-      if (current.phase === 'pending' && Math.abs(run.job.record.number - current.number) > 1) {
+      // Abort background neighbor if current visible page is uncached, or if job fell outside ±5 window
+      if ((current.phase === 'pending' && run.job.record !== current) ||
+          Math.abs(run.job.record.number - run.page) > 5) {
         run.job.controller.abort();
       }
       return;
     }
     clearTimeout(run.timer);
-    const ahead = run.mounted.get(run.page + 1)?.record;
-    const canPrefetch = ['done', 'partial'].includes(current.phase);
-    const record = current.phase === 'pending' ? current : canPrefetch && ahead?.phase === 'pending' ? ahead : null;
-    if (!record) return;
-    // Let the visible page start straight away, and defer only speculative work.
-    run.timer = setTimeout(() => {
-      if (state !== run || run.mounted.get(record.number)?.record !== record || run.job || record.phase !== 'pending') return;
+    run.timer = setTimeout(async () => {
+      if (state !== run || run.job || run.userCancelled) return;
+      const record = await pickNextWindowRecord(run);
+      if (state !== run || run.job || run.userCancelled) return;
+      if (!record) {
+        const win = windowPagesAround(run.page, total, 5);
+        syncCompareTask(run, `当前第 ${run.page} 页及邻近 ±5 页（共 ${win.length} 页）均已就绪`, 'done', run.page);
+        return;
+      }
       const job = run.job = {record, translation: run.translation, controller: new AbortController()};
-      setStatus(run, record, 'working', '正在准备第 ' + record.number + ' 页…');
+      const msg = record.number === run.page
+        ? ('正在翻译第 ' + record.number + ' 页…')
+        : ('正在后台预译邻近第 ' + record.number + ' 页…');
+      setStatus(run, record, 'working', msg);
+      syncCompareTask(run, msg, 'running', record.number);
       updateStatus(run);
       void translatePage(run, job).finally(() => {
         run.job = null;
         if (state === run) updateStatus(run);
         queueTranslation(run);
       });
-    }, record === current ? 0 : 120);
+    }, 0);
   }
 
   async function mountTranslation(run, slot) {
@@ -457,7 +611,7 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
     refresh(run);
   }
 
-  function stop() {
+  function stop({background = false} = {}) {
     const run = state;
     if (!run) return;
     state = null;
@@ -465,9 +619,24 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
     cancelAnimationFrame(scrollFrame);
     scrollFrame = 0;
     run.job?.controller.abort();
-    run.controller.abort();
     for (const slot of run.mounted.values()) unmount(run, slot);
     stack.replaceChildren();
+    if (background && !run.userCancelled) {
+      startCompareBgPrefetch({
+        exitPage: run.page,
+        total,
+        translation: run.translation,
+        opening: run.opening,
+        blob: run.blob,
+        docController: run.controller,
+        fileId: session.file?.id,
+        fileName: session.file?.name,
+        profileId: session.profileId,
+        fingerprint: run.fingerprint
+      });
+    } else {
+      run.controller.abort();
+    }
   }
 
   const resize = new ResizeObserver(() => { if (state) adjustWidth(state); });
@@ -485,19 +654,36 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
   next.onclick = () => { if (state) jumpToPage(state, state.page + 1); };
   input.onchange = () => { if (state) jumpToPage(state, Number(input.value)); };
   input.onkeydown = event => { if (event.key === 'Enter') input.blur(); };
-  engine.onchange = () => {
+  function switchTranslationOption() {
     const run = state;
     if (!run) return;
-    try { localStorage.setItem(enginePreferenceKey, engine.value); } catch {}
-    if (!run.engines.has(engine.value)) run.engines.set(engine.value, createTranslation(run, engine.value));
+    try {
+      localStorage.setItem(enginePreferenceKey, engine.value);
+      localStorage.setItem(layoutPreferenceKey, layoutSelect.value);
+    } catch {}
+    const comboKey = engine.value + ':' + layoutSelect.value;
+    if (!run.engines.has(comboKey)) {
+      run.engines.set(comboKey, createTranslation(run, engine.value, layoutSelect.value));
+    }
     clearTimeout(run.timer);
     run.job?.controller.abort();
-    run.translation = run.engines.get(engine.value);
+    run.userCancelled = false;
+    run.translation = run.engines.get(comboKey);
     for (const slot of run.mounted.values()) unmount(run, slot);
     refresh(run);
-  };
+  }
+  engine.onchange = switchTranslationOption;
+  layoutSelect.onchange = switchTranslationOption;
+  window.addEventListener('donote-translation-settings-change', event => {
+    if (!state) return;
+    const next = event.detail?.provider === 'openai' ? 'openai' : (event.detail?.localModel || 'compact');
+    if (['offline', 'tiny', 'compact', 'large', 'openai'].includes(next)) engine.value = next;
+    state.engines.clear();
+    switchTranslationOption();
+  }, {signal: session.controller.signal});
   retry.onclick = () => {
     const run = state;
+    if (run) run.userCancelled = false;
     const slot = run?.mounted.get(run.page);
     if (!slot) return;
     if (slot.renderError && !slot.renderError.invalid) {
@@ -528,7 +714,7 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
   get('[data-return]').onclick = async () => {
     if (!state) return;
     const anchor = position(state);
-    stop();
+    stop({background: true});
     view.hidden = true;
     for (const node of [layout, originalBar, tools, bar]) node.hidden = false;
     await session.showPage(anchor.page, anchor.scroll);
@@ -539,6 +725,7 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
     if (state || starting) return;
     starting = true;
     try {
+      await stopCompareBgJob();
       if (layout.hidden) await leaveReflow();
       session.controller.signal.throwIfAborted();
       const blob = session.sourceBlob;
@@ -550,12 +737,17 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
       session.controller.signal.throwIfAborted();
       await window.desktopTranslation?.ready?.().catch(() => {});
       session.controller.signal.throwIfAborted();
-      let choice;
-      try { choice = localStorage.getItem(enginePreferenceKey); } catch {}
+      let choice, savedLayout;
+      try {
+        choice = localStorage.getItem(enginePreferenceKey);
+        savedLayout = localStorage.getItem(layoutPreferenceKey);
+      } catch {}
+      if (choice === 'gguf') choice = window.desktopTranslation?.localModelPreference?.() || 'compact';
       const configuredProvider = window.desktopTranslation?.provider?.();
       const defaultChoice = configuredProvider === 'openai' && window.desktopTranslation?.openaiConfigured?.() ? 'openai' :
-        (window.desktopTranslation?.localConfigured?.() ? 'gguf' : 'offline');
-      engine.value = ['offline', 'gguf', 'openai'].includes(choice) ? choice : defaultChoice;
+        (window.desktopTranslation?.localConfigured?.() ? (window.desktopTranslation?.localModelPreference?.() || 'compact') : 'offline');
+      engine.value = ['offline', 'tiny', 'compact', 'large', 'openai'].includes(choice) ? choice : defaultChoice;
+      layoutSelect.value = savedLayout === 'full' ? 'full' : 'fast';
       const fragment = document.createDocumentFragment();
       const rows = Array.from({length: total}, (_, index) => {
         const row = document.createElement('section');
@@ -571,8 +763,9 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
         blob, fingerprint: pdfPreviewFingerprint(session), page: start,
         width: 0, rows, mounted: new Map(), engines: new Map(), controller: new AbortController()
       };
-      state.translation = createTranslation(state, engine.value);
-      state.engines.set(engine.value, state.translation);
+      const comboKey = engine.value + ':' + layoutSelect.value;
+      state.translation = createTranslation(state, engine.value, layoutSelect.value);
+      state.engines.set(comboKey, state.translation);
       stack.style.setProperty('--compare-default-ratio', viewport.width / viewport.height);
       pages.style.removeProperty('--compare-last-ratio');
       stack.replaceChildren(fragment);
@@ -590,7 +783,7 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
 
   session.comparisonPosition = () => state ? position(state) : null;
   session.controller.signal.addEventListener('abort', () => {
-    stop();
+    stop({background: true});
     resize.disconnect();
     memo.clear();
   }, {once: true});

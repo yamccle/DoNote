@@ -5,10 +5,14 @@
 import inspect
 import json
 import os
+import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+DELIM_PATTERN = re.compile(r"@@(\d+)@@")
 
 
 def _prefer_vulkan_runtime():
@@ -46,7 +50,7 @@ def resolve_gpu_layers(llama_cpp_module):
     return 0
 
 
-def create_llama_instance(model_path, n_ctx=8192):
+def create_llama_instance(model_path, n_ctx=2048):
     _prefer_vulkan_runtime()
     import llama_cpp
     from llama_cpp import Llama
@@ -71,6 +75,29 @@ def create_llama_instance(model_path, n_ctx=8192):
         except Exception:
             pass
     return Llama(**kwargs)
+
+
+def build_delimited_prompt(items, header):
+    # items: list of strings; uses lightweight @@id@@ markers instead of JSON to save ~30% tokens & avoid {} collisions
+    lines = [header, "严格保留每一段开头的 @@编号@@ 标记，不要合并、遗漏或解释，直接输出对应中文译文："]
+    for idx, text in enumerate(items):
+        lines.append(f"@@{idx}@@ {text}")
+    return "\n".join(lines)
+
+
+def parse_delimited_response(answer, count):
+    text = str(answer or "").rsplit("</think>", 1)[-1].strip()
+    matches = list(DELIM_PATTERN.finditer(text))
+    mapped = {}
+    for pos, match in enumerate(matches):
+        idx = int(match.group(1))
+        if 0 <= idx < count:
+            start = match.end()
+            end = matches[pos + 1].start() if pos + 1 < len(matches) else len(text)
+            val = text[start:end].strip()
+            if val:
+                mapped[idx] = val
+    return mapped
 
 
 def parse_batch_json_response(answer, count):
@@ -110,9 +137,11 @@ def openai_compatible_chat(config, system, instruction, max_tokens=2048, timeout
     endpoint = normalize_chat_completions_url(config.get("baseUrl"))
     model = str(config.get("model") or "").strip()
     api_key = str(config.get("apiKey") or "").strip()
+    if api_key.lower().startswith("bearer "):
+        api_key = api_key[7:].strip()
     if not model:
         raise ValueError("未配置云端大模型名称（Model）。")
-    body = {
+    body_bytes = json.dumps({
         "model": model,
         "messages": [
             {"role": "system", "content": system},
@@ -121,31 +150,47 @@ def openai_compatible_chat(config, system, instruction, max_tokens=2048, timeout
         "temperature": 0.1,
         "max_tokens": max(128, min(8192, int(max_tokens))),
         "stream": False,
-    }
+    }, ensure_ascii=False).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "User-Agent": "DoNote-Desktop/1.0",
     }
-    if api_key:
+    if api_key and api_key != "local":
         headers["Authorization"] = "Bearer " + api_key
-    req = urllib.request.Request(
-        endpoint,
-        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as err:
-        detail = ""
+
+    raw = None
+    for attempt in range(3):
+        req = urllib.request.Request(endpoint, data=body_bytes, headers=headers, method="POST")
         try:
-            detail = err.read().decode("utf-8", errors="replace")[:300]
-        except Exception:
-            pass
-        raise RuntimeError(f"云端模型接口返回 HTTP {err.code}：{detail or err.reason}")
-    except urllib.error.URLError as err:
-        raise RuntimeError(f"无法连接云端模型接口：{err.reason}")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            break
+        except urllib.error.HTTPError as err:
+            detail = ""
+            try:
+                err_body = err.read().decode("utf-8", errors="replace")
+                parsed_err = json.loads(err_body)
+                if isinstance(parsed_err, dict) and isinstance(parsed_err.get("error"), dict):
+                    detail = str(parsed_err["error"].get("message") or "")[:240]
+                else:
+                    detail = err_body[:240]
+            except Exception:
+                pass
+            if err.code in (408, 429, 500, 502, 503, 504) and attempt < 2:
+                time.sleep(0.6 * (attempt + 1))
+                continue
+            if err.code in (401, 403):
+                raise RuntimeError(f"云端模型 API 密钥无效或无权限 (HTTP {err.code})：{detail or err.reason}")
+            if err.code == 402:
+                raise RuntimeError(f"云端模型账户余额不足 (HTTP 402)：{detail or err.reason}")
+            raise RuntimeError(f"云端模型接口返回 HTTP {err.code}：{detail or err.reason}")
+        except (urllib.error.URLError, TimeoutError, OSError) as err:
+            if attempt < 2:
+                time.sleep(0.6 * (attempt + 1))
+                continue
+            reason = getattr(err, "reason", None) or err
+            raise RuntimeError(f"无法连接云端模型接口：{reason}")
 
     payload = json.loads(raw)
     choices = payload.get("choices") or []
@@ -168,13 +213,16 @@ class PdfGgufTranslation:
             self.model = None
         self.model_key = None
 
-    def complete(self, model_path, system, instruction, max_tokens):
+    def warmup(self, model_path):
         info = model_path.stat()
         key = (model_path, info.st_size, info.st_mtime_ns)
         if self.model_key != key:
             self.close()
-            self.model = create_llama_instance(model_path, n_ctx=8192)
+            self.model = create_llama_instance(model_path, n_ctx=3072)
             self.model_key = key
+
+    def complete(self, model_path, system, instruction, max_tokens):
+        self.warmup(model_path)
 
         options = {
             "temperature": 0.1,
@@ -201,3 +249,64 @@ class PdfGgufTranslation:
             **options,
         )["choices"][0]
         return choice["message"].get("content"), choice["finish_reason"]
+
+    def complete_delimited_stream(self, model_path, system, items, header, max_tokens, on_item=None, is_cancelled=None):
+        self.warmup(model_path)
+        instruction = build_delimited_prompt(items, header)
+        options = {
+            "temperature": 0.1,
+            "top_p": 0.85,
+            "repeat_penalty": 1.04,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        if uses_non_thinking_prompt(model_path):
+            prompt = (
+                "<|im_start|>system\n" + system + "<|im_end|>\n"
+                "<|im_start|>user\n" + instruction + "<|im_end|>\n"
+                "<|im_start|>assistant\n<think>\n\n</think>\n\n@@0@@ "
+            )
+            tokens = self.model.tokenize(prompt.encode("utf-8"), add_bos=False, special=True)
+            stream_iter = self.model.create_completion(tokens, stop=["<|im_end|>"], **options)
+            prefix_seed = "@@0@@ "
+        else:
+            stream_iter = self.model.create_chat_completion(
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": instruction},
+                ],
+                **options,
+            )
+            prefix_seed = ""
+
+        buf = prefix_seed
+        emitted = set()
+        for chunk in stream_iter:
+            if is_cancelled and is_cancelled():
+                break
+            choices = chunk.get("choices") or []
+            if not choices:
+                continue
+            delta = choices[0].get("text") if "text" in choices[0] else (choices[0].get("delta") or {}).get("content")
+            if not delta:
+                continue
+            buf += delta
+            if on_item and "</think>" not in delta:
+                visible = buf.rsplit("</think>", 1)[-1]
+                matches = list(DELIM_PATTERN.finditer(visible))
+                # Whenever marker k+1 appears, item at matches[k] is 100% complete!
+                for pos in range(len(matches) - 1):
+                    idx = int(matches[pos].group(1))
+                    if 0 <= idx < len(items) and idx not in emitted:
+                        seg = visible[matches[pos].end():matches[pos + 1].start()].strip()
+                        emitted.add(idx)
+                        if seg:
+                            on_item(idx, seg)
+
+        mapped = parse_delimited_response(buf, len(items))
+        if on_item:
+            for idx, val in mapped.items():
+                if idx not in emitted and val:
+                    emitted.add(idx)
+                    on_item(idx, val)
+        return mapped

@@ -26,8 +26,19 @@ class MockOpenAiHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length") or "0")
         body = json.loads(self.rfile.read(length).decode("utf-8"))
+        auth = self.headers.get("Authorization") or ""
+        assert auth == "Bearer sk-test-token", f"Unexpected auth header: {auth}"
         with MockOpenAiHandler.lock:
             MockOpenAiHandler.call_count += 1
+            current_call = MockOpenAiHandler.call_count
+        if current_call == 2:
+            err_payload = json.dumps({"error": {"message": "Rate limit burst"}}).encode("utf-8")
+            self.send_response(429)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(err_payload)))
+            self.end_headers()
+            self.wfile.write(err_payload)
+            return
         user_content = body["messages"][-1]["content"]
         reply = {
             "id": "chatcmpl-test",
@@ -64,6 +75,13 @@ def main():
     )
     assert mapped == {0: "第一段 {v0}", 1: "第二段"}, f"Unexpected parsed batch: {mapped}"
 
+    # 2b. Delimited @@id@@ parser checks (Immersive-Translate style single-pass streaming)
+    delim_mapped = pgt.parse_delimited_response(
+        "<think>draft @@0@@ ignore</think>\n@@0@@ 金属表面电导率 {v0}\n@@1@@ 图 9.10 表面粗糙度影响\n@@99@@ 越界",
+        2,
+    )
+    assert delim_mapped == {0: "金属表面电导率 {v0}", 1: "图 9.10 表面粗糙度影响"}, f"Unexpected delim: {delim_mapped}"
+
     # 3. GPU offload detection fallback checks
     class DummyLlamaCppTrue:
         @staticmethod
@@ -86,7 +104,7 @@ def main():
     try:
         cfg = {
             "baseUrl": f"http://127.0.0.1:{port}",
-            "apiKey": "sk-test-token",
+            "apiKey": "Bearer sk-test-token",
             "model": "deepseek-chat",
             "concurrency": 4,
         }
@@ -98,7 +116,7 @@ def main():
             ))
         assert len(results) == 8
         assert all(content.startswith("译文：") and reason == "stop" for content, reason in results)
-        assert MockOpenAiHandler.call_count == 8
+        assert MockOpenAiHandler.call_count == 9, f"Expected 8 + 1 retry = 9 calls, got {MockOpenAiHandler.call_count}"
     finally:
         server.shutdown()
         server.server_close()

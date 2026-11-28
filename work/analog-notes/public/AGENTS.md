@@ -35,11 +35,11 @@
 - `pdf-research-notes.js` 把摘录与原文片段写进目标记录的 `pdfSource` / `pdfEvidence`。详情「引用资料」展示摘录预览并按页码和选区回跳原 PDF。
 - `pdf-backlinks.js` 汇总当前 PDF 被哪些记录引用，在页面右上角显示「被引用 N」角标并在侧栏「引用」页签提供反向打开与选区定位。
 - `pdf-ocr.js` 离线识别扫描页框选区域，将识别文本交给翻译/摘录侧栏并写入 `pdf-search.js` 持久化检索索引。
-- `pdf-translation.js` 以「原文 → 电路术语胶囊 → 译文」无嵌套双栏衔接选区/识字翻译（支持本地模型、快速离线与 OpenAI 兼容云端翻译）、复制译文、保存批注、存为研究笔记与追加到记录；手动校对文字时保留原页面与选区坐标。整页翻译任务维护 `pdf2zhPending` 与源文件记录。
-- `pdf-page-comparison.js` 在 PDF 阅读器中做原文与译文对照（支持「快速离线 / 本地大模型 / 云端大模型」三档切换与独立缓存键），并把正在翻译的文件编号交给任务中心。
+- `pdf-translation.js` 以「原文 → 电路术语胶囊 → 译文」无嵌套双栏衔接选区/识字翻译（选中即翻自动跟随已保存的云端/本地翻译源，同时保留显式「本地翻译」与「在线翻译」入口）、复制译文、保存批注、存为研究笔记与追加到记录；手动校对文字时保留原页面与选区坐标。整页翻译任务按文档维度聚合单张任务卡（`pdf2zh:doc:*`）并在取消时自动清理。
+- `pdf-page-comparison.js` 在 PDF 阅读器中做原文与译文对照（支持 `0.6B / 1.7B / 4B / 快速离线 / 云端大模型` 与 `极速版面 / 公式精排` 独立切换、退出页 `±5` 页后台预译及翻译源保存热切换），并把正在翻译的文件编号交给任务中心。
 - `circuit-glossary.js` 匹配跨学科与专业双语术语，在翻译双栏中段展示命中胶囊并支持一键插入译文或自定义词库。
 - `translate-lang.js` 管理翻译源语言与目标语言偏好，支持副栏一键互换语向。
-- `pdf-annotations.js`、`pdf-annotation-export.js` 和 `pdf-reflow.js` 提供紧凑批注卡片、页签计数、仅当前页过滤、渐进式批注展开、圆点换色、闪烁回跳与排版重流控制。
+- `pdf-annotations.js`、`pdf-annotation-export.js` 和 `pdf-reflow.js` 提供紧凑批注卡片、页签计数、仅当前页过滤、渐进式批注展开、圆点换色、闪烁回跳，以及支持向上回滚预加载与任意页跳转的排版重流控制。
 - `reader-ai.js` 提供工程精读快捷提问、SSE 流式回答、Markdown + KaTeX 公式防转义排版、可点击页码胶囊回跳与沉淀笔记。
 - `reader-toolbar.css` 和 `reader-panels.css` 统一布局工具菜单、右侧四页签面板、双栏翻译卡、紧凑批注卡与公式级 AI 问答界面。
 - `presentation-preview.js`、`presentation-handout.js` 和 `presentation-preview.css` 提供 PPT / PPTX 资料库级工作台：胶片导航、网格总览、沉浸全屏放映、原片讲义自动提取、逐页批注防抖保存、一键导出双栏图文复习讲义 (.html / .md)、全文检索索引构建与首页封面缩略图生成。

@@ -41,8 +41,11 @@
  padding:0;border:0;background:transparent;
 }
 #reader.reader-enhanced :is(.reader-statusbar,.pdf-tools,.pdf-reflow-controls) {flex-wrap:wrap}
-#reader.reader-enhanced :is(.reader-statusbar,.pdf-tools,.pdf-reflow-controls)[hidden],
+#reader.reader-enhanced :is(.reader-statusbar,.pdf-tools,.pdf-reflow-controls,.pdf-toolbar-group)[hidden],
 #reader.reader-enhanced .pdf-reflow-controls button[hidden] {display:none}
+#reader.reader-enhanced #pdfReflowPageInput {width:7ch;text-align:center;font-variant-numeric:tabular-nums;appearance:textfield}
+#reader.reader-enhanced #pdfReflowPageInput::-webkit-inner-spin-button {appearance:none}
+#reader.reader-enhanced #pdfReflowTotal {padding-inline:3px;color:var(--muted);font-size:var(--type-label);font-variant-numeric:tabular-nums;white-space:nowrap}
 #reader.reader-enhanced .pdf-toolbar-group {
  display:flex;align-items:center;gap:2px;flex:none;min-width:0;
  padding:0 7px;

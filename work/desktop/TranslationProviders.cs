@@ -1,6 +1,14 @@
+/**
+ * [INPUT]: 读取本机 Windows DPAPI 加密的 translation-settings.bin 与工作台 WebView2 翻译命令。
+ * [OUTPUT]: 提供本地 GGUF、OpenAI-Compatible 云端大模型、百度与 Azure 翻译凭证持久化、连接测试及即时抢占式请求执行。
+ * [POS]: WorkspaceWindow 翻译服务分部类，与 DocumentTranslation.cs 共享云端并发工作池配置。
+ * [PROTOCOL]: Update this header on change, then check AGENTS.md
+ */
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,11 +20,17 @@ using Microsoft.Web.WebView2.Core;
 
 internal sealed partial class WorkspaceWindow
 {
-    private static readonly HttpClient translationClient = new HttpClient(new HttpClientHandler
+    private static HttpClient CreateTranslationHttpClient()
     {
-        AllowAutoRedirect = false,
-        UseCookies = false,
-    }) { Timeout = TimeSpan.FromSeconds(20) };
+        try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
+        return new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false,
+        }) { Timeout = TimeSpan.FromSeconds(60) };
+    }
+
+    private static readonly HttpClient translationClient = CreateTranslationHttpClient();
     private readonly JavaScriptSerializer translationJson = new JavaScriptSerializer { MaxJsonLength = 65536, RecursionLimit = 16 };
     private string activeTranslationId;
     private CancellationTokenSource activeTranslation;
@@ -69,18 +83,36 @@ internal sealed partial class WorkspaceWindow
         return request.TryGetValue(key, out value) ? (value ?? "").Trim() : "";
     }
 
-    private void SaveTranslationSettings(Dictionary<string, string> request)
+    private static string NormalizeApiKeyInput(string raw)
     {
-        bool recovered;
-        var settings = LoadTranslationSettings(out recovered);
+        var trimmed = (raw ?? "").Trim();
+        if (trimmed.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            trimmed = trimmed.Substring(7).Trim();
+        return trimmed.Trim('"', '\'').Trim();
+    }
+
+    private TranslationSettings ApplyTranslationRequestToSettings(TranslationSettings baseSettings, Dictionary<string, string> request)
+    {
         var provider = ReadTranslationValue(request, "provider");
         if (provider != "localai" && provider != "mymemory" && provider != "baidu" && provider != "azure" && provider != "openai")
             throw new InvalidOperationException("请选择可用的翻译源。");
-        settings.provider = provider;
+        var settings = new TranslationSettings
+        {
+            provider = provider,
+            baiduId = baseSettings.baiduId,
+            baiduSecret = baseSettings.baiduSecret,
+            azureKey = baseSettings.azureKey,
+            azureRegion = baseSettings.azureRegion,
+            localModel = baseSettings.localModel,
+            openaiBaseUrl = baseSettings.openaiBaseUrl,
+            openaiKey = baseSettings.openaiKey,
+            openaiModel = baseSettings.openaiModel,
+            openaiConcurrency = baseSettings.openaiConcurrency
+        };
         if (provider == "openai")
         {
             var baseUrl = ReadTranslationValue(request, "openaiBaseUrl").TrimEnd('/');
-            var key = ReadTranslationValue(request, "key");
+            var key = NormalizeApiKeyInput(ReadTranslationValue(request, "key"));
             var model = ReadTranslationValue(request, "openaiModel");
             int concurrency;
             if (!int.TryParse(ReadTranslationValue(request, "openaiConcurrency"), out concurrency)) concurrency = 8;
@@ -91,7 +123,11 @@ internal sealed partial class WorkspaceWindow
                 throw new InvalidOperationException("请输入有效的 http(s) 接口地址（Base URL）。");
             if (string.IsNullOrEmpty(model) || model.Length > 120)
                 throw new InvalidOperationException("请输入有效的模型名称（如 deepseek-chat）。");
+            if (key.Length > 512)
+                throw new InvalidOperationException("API 密钥长度超出限制。");
             if (key.Length != 0) settings.openaiKey = key;
+            if (string.IsNullOrEmpty(settings.openaiKey) && parsedUri.IsLoopback)
+                settings.openaiKey = "local";
             if (string.IsNullOrEmpty(settings.openaiKey))
                 throw new InvalidOperationException("请输入云端大模型 API 密钥。");
             settings.openaiBaseUrl = baseUrl;
@@ -101,7 +137,7 @@ internal sealed partial class WorkspaceWindow
         if (provider == "baidu")
         {
             var appId = ReadTranslationValue(request, "appId");
-            var secret = ReadTranslationValue(request, "key");
+            var secret = NormalizeApiKeyInput(ReadTranslationValue(request, "key"));
             if (appId.Length != 0) settings.baiduId = appId;
             if (secret.Length != 0) settings.baiduSecret = secret;
             if (!Regex.IsMatch(settings.baiduId ?? "", @"\A[0-9]{1,40}\z") || !ValidTranslationKey(settings.baiduSecret))
@@ -109,7 +145,7 @@ internal sealed partial class WorkspaceWindow
         }
         if (provider == "azure")
         {
-            var key = ReadTranslationValue(request, "key");
+            var key = NormalizeApiKeyInput(ReadTranslationValue(request, "key"));
             if (key.Length != 0) settings.azureKey = key;
             settings.azureRegion = ReadTranslationValue(request, "region");
             if (!ValidTranslationKey(settings.azureKey) || !Regex.IsMatch(settings.azureRegion, @"\A[a-zA-Z0-9-]{0,40}\z"))
@@ -118,6 +154,14 @@ internal sealed partial class WorkspaceWindow
         settings.localModel = ReadTranslationValue(request, "localModel");
         if (settings.localModel != "large" && settings.localModel != "compact" && settings.localModel != "tiny")
             settings.localModel = "large";
+        return settings;
+    }
+
+    private void SaveTranslationSettings(Dictionary<string, string> request)
+    {
+        bool recovered;
+        var current = LoadTranslationSettings(out recovered);
+        var settings = ApplyTranslationRequestToSettings(current, request);
         var bytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(translationJson.Serialize(settings)), null, DataProtectionScope.CurrentUser);
         var temporary = TranslationSettingsPath + ".new";
         File.WriteAllBytes(temporary, bytes);
@@ -131,7 +175,7 @@ internal sealed partial class WorkspaceWindow
 
     private static bool ValidTranslationKey(string value)
     {
-        return Regex.IsMatch(value ?? "", @"\A[a-zA-Z0-9_\-]{6,160}\z");
+        return Regex.IsMatch(value ?? "", @"\A[a-zA-Z0-9_\-\.]{6,512}\z");
     }
 
     private void SendTranslationSettings(CoreWebView2 web)
@@ -172,7 +216,7 @@ internal sealed partial class WorkspaceWindow
                     var pending = activeTranslation;
                     activeTranslation = null;
                     activeTranslationId = null;
-                    if (pending != null) pending.Cancel();
+                    if (pending != null) { try { pending.Cancel(); } catch (ObjectDisposedException) { } }
                 }
                 return;
             }
@@ -190,16 +234,37 @@ internal sealed partial class WorkspaceWindow
             }
             if (action == "save")
             {
-                SaveTranslationSettings(data);SendTranslationSettings(web);
+                SaveTranslationSettings(data);
+                SendTranslationSettings(web);
                 PostWorkspaceMessage(web, new { type = "translation-response", id });
                 return;
             }
+            if (action == "test")
+            {
+                var testSettings = ApplyTranslationRequestToSettings(LoadTranslationSettings(), data);
+                using (var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(25)))
+                {
+                    var watch = Stopwatch.StartNew();
+                    var sample = await TranslateWithProvider(testSettings, "en", "zh",
+                        "Terahertz planar antennas achieve low ohmic loss.", "", testCts.Token);
+                    watch.Stop();
+                    var preview = sample.Length > 48 ? sample.Substring(0, 48) + "…" : sample;
+                    PostWorkspaceMessage(web, new { type = "translation-response", id,
+                        value = "✓ 连接可用（" + watch.Elapsed.TotalSeconds.ToString("0.0") + "s）：" + preview });
+                }
+                return;
+            }
             if (action != "translate") throw new InvalidOperationException("翻译操作无效。");
-            if (activeTranslation != null) throw new InvalidOperationException("还有翻译正在处理，请稍后重试。");
+            var previous = activeTranslation;
+            activeTranslation = null;
+            activeTranslationId = null;
+            if (previous != null) { try { previous.Cancel(); } catch (ObjectDisposedException) { } }
+
             var settings = LoadTranslationSettings();
             var provider = ReadTranslationValue(data, "provider");
-            if (provider != "localai" && provider != settings.provider)
-                throw new InvalidOperationException("翻译源已变化，请重新翻译。");
+            if (string.IsNullOrEmpty(provider)) provider = settings.provider;
+            if (provider != "localai" && provider != "openai" && provider != "baidu" && provider != "azure")
+                throw new InvalidOperationException("不支持的翻译服务类型。");
             settings.provider = provider;
             var source = ReadTranslationValue(data, "source");
             var target = ReadTranslationValue(data, "target");
@@ -234,7 +299,7 @@ internal sealed partial class WorkspaceWindow
         }
         catch (Exception error)
         {
-            var message = error is InvalidOperationException ? error.Message : "翻译服务不可用，或本机无法读取设置。";
+            var message = error is InvalidOperationException ? error.Message : "翻译服务请求失败，请检查网络连接或接口地址。";
             PostWorkspaceMessage(web, new { type = "translation-response", id, error = message });
         }
     }
@@ -262,6 +327,41 @@ internal sealed partial class WorkspaceWindow
         };
     }
 
+    private string FormatHttpProviderError(string provider, HttpStatusCode statusCode, string rawBody)
+    {
+        var code = (int)statusCode;
+        if (provider == "openai")
+        {
+            var detail = "";
+            try
+            {
+                var root = translationJson.DeserializeObject(rawBody) as Dictionary<string, object>;
+                object errObj;
+                if (root != null && root.TryGetValue("error", out errObj))
+                {
+                    var errDict = errObj as Dictionary<string, object>;
+                    object msgObj;
+                    if (errDict != null && errDict.TryGetValue("message", out msgObj))
+                        detail = Convert.ToString(msgObj);
+                    else if (errObj is string)
+                        detail = (string)errObj;
+                }
+            }
+            catch { }
+            if (code == 401 || code == 403)
+                return "API 密钥无效或无权限（HTTP " + code + "）" + (string.IsNullOrEmpty(detail) ? "" : "：" + detail);
+            if (code == 402)
+                return "云端模型账户余额不足（HTTP 402）" + (string.IsNullOrEmpty(detail) ? "" : "：" + detail);
+            if (code == 404)
+                return "接口地址或模型名称不存在（HTTP 404）" + (string.IsNullOrEmpty(detail) ? "" : "：" + detail);
+            if (code == 429)
+                return "云端模型请求频率受限（HTTP 429），可适当调低并发数或稍后重试。";
+            if (!string.IsNullOrEmpty(detail))
+                return "云端模型返回 HTTP " + code + "：" + (detail.Length > 160 ? detail.Substring(0, 160) : detail);
+        }
+        return "翻译服务返回 HTTP " + code + "，请检查凭证、区域或额度。";
+    }
+
     private async Task<string> TranslateWithProvider(TranslationSettings settings, string source, string target, string text, string context, CancellationToken cancellation)
     {
         HttpRequestMessage request;
@@ -279,7 +379,10 @@ internal sealed partial class WorkspaceWindow
                 + (string.IsNullOrEmpty(extra) ? "" : "\n术语参考（仅供理解）：" + (extra.Length > 2400 ? extra.Substring(0, 2400) : extra))
                 + "\n原文：\n" + text;
             request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-            request.Headers.Add("Authorization", "Bearer " + (string)cfg["apiKey"]);
+            request.Headers.TryAddWithoutValidation("User-Agent", "DoNote-Desktop/1.0");
+            var apiKey = (string)cfg["apiKey"];
+            if (!string.IsNullOrEmpty(apiKey) && apiKey != "local")
+                request.Headers.Add("Authorization", "Bearer " + apiKey);
             request.Content = new StringContent(translationJson.Serialize(new
             {
                 model = (string)cfg["model"],
@@ -320,9 +423,10 @@ internal sealed partial class WorkspaceWindow
         using (request)
         using (var response = await translationClient.SendAsync(request, cancellation))
         {
+            var bodyText = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode)
-                throw new InvalidOperationException("翻译服务返回 HTTP " + (int)response.StatusCode + "，请检查凭证、区域或额度。");
-            var jsonValue = translationJson.DeserializeObject(await response.Content.ReadAsStringAsync());
+                throw new InvalidOperationException(FormatHttpProviderError(settings.provider, response.StatusCode, bodyText));
+            var jsonValue = translationJson.DeserializeObject(bodyText);
             if (settings.provider == "openai")
             {
                 var root = (Dictionary<string, object>)jsonValue;
@@ -338,7 +442,7 @@ internal sealed partial class WorkspaceWindow
                 object result;
                 if (!data.TryGetValue("trans_result", out result))
                 {
-                    object code;data.TryGetValue("error_code", out code);
+                    object code; data.TryGetValue("error_code", out code);
                     string status = Convert.ToString(code);
                     throw new InvalidOperationException("百度翻译未返回译文" + (Regex.IsMatch(status, @"\A\d{1,8}\z") ? "（" + status + "）" : "") + "，请检查凭证或额度。");
                 }

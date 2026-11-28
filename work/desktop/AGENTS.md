@@ -39,8 +39,8 @@
 
 ## 设置中心与网页收藏
 
-- `desktop-settings.html`、`desktop-settings.js`、`desktop-settings.css`、`desktop-translation.js`、`TranslationProviders.cs` 与 `WindowChrome.cs` 提供「外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统」四栏自适应舒展设置中心及 OpenAI-Compatible 并发大模型翻译源。
-- `pdf_gguf_translation.py`、`pdfmathtranslate.py`、`bilingual-book-worker.py` 与 `enable-vulkan-gpu.ps1` 实现文献翻译三级加速：可选 `vulkan-dependencies` + GPU 自适应（`llama_supports_gpu_offload`）+ `n_batch=512`、轻模型级联路由（短/无公式段直连 `opus-mt-en-zh`）与 GGUF 多段 JSON 批译、以及 OpenAI-Compatible `ThreadPoolExecutor` 并发池。
+- `desktop-settings.html`、`desktop-settings.js`、`desktop-settings.css`、`desktop-translation.js`、`TranslationProviders.cs` 与 `WindowChrome.cs` 提供「外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统」四栏自适应舒展设置中心、DPAPI 密钥状态就绪提示、一键连接测速、抢占式连续选词翻译及跨视图热切换 OpenAI-Compatible 并发大模型翻译源。
+- `pdf_gguf_translation.py`、`pdfmathtranslate.py`、`bilingual-book-worker.py` 与 `enable-vulkan-gpu.ps1` 实现文献翻译三级加速：可选 `vulkan-dependencies` + GPU 自适应（`llama_supports_gpu_offload`）+ `n_batch=512`、极速轻模型级联与 GGUF `@@id@@` 流式多段批译、以及带瞬态退避重试与单段容错隔离的 OpenAI-Compatible `ThreadPoolExecutor` 并发池。
 - `web-fetch.mjs` 执行公网 IP 校验防 SSRF，复用 TLS Keep-Alive 连接与 `gzip/deflate/br` 流式限额解压，单进程 8 路并发限时抓取网页正文与配图样式。
 
 ## 云端备份

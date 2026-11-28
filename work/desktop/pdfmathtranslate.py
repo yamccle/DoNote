@@ -1,9 +1,14 @@
+# [INPUT]: 读取单页/多页 PDF 源路径、.cancel 协作取消标记与 offline / gguf / openai 翻译配置。
+# [OUTPUT]: 流式输出 pdf2zh-paragraph 预览片段，生成保版面单语译文 PDF 并输出 pdf2zh-result。
+# [POS]: 桌面端 PDFMathTranslate 整页对照常驻 Worker，保持模型常驻内存并支持多引擎并发批译。
+# [PROTOCOL]: Update this header on change, then check AGENTS.md
 import ast
 import contextlib
 import json
 import os
 import re
 import sys
+import threading
 import traceback
 from collections import Counter
 from pathlib import Path
@@ -21,8 +26,13 @@ SYS_PATHS = [
 ]
 sys.path[:0] = [str(path) for path in SYS_PATHS]
 
-from concurrent.futures import ThreadPoolExecutor
-from pdf_gguf_translation import PdfGgufTranslation, openai_compatible_chat, parse_batch_json_response
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pdf_gguf_translation import (
+    PdfGgufTranslation,
+    build_delimited_prompt,
+    openai_compatible_chat,
+    parse_delimited_response,
+)
 from offline_en_zh import HAN_CHAR, LATIN_WORD, OfflineEnglishToChinese, valid_english_to_chinese
 
 FORMULA = re.compile(r"\{\s*v\s*(\d+(?:\s+\d+)*)\s*\}", re.IGNORECASE)
@@ -72,6 +82,7 @@ def load_layout_model(model_path):
             # CPU. Always load the portable model, even if an older build
             # wrote a hardware-specific .optimized file next to it.
             options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
+            options.intra_op_num_threads = max(2, min(8, os.cpu_count() or 4))
             self.model_path = str(model_path)
             self.model = onnxruntime.InferenceSession(
                 self.model_path, options, providers=["CPUExecutionProvider"]
@@ -87,8 +98,24 @@ def main(request):
     global LAYOUT, OFFLINE
     if not isinstance(request, dict):
         raise ValueError("PDFMathTranslate 请求无效。")
+    if request.get("action") == "warmup":
+        warm_model = Path(str(request.get("model") or "")).resolve()
+        if warm_model.is_file():
+            GGUF.warmup(warm_model)
+        emit({"type": "pdf2zh-warmup-done"})
+        return
     source = Path(str(request.get("source") or "")).resolve()
     output_dir = Path(str(request.get("output") or "")).resolve()
+    cancel_file = Path(str(request.get("cancelFile") or "")) if request.get("cancelFile") else None
+    cancel_event = threading.Event()
+
+    def is_cancelled():
+        if cancel_event.is_set():
+            return True
+        if cancel_file and cancel_file.exists():
+            cancel_event.set()
+            return True
+        return False
     model_path = Path(str(request.get("model") or "")).resolve()
     engine = request.get("engine", "gguf")
     openai_config = request.get("openai") if isinstance(request.get("openai"), dict) else None
@@ -161,7 +188,7 @@ def main(request):
                     elif engine == "openai" and openai_config:
                         self.add_cache_impact_parameters("openai", str(openai_config.get("model") or "openai"))
                     elif not test_translator:
-                        self.add_cache_impact_parameters("gguf", model_key)
+                        self.add_cache_impact_parameters("gguf-v2", model_key)
 
                 def cached(self, source, words, expected):
                     try:
@@ -178,6 +205,8 @@ def main(request):
                     attempts = 2 if len(words) > 3 else 1
                     last_error = None
                     for attempt in range(attempts):
+                        if is_cancelled():
+                            return ""
                         reminder = "\n不要解释、遗漏或添加任何公式标记。" if attempt else ""
                         prompt = (
                             instruction + reminder
@@ -210,32 +239,44 @@ def main(request):
                         raise last_error
                     return ""
 
-                def _llm_batch(self, group):
+                def _llm_batch(self, group, on_stream_valid=None):
                     # group: list of (source, words, expected)
-                    numbered = [{"id": idx, "en": item[0]} for idx, item in enumerate(group)]
-                    user = (
-                        "将下面的学术论文英文章节逐条翻译为简体中文。保留数字、单位、缩写和每一个 {v0} 形式的公式标记，"
-                        "公式标记的内容和数量必须与对应条目完全一致。严格返回 JSON 数组，只含 id 和 zh 字段。\n"
-                        + json.dumps(numbered, ensure_ascii=False)
+                    header = (
+                        "将下面的学术论文英文段落逐条翻译为简体中文。保留数字、单位、缩写和每一个 {v0} 形式的公式标记，"
+                        "公式标记的内容和数量必须与对应条目完全一致。"
                     )
-                    total_chars = sum(len(item[0]) for item in group)
+                    items = [item[0] for item in group]
+                    total_chars = sum(len(s) for s in items)
+                    max_toks = max(256, min(4096, int(total_chars * 1.6) + 192))
                     mapped = {}
+                    streamed_ok = {}
                     try:
                         if engine == "openai":
+                            user = build_delimited_prompt(items, header)
                             content, _ = openai_compatible_chat(
-                                openai_config,
-                                "你是专业学术论文英译中译者。",
-                                user,
-                                max(256, min(4096, total_chars * 2 + 256)),
+                                openai_config, "你是专业学术论文英译中译者。", user, max_toks
                             )
+                            mapped = parse_delimited_response(clean_unicode(content), len(group))
                         else:
-                            content, _ = GGUF.complete(
+                            def handle_stream_item(idx, raw_seg):
+                                if idx in streamed_ok:
+                                    return
+                                src, words, expected = group[idx]
+                                cand = clean_answer(raw_seg)
+                                if cand and valid_translation(src, cand, words, expected):
+                                    streamed_ok[idx] = cand
+                                    if on_stream_valid:
+                                        on_stream_valid(idx, cand)
+
+                            mapped = GGUF.complete_delimited_stream(
                                 model_path,
                                 "你是专业学术论文英译中译者。",
-                                user,
-                                max(256, min(4096, total_chars * 2 + 256)),
+                                items,
+                                header,
+                                max_toks,
+                                on_item=handle_stream_item,
+                                is_cancelled=is_cancelled,
                             )
-                        mapped = parse_batch_json_response(clean_unicode(content), len(group))
                     except Exception as error:
                         if engine == "gguf" and GGUF.model is None:
                             raise
@@ -243,11 +284,22 @@ def main(request):
 
                     answers = []
                     for idx, (source, words, expected) in enumerate(group):
+                        if is_cancelled():
+                            answers.append("")
+                            continue
+                        if idx in streamed_ok:
+                            answers.append(streamed_ok[idx])
+                            continue
                         candidate = clean_answer(mapped.get(idx, "")) if idx in mapped else ""
                         if candidate and valid_translation(source, candidate, words, expected):
+                            if on_stream_valid:
+                                on_stream_valid(idx, candidate)
                             answers.append(candidate)
                         else:
-                            answers.append(self._llm_single(source, words, expected))
+                            single = self._llm_single(source, words, expected)
+                            if single and on_stream_valid:
+                                on_stream_valid(idx, single)
+                            answers.append(single)
                     return answers
 
                 def translate_many(self, texts):
@@ -294,7 +346,6 @@ def main(request):
                         finally:
                             pending.clear()
 
-                    first_batch = True
                     for text in texts:
                         source = normalise_formula_tokens(clean_unicode(text))
                         index = len(results)
@@ -305,15 +356,12 @@ def main(request):
                         expected = Counter(FORMULA.findall(source))
                         cached = self.cached(source, words, expected) if cache_enabled else None
                         if cached:
-                            flush_pending()
                             emit({"type": "pdf2zh-paragraph", "text": cached})
                             results[index] = cached
-                            first_batch = False
                             continue
                         pending.append((index, words, expected))
-                        if len(pending) >= (1 if first_batch else 8):
+                        if len(pending) >= 24:
                             flush_pending()
-                            first_batch = False
                     flush_pending()
                     return results
 
@@ -338,13 +386,13 @@ def main(request):
                             emit({"type": "pdf2zh-paragraph", "text": cached})
                             results[index] = cached
                             continue
-                        # Cascade rule: simple short/medium blocks without formulas go to fast CT2 first.
-                        if cascade_enabled and not expected and len(words) <= 18 and (RUNTIME / "translation-en-zh").is_dir():
+                        # Only cascade trivial short labels/headings (<=6 words, no formulas) to preserve 100% LLM domain terminology
+                        if cascade_enabled and not expected and len(words) <= 6 and (RUNTIME / "translation-en-zh").is_dir():
                             fast_items.append((index, source, words, expected))
                         else:
                             llm_items.append((index, source, words, expected))
 
-                    if fast_items:
+                    if fast_items and not is_cancelled():
                         try:
                             if OFFLINE is None:
                                 OFFLINE = OfflineEnglishToChinese(RUNTIME / "translation-en-zh")
@@ -361,22 +409,14 @@ def main(request):
                             print("Cascade offline fallback to GGUF:", error, file=sys.stderr)
                             llm_items.extend(fast_items)
 
-                    if llm_items and model_error is None:
+                    if llm_items and model_error is None and not is_cancelled():
                         llm_items.sort(key=lambda item: item[0])
                         batches = []
                         current = []
                         current_chars = 0
                         for item in llm_items:
                             item_len = len(item[1])
-                            formula_count = sum(item[3].values())
-                            if formula_count >= 3:
-                                if current:
-                                    batches.append(current)
-                                    current = []
-                                    current_chars = 0
-                                batches.append([item])
-                                continue
-                            if current and (len(current) >= 6 or current_chars + item_len > 1800):
+                            if current and (len(current) >= 14 or current_chars + item_len > 3200):
                                 batches.append(current)
                                 current = []
                                 current_chars = 0
@@ -386,21 +426,30 @@ def main(request):
                             batches.append(current)
 
                         for batch in batches:
-                            if model_error is not None:
+                            if model_error is not None or is_cancelled():
                                 break
                             try:
+                                streamed_indices = set()
+
+                                def on_item_done(local_idx, answer_text):
+                                    index, src, _, _ = batch[local_idx]
+                                    streamed_indices.add(local_idx)
+                                    if cache_enabled:
+                                        self.cache.set(src, answer_text)
+                                    results[index] = answer_text
+                                    emit({"type": "pdf2zh-paragraph", "text": answer_text})
+
                                 if len(batch) == 1:
-                                    ans_list = [self._llm_single(batch[0][1], batch[0][2], batch[0][3])]
-                                else:
-                                    ans_list = self._llm_batch([(it[1], it[2], it[3]) for it in batch])
-                                for (index, src, _, _), answer in zip(batch, ans_list):
-                                    if answer:
-                                        if cache_enabled:
-                                            self.cache.set(src, answer)
-                                        results[index] = answer
-                                        emit({"type": "pdf2zh-paragraph", "text": answer})
+                                    ans_one = self._llm_single(batch[0][1], batch[0][2], batch[0][3])
+                                    if ans_one:
+                                        on_item_done(0, ans_one)
                                     else:
                                         skipped_paragraphs += 1
+                                else:
+                                    ans_list = self._llm_batch([(it[1], it[2], it[3]) for it in batch], on_stream_valid=on_item_done)
+                                    for local_idx, answer in enumerate(ans_list):
+                                        if not answer:
+                                            skipped_paragraphs += 1
                             except Exception as error:
                                 if GGUF.model is None:
                                     model_error = error
@@ -432,15 +481,22 @@ def main(request):
                         return results
                     concurrency = max(1, min(16, int((openai_config or {}).get("concurrency") or 8)))
                     workers = min(concurrency, len(pending))
+                    succeeded = 0
+                    first_error = None
+                    fatal_error = None
                     with ThreadPoolExecutor(max_workers=workers) as pool:
-                        futures = [
-                            (item, pool.submit(self._llm_single, item[1], item[2], item[3]))
+                        future_map = {
+                            pool.submit(self._llm_single, item[1], item[2], item[3]): item
                             for item in pending
-                        ]
-                        for (index, src, _, _), future in futures:
+                        }
+                        for future in as_completed(future_map):
+                            index, src, _, _ = future_map[future]
+                            if is_cancelled():
+                                continue
                             try:
                                 answer = future.result()
                                 if answer:
+                                    succeeded += 1
                                     if cache_enabled:
                                         self.cache.set(src, answer)
                                     results[index] = answer
@@ -448,9 +504,16 @@ def main(request):
                                 else:
                                     skipped_paragraphs += 1
                             except Exception as error:
-                                if model_error is None:
-                                    model_error = error
                                 skipped_paragraphs += 1
+                                if first_error is None:
+                                    first_error = error
+                                msg = str(error)
+                                if "HTTP 401" in msg or "HTTP 402" in msg or "HTTP 403" in msg or "HTTP 404" in msg:
+                                    fatal_error = error
+                    if fatal_error is not None:
+                        model_error = fatal_error
+                    elif succeeded == 0 and first_error is not None:
+                        model_error = first_error
                     return results
 
                 def translate(self, text, ignore_cache=False):
@@ -515,6 +578,8 @@ def main(request):
                     # second generation unless it could recover meaningful text.
                     attempts = 2 if len(words) > 3 else 1
                     for attempt in range(attempts):
+                        if is_cancelled():
+                            return ""
                         reminder = "\n不要解释、遗漏或添加任何公式标记。" if attempt else ""
                         prompt = (
                             instruction + reminder
@@ -554,17 +619,29 @@ def main(request):
                         BABELDOC_CACHE / "models" / "doclayout_yolo_docstructbench_imgsz1024.onnx"
                     )
                 layout_model = LAYOUT
-            mono, _ = translate_stream(
-                stream,
-                pages=pages,
-                lang_in="en",
-                lang_out="zh",
-                service="donote_local",
-                thread=1,
-                model=layout_model,
-                ultrafast=mode == "fast",
-                mono_only=True,
-            )
+            try:
+                mono, _ = translate_stream(
+                    stream,
+                    pages=pages,
+                    lang_in="en",
+                    lang_out="zh",
+                    service="donote_local",
+                    thread=1,
+                    model=layout_model,
+                    ultrafast=mode == "fast",
+                    mono_only=True,
+                    cancellation_event=cancel_event,
+                )
+            except BaseException as stream_err:
+                if isinstance(stream_err, (KeyboardInterrupt, SystemExit)):
+                    raise
+                if is_cancelled() or "cancel" in stream_err.__class__.__name__.lower():
+                    emit({"type": "pdf2zh-result", "cancelled": True})
+                    return
+                raise
+            if is_cancelled():
+                emit({"type": "pdf2zh-result", "cancelled": True})
+                return
             if model_error is not None:
                 label = "离线快速翻译模型" if engine == "offline" else "云端大模型" if engine == "openai" else "本地大模型"
                 raise ValueError(f"无法加载{label}：{model_error}") from model_error

@@ -177,9 +177,9 @@
 
 ### 2. 文献翻译三级加速：离线 GGUF、可选 Vulkan GPU 与云端并发 API
 
-- **自动级联与多段打包批译（开箱即用）**：使用本地 `Qwen3` GGUF 翻译论文时，短句与无公式块自动分流到内置 `opus-mt-en-zh` 快速直译，长难段与公式段按批打包为编号 JSON 一次推理。
+- **自动级联与流式多段批译（开箱即用）**：使用本地 `Qwen3` GGUF 翻译论文时，极短标题标签自动分流至内置 `opus-mt-en-zh` 瞬时直译，正文与公式段采用 `@@id@@` 零开销流式打包批译，退出对照后自动在后台完成 `±5` 页预缓存。
 - **可选 Vulkan GPU 加速**：可在 DoNote 安装目录执行 `pwsh -File .\tools\enable-vulkan-gpu.ps1 -InstallDir <你的安装目录>` 安装独立的 `vulkan-dependencies` 加速层（支持 AMD / NVIDIA / Intel 核显与独显；传入 `-Disable` 可一键回退 CPU）。
-- **云端大模型并发 API（1–3 秒整页）**：在「设置 → AI 与翻译 → 翻译服务」选择「云端大模型（OpenAI 兼容 · 并发极速）」，配置 DeepSeek、通义千问、OpenAI 或本地 Ollama 接口与并发数（1–16）即可并发加速划词、整页对照与智能排版翻译。
+- **云端大模型并发 API（1–3 秒整页）**：在「设置 → AI 与翻译 → 翻译服务」选择「云端大模型（OpenAI 兼容 · 并发极速）」，配置 DeepSeek、通义千问、OpenAI 或本地 Ollama 接口与并发数（1–16），支持一键连接测速、DPAPI 密钥加密持久化及划词/整页对照/智能排版跨视图即时热切换。
 
 安装包已内置 `llama.cpp` 推理后端，下载任一 GGUF 权重按「保存目标文件名」放入 `models\translation\`（注意从 `bartowski` 下载 4B / 1.7B 时去掉文件名前缀 `Qwen_`），在「偏好设置 → AI 与翻译」将翻译源切换为「本地大模型」即可离线使用：
 

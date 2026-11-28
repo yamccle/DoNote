@@ -250,9 +250,9 @@
 <div class="field" id="translationOpenAiModelField" hidden><label for="translationOpenAiModel">模型名称（Model）</label><input id="translationOpenAiModel" autocomplete="off" placeholder="deepseek-chat" maxlength="120"></div>
 <div class="field" id="translationOpenAiConcurrencyField" hidden><label for="translationOpenAiConcurrency">文献整页并发数（1–16）</label><input id="translationOpenAiConcurrency" type="number" min="1" max="16" value="8"></div>
 <div class="field" id="translationAppIdField" hidden><label for="translationAppId">百度 APP ID</label><input id="translationAppId" autocomplete="off" maxlength="40"></div>
-<div class="field" id="translationKeyField" hidden><label for="translationKey">服务密钥 / API Key</label><input id="translationKey" type="password" autocomplete="new-password" maxlength="160"></div>
+<div class="field" id="translationKeyField" hidden><label for="translationKey"><span id="translationKeyLabelText">服务密钥 / API Key</span></label><input id="translationKey" type="password" autocomplete="new-password" maxlength="512" placeholder="请输入 API Key（如 sk-...）"></div>
 <div class="field" id="translationRegionField" hidden><label for="translationRegion">Azure 区域（全球资源可留空）</label><input id="translationRegion" maxlength="40"></div>
 <div class="field" id="localModelField"><label for="translationLocalModel">本地模型规模</label><select id="translationLocalModel"><option value="large">高质量 · Qwen3-4B</option><option value="compact">轻量 · Qwen3-1.7B</option><option value="tiny">极速 · Qwen3-0.6B</option></select><p id="translationLocalStatus" class="section-note"></p><button type="button" class="secondary" id="openLocalModelFolder">打开本地模型目录</button></div>
 <p id="translationHelp" class="section-note"></p><p id="translationSettingsStatus" class="form-message" role="status"></p></div>
-<div class="modalfoot"><button type="button" class="secondary" data-close-translation>取消</button><button type="submit" id="translationSettingsSave" class="primary">保存翻译源</button></div>
+<div class="modalfoot"><button type="button" class="secondary" data-close-translation>取消</button><div class="right"><button type="button" class="secondary" id="translationTestBtn" hidden>测试连接</button><button type="submit" id="translationSettingsSave" class="primary">保存翻译源</button></div></div>
 </form></dialog>

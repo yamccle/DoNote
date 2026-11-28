@@ -34,6 +34,14 @@ export async function testPdfTranslationBridges(page) {
             });
             window.qaRelease.post({ type: 'translation-response', id: req.id });
           });
+        } else if (req.action === 'test') {
+          queueMicrotask(() => {
+            window.qaRelease.post({
+              type: 'translation-response',
+              id: req.id,
+              value: '✓ 连接可用（0.3s）：太赫兹平面天线实现了低欧姆损耗。'
+            });
+          });
         } else if (req.action === 'translate') {
           queueMicrotask(() => {
             window.qaRelease.post({
@@ -101,11 +109,18 @@ export async function testPdfTranslationBridges(page) {
       });
       const pageOut = await doc.translate(1, {
         preference: 'openai',
+        mode: 'fast',
         source: { fileId: 'f-test', page: 1, name: 'Terahertz.pdf' },
         onProgress: text => progresses.push(text),
         onParagraph: text => paragraphs.push(text)
       });
+      const pageOut2 = await doc.translate(2, {
+        preference: 'openai',
+        mode: 'fast',
+        source: { fileId: 'f-test', page: 2, name: 'Terahertz.pdf' }
+      });
       doc.close();
+      const pdf2zhTasks = window.DoNoteTasks.list().filter(item => String(item.id).startsWith('pdf2zh:'));
 
       const bbOut = await window.BilingualBook.pair(
         [{ id: '0', type: 'para', text: 'Low-power SAR ADC' }],
@@ -113,6 +128,19 @@ export async function testPdfTranslationBridges(page) {
       );
 
       const onlineText = await translatePdfOnline(' Terahertz FSS ', 'en', 'zh', new AbortController().signal, () => {}, 'ctx', 'openai');
+      const onlineText2 = await translatePdfOnline(' Dielectric loss ', 'en', 'zh', new AbortController().signal, () => {}, 'ctx', 'openai');
+      const testConnMsg = await window.desktopTranslation.request({
+        action: 'test',
+        provider: 'openai',
+        openaiBaseUrl: 'https://api.deepseek.com',
+        openaiModel: 'deepseek-chat',
+        openaiConcurrency: '8',
+        key: ''
+      });
+      document.getElementById('openTranslationSettings')?.click();
+      const keyPlaceholder = document.getElementById('translationKey')?.placeholder || '';
+      const keyLabel = document.getElementById('translationKeyLabelText')?.textContent || '';
+      document.getElementById('translationSettings')?.close();
 
       return {
         provider: window.desktopTranslation.provider(),
@@ -124,7 +152,14 @@ export async function testPdfTranslationBridges(page) {
         paragraphs,
         pairsCount: pairs.length,
         bbTranslation: bbOut.pairs[0]?.translation,
-        onlineText
+        onlineText,
+        onlineText2,
+        testConnMsg,
+        keyPlaceholder,
+        keyLabel,
+        pdf2zhTaskCount: pdf2zhTasks.length,
+        pdf2zhTaskPage: pdf2zhTasks[0]?.page,
+        pdf2zhTaskState: pdf2zhTasks[0]?.state
       };
     } finally {
       window.chrome.webview.postMessage = origPost;
@@ -140,5 +175,12 @@ export async function testPdfTranslationBridges(page) {
   assert.equal(result.pairsCount, 1);
   assert.equal(result.bbTranslation, '双语译：Low-power SAR ADC');
   assert.equal(result.onlineText, '[openai] 译： Terahertz FSS ');
+  assert.equal(result.onlineText2, '[openai] 译： Dielectric loss ');
+  assert.ok(result.testConnMsg.includes('连接可用'));
+  assert.ok(result.keyPlaceholder.includes('密钥已保存'));
+  assert.ok(result.keyLabel.includes('已加密保存'));
+  assert.equal(result.pdf2zhTaskCount, 1);
+  assert.equal(result.pdf2zhTaskPage, 2);
+  assert.equal(result.pdf2zhTaskState, 'done');
   console.log('PASS desktop translation bridges: PdfMathTranslate, BilingualBook and OpenAI provider');
 }
