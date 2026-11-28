@@ -126,8 +126,9 @@ internal sealed partial class WorkspaceWindow
                 if (start < 1 || end != start) throw new InvalidDataException("整页对照每次处理一页。");
                 if (mode != "fast" && mode != "full") throw new InvalidDataException("PDFMathTranslate 模式无效。");
                 var offline = preference == "offline";
-                var model = offline ? null : FindLocalLlmModel(preference);
-                if (!offline && model == null) throw new InvalidOperationException(LocalLlmMissingMessage(preference));
+                string model;
+                Dictionary<string, object> openaiConfig;
+                var engine = ResolveDocumentTranslationEngine(preference, out model, out openaiConfig);
                 if (bilingualPairRequestId == null) StopBilingualPairWorker();
                 var directory = pdf2zhDirectory;
                 var output = Path.Combine(directory, "page-" + Guid.NewGuid().ToString("N"));
@@ -139,7 +140,8 @@ internal sealed partial class WorkspaceWindow
                     end,
                     model,
                     mode,
-                    engine = offline ? "offline" : "gguf"
+                    engine,
+                    openai = openaiConfig
                 }));
                 var process = EnsureDocumentWorker(ref pdf2zhProcess, "pdfmathtranslate.py",
                     "pdfmathtranslate-dependencies", "PDFMathTranslate");
@@ -148,7 +150,7 @@ internal sealed partial class WorkspaceWindow
                 try
                 {
                     PostWorkspaceMessage(web, new { type = "pdf2zh-progress", id,
-                        status = (offline ? "离线快速翻译" : "本地大模型翻译") + " · 第 " + start + " 页…" });
+                        status = (offline ? "离线快速翻译" : engine == "openai" ? "云端大模型并发翻译" : "本地大模型翻译") + " · 第 " + start + " 页…" });
                     Dictionary<string, object> result;
                     try
                     {
@@ -233,15 +235,16 @@ internal sealed partial class WorkspaceWindow
                 throw new InvalidDataException("双语段落数据无效。");
             var translate = request.TryGetValue("translate", out value) && Convert.ToBoolean(value);
             var preference = request.TryGetValue("preference", out value) ? Convert.ToString(value) : "large";
-            var offline = translate && preference == "offline";
-            var model = translate && !offline ? FindLocalLlmModel(preference) : null;
-            if (translate && !offline && model == null) throw new InvalidOperationException(LocalLlmMissingMessage(preference));
+            string model = null;
+            Dictionary<string, object> openaiConfig = null;
+            var engine = translate ? ResolveDocumentTranslationEngine(preference, out model, out openaiConfig) : "gguf";
             var payload = documentTranslationJson.Serialize(CleanDocumentTranslationValue(new Dictionary<string, object>
             {
                 { "blocks", blocks },
                 { "translate", translate },
                 { "model", model ?? "" },
-                { "engine", offline ? "offline" : "gguf" },
+                { "engine", engine },
+                { "openai", openaiConfig },
                 { "source", request.TryGetValue("source", out value) ? value : "en" },
                 { "target", request.TryGetValue("target", out value) ? value : "zh" }
             }));
@@ -303,6 +306,22 @@ internal sealed partial class WorkspaceWindow
                 error = CleanUtf8Text(detail.Length > 800 ? detail.Substring(0, 800) : detail) });
         }
         return true;
+    }
+
+    private string ResolveDocumentTranslationEngine(string preference, out string model, out Dictionary<string, object> openaiConfig)
+    {
+        model = null;
+        openaiConfig = null;
+        if (preference == "offline") return "offline";
+        var settings = LoadTranslationSettings();
+        if (preference == "openai" || (settings != null && settings.provider == "openai"))
+        {
+            openaiConfig = BuildOpenAiWorkerConfig(settings);
+            return "openai";
+        }
+        model = FindLocalLlmModel(preference);
+        if (model == null) throw new InvalidOperationException(LocalLlmMissingMessage(preference));
+        return "gguf";
     }
 
     private void PostDocumentWorkerMessage(CoreWebView2 web, object message)

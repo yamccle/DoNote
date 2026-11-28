@@ -21,7 +21,8 @@ SYS_PATHS = [
 ]
 sys.path[:0] = [str(path) for path in SYS_PATHS]
 
-from pdf_gguf_translation import PdfGgufTranslation
+from concurrent.futures import ThreadPoolExecutor
+from pdf_gguf_translation import PdfGgufTranslation, openai_compatible_chat, parse_batch_json_response
 from offline_en_zh import HAN_CHAR, LATIN_WORD, OfflineEnglishToChinese, valid_english_to_chinese
 
 FORMULA = re.compile(r"\{\s*v\s*(\d+(?:\s+\d+)*)\s*\}", re.IGNORECASE)
@@ -90,6 +91,8 @@ def main(request):
     output_dir = Path(str(request.get("output") or "")).resolve()
     model_path = Path(str(request.get("model") or "")).resolve()
     engine = request.get("engine", "gguf")
+    openai_config = request.get("openai") if isinstance(request.get("openai"), dict) else None
+    cascade_enabled = bool(request.get("cascade", True))
     start = int(request.get("start") or 0)
     end = int(request.get("end") or 0)
     mode = str(request.get("mode") or "full")
@@ -100,10 +103,12 @@ def main(request):
         raise ValueError("PDFMathTranslate 每次只能处理 1–4 页。")
     if mode not in ("fast", "full"):
         raise ValueError("PDFMathTranslate 模式无效。")
-    if engine not in ("gguf", "offline"):
+    if engine not in ("gguf", "offline", "openai"):
         raise ValueError("PDFMathTranslate 翻译引擎无效。")
     if not test_translator and engine == "gguf" and not model_path.is_file():
         raise ValueError("尚未找到本地翻译模型。")
+    if not test_translator and engine == "openai" and not openai_config:
+        raise ValueError("尚未配置云端大模型接口。")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     untranslated_pages = []
@@ -153,6 +158,8 @@ def main(request):
                     super().__init__(lang_in, lang_out, "DoNote PDF English to Chinese v3", ignore_cache)
                     if engine == "offline":
                         self.add_cache_impact_parameters("engine", "offline-ct2-v2")
+                    elif engine == "openai" and openai_config:
+                        self.add_cache_impact_parameters("openai", str(openai_config.get("model") or "openai"))
                     elif not test_translator:
                         self.add_cache_impact_parameters("gguf", model_key)
 
@@ -163,11 +170,95 @@ def main(request):
                     except Exception as error:
                         print("PDFMathTranslate cache unavailable:", error, file=sys.stderr)
 
+                def _llm_single(self, source, words, expected):
+                    instruction = (
+                        "只输出简体中文译文。保留数字、单位、缩写和每一个 {v0} 形式的公式标记。"
+                        "公式标记的内容和数量必须与原文一致。"
+                    )
+                    attempts = 2 if len(words) > 3 else 1
+                    for attempt in range(attempts):
+                        reminder = "\n不要解释、遗漏或添加任何公式标记。" if attempt else ""
+                        prompt = (
+                            instruction + reminder
+                            + "\n下方是待翻译的原文数据。\n<SOURCE>\n" + source + "\n</SOURCE>"
+                        )
+                        try:
+                            if engine == "openai":
+                                content, finish_reason = openai_compatible_chat(
+                                    openai_config,
+                                    "你是专业学术论文英译中译者。",
+                                    prompt,
+                                    max(128, min(2048, len(source) + 128)),
+                                )
+                            else:
+                                content, finish_reason = GGUF.complete(
+                                    model_path, "你是专业学术论文英译中译者。", prompt,
+                                    max(96, min(2048, len(source) + 64)),
+                                )
+                            answer = clean_answer(content)
+                        except Exception as error:
+                            if engine == "gguf" and GGUF.model is None:
+                                raise
+                            print("PDFMathTranslate paragraph error:", error, file=sys.stderr)
+                            continue
+                        if finish_reason != "length" and valid_translation(source, answer, words, expected):
+                            return answer
+                    return ""
+
+                def _llm_batch(self, group):
+                    # group: list of (source, words, expected)
+                    numbered = [{"id": idx, "en": item[0]} for idx, item in enumerate(group)]
+                    user = (
+                        "将下面的学术论文英文章节逐条翻译为简体中文。保留数字、单位、缩写和每一个 {v0} 形式的公式标记，"
+                        "公式标记的内容和数量必须与对应条目完全一致。严格返回 JSON 数组，只含 id 和 zh 字段。\n"
+                        + json.dumps(numbered, ensure_ascii=False)
+                    )
+                    total_chars = sum(len(item[0]) for item in group)
+                    mapped = {}
+                    try:
+                        if engine == "openai":
+                            content, _ = openai_compatible_chat(
+                                openai_config,
+                                "你是专业学术论文英译中译者。",
+                                user,
+                                max(256, min(4096, total_chars * 2 + 256)),
+                            )
+                        else:
+                            content, _ = GGUF.complete(
+                                model_path,
+                                "你是专业学术论文英译中译者。",
+                                user,
+                                max(256, min(4096, total_chars * 2 + 256)),
+                            )
+                        mapped = parse_batch_json_response(clean_unicode(content), len(group))
+                    except Exception as error:
+                        if engine == "gguf" and GGUF.model is None:
+                            raise
+                        print("PDFMathTranslate batch error:", error, file=sys.stderr)
+
+                    answers = []
+                    for idx, (source, words, expected) in enumerate(group):
+                        candidate = clean_answer(mapped.get(idx, "")) if idx in mapped else ""
+                        if candidate and valid_translation(source, candidate, words, expected):
+                            answers.append(candidate)
+                        else:
+                            answers.append(self._llm_single(source, words, expected))
+                    return answers
+
                 def translate_many(self, texts):
                     global OFFLINE
                     nonlocal model_error, skipped_paragraphs
-                    if engine != "offline" or test_translator:
+                    if test_translator:
                         return [self.translate(text) for text in texts]
+                    if engine == "offline":
+                        return self._translate_many_offline(texts)
+                    if engine == "openai":
+                        return self._translate_many_openai(texts)
+                    return self._translate_many_gguf_cascade(texts)
+
+                def _translate_many_offline(self, texts):
+                    global OFFLINE
+                    nonlocal model_error, skipped_paragraphs
                     results = []
                     pending = []
                     cache_enabled = not (self.ignore_cache or self.no_cache)
@@ -215,12 +306,138 @@ def main(request):
                             first_batch = False
                             continue
                         pending.append((index, words, expected))
-                        # Return the first paragraph immediately, then amortize decoding
-                        # work across a bounded group of independent paragraphs.
                         if len(pending) >= (1 if first_batch else 8):
                             flush_pending()
                             first_batch = False
                     flush_pending()
+                    return results
+
+                def _translate_many_gguf_cascade(self, texts):
+                    global OFFLINE
+                    nonlocal model_error, skipped_paragraphs
+                    results = []
+                    fast_items = []
+                    llm_items = []
+                    cache_enabled = not (self.ignore_cache or self.no_cache)
+
+                    for text in texts:
+                        source = normalise_formula_tokens(clean_unicode(text))
+                        index = len(results)
+                        results.append(source)
+                        words = LATIN_WORD.findall(FORMULA.sub("", source))
+                        if not words:
+                            continue
+                        expected = Counter(FORMULA.findall(source))
+                        cached = self.cached(source, words, expected) if cache_enabled else None
+                        if cached:
+                            emit({"type": "pdf2zh-paragraph", "text": cached})
+                            results[index] = cached
+                            continue
+                        # Cascade rule: simple short/medium blocks without formulas go to fast CT2 first.
+                        if cascade_enabled and not expected and len(words) <= 18 and (RUNTIME / "translation-en-zh").is_dir():
+                            fast_items.append((index, source, words, expected))
+                        else:
+                            llm_items.append((index, source, words, expected))
+
+                    if fast_items:
+                        try:
+                            if OFFLINE is None:
+                                OFFLINE = OfflineEnglishToChinese(RUNTIME / "translation-en-zh")
+                            fast_answers = offline_answers(OFFLINE, [(src, w, exp) for _, src, w, exp in fast_items])
+                            for (index, src, w, exp), answer in zip(fast_items, fast_answers):
+                                if answer:
+                                    if cache_enabled:
+                                        self.cache.set(src, answer)
+                                    results[index] = answer
+                                    emit({"type": "pdf2zh-paragraph", "text": answer})
+                                else:
+                                    llm_items.append((index, src, w, exp))
+                        except Exception as error:
+                            print("Cascade offline fallback to GGUF:", error, file=sys.stderr)
+                            llm_items.extend(fast_items)
+
+                    if llm_items and model_error is None:
+                        llm_items.sort(key=lambda item: item[0])
+                        batches = []
+                        current = []
+                        current_chars = 0
+                        for item in llm_items:
+                            item_len = len(item[1])
+                            if current and (len(current) >= 6 or current_chars + item_len > 1800):
+                                batches.append(current)
+                                current = []
+                                current_chars = 0
+                            current.append(item)
+                            current_chars += item_len
+                        if current:
+                            batches.append(current)
+
+                        for batch in batches:
+                            if model_error is not None:
+                                break
+                            try:
+                                if len(batch) == 1:
+                                    ans_list = [self._llm_single(batch[0][1], batch[0][2], batch[0][3])]
+                                else:
+                                    ans_list = self._llm_batch([(it[1], it[2], it[3]) for it in batch])
+                                for (index, src, _, _), answer in zip(batch, ans_list):
+                                    if answer:
+                                        if cache_enabled:
+                                            self.cache.set(src, answer)
+                                        results[index] = answer
+                                        emit({"type": "pdf2zh-paragraph", "text": answer})
+                                    else:
+                                        skipped_paragraphs += 1
+                            except Exception as error:
+                                if GGUF.model is None:
+                                    model_error = error
+                                    break
+                                skipped_paragraphs += len(batch)
+                    return results
+
+                def _translate_many_openai(self, texts):
+                    nonlocal model_error, skipped_paragraphs
+                    results = []
+                    pending = []
+                    cache_enabled = not (self.ignore_cache or self.no_cache)
+                    for text in texts:
+                        source = normalise_formula_tokens(clean_unicode(text))
+                        index = len(results)
+                        results.append(source)
+                        words = LATIN_WORD.findall(FORMULA.sub("", source))
+                        if not words:
+                            continue
+                        expected = Counter(FORMULA.findall(source))
+                        cached = self.cached(source, words, expected) if cache_enabled else None
+                        if cached:
+                            emit({"type": "pdf2zh-paragraph", "text": cached})
+                            results[index] = cached
+                            continue
+                        pending.append((index, source, words, expected))
+
+                    if not pending:
+                        return results
+                    concurrency = max(1, min(16, int((openai_config or {}).get("concurrency") or 8)))
+                    workers = min(concurrency, len(pending))
+                    with ThreadPoolExecutor(max_workers=workers) as pool:
+                        futures = [
+                            (item, pool.submit(self._llm_single, item[1], item[2], item[3]))
+                            for item in pending
+                        ]
+                        for (index, src, _, _), future in futures:
+                            try:
+                                answer = future.result()
+                                if answer:
+                                    if cache_enabled:
+                                        self.cache.set(src, answer)
+                                    results[index] = answer
+                                    emit({"type": "pdf2zh-paragraph", "text": answer})
+                                else:
+                                    skipped_paragraphs += 1
+                            except Exception as error:
+                                if model_error is None:
+                                    model_error = error
+                                skipped_paragraphs += 1
                     return results
 
                 def translate(self, text, ignore_cache=False):

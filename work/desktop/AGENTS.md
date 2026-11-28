@@ -11,6 +11,9 @@
 - `OnlineUpdatePlan.cs` 计算从本机到最新正式版的更新路径。按总下载量比较增量包和完整包。
 - `LocalUpdate.cs` 查询 GitHub Releases。逐包下载并校验 SHA-256。完成后启动独立更新器。
 - `UpdateHost.cs` 持有单实例锁逐包安装。单步失败时回退该步，安装结束后重新打开 DoNote。
+- `SetupPackage.cs` 读取 `DNSETUP1` 自解压尾部并流式校验内嵌完整包，执行用户级安装/覆盖升级、写出纯卸载器、创建快捷方式、注册 `HKCU` 卸载项以及默认保留 `Data`/`models` 的安全卸载。
+- `SetupHost.cs` 提供中文用户级安装向导与安全卸载 WinForms 界面，同时支持 `--verify-only`、`--silent`、`--uninstall` 命令行模式。
+- `make-installer.ps1` 编译 `SetupHost.cs` + `SetupPackage.cs` + `UpdatePackage.cs` 为纯壳，流式拼接便携完整包与 `DNSETUP1` 校验尾，生成并自检 `DoNote-Setup-x64-*.exe`。
 - `Program.cs` 为已验证来源的工作台消息选择 Windows 宿主服务。
 
 ## 云备份
@@ -36,7 +39,8 @@
 
 ## 设置中心与网页收藏
 
-- `desktop-settings.html`、`desktop-settings.js`、`desktop-settings.css` 和 `WindowChrome.cs` 提供「外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统」四栏自适应舒展设置中心。多端协同只保留云盘文件夹对齐，不再提供网址、令牌、登录、实时推送或加密口令。另支持成就殿宇显隐开关，以及启动后静默检查新版本并在原生标题栏与设置图标亮起温和圆点提示。
+- `desktop-settings.html`、`desktop-settings.js`、`desktop-settings.css`、`desktop-translation.js`、`TranslationProviders.cs` 与 `WindowChrome.cs` 提供「外观与阅读 · AI 与翻译 · 多端协同 · 资料与系统」四栏自适应舒展设置中心及 OpenAI-Compatible 并发大模型翻译源。
+- `pdf_gguf_translation.py`、`pdfmathtranslate.py`、`bilingual-book-worker.py` 与 `enable-vulkan-gpu.ps1` 实现文献翻译三级加速：可选 `vulkan-dependencies` + GPU 自适应（`llama_supports_gpu_offload`）+ `n_batch=512`、轻模型级联路由（短/无公式段直连 `opus-mt-en-zh`）与 GGUF 多段 JSON 批译、以及 OpenAI-Compatible `ThreadPoolExecutor` 并发池。
 - `web-fetch.mjs` 执行公网 IP 校验防 SSRF，复用 TLS Keep-Alive 连接与 `gzip/deflate/br` 流式限额解压，单进程 8 路并发限时抓取网页正文与配图样式。
 
 ## 云端备份

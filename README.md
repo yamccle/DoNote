@@ -116,10 +116,18 @@
 | [`DoNote-r141-release.json`](https://github.com/yamccle/DoNote/releases/download/r141/DoNote-r141-release.json) | `r141` 发布溯源清单（源码提交 `878f853`、依赖锁与四项自动化门禁记录） | 984 字节 | `c97ad12cf30bb9d18aa4046d5b0c6ed7bbeaa0229bfad0e6f40c9d2623fe22df` |
 | [`DoNote-Windows-x64-r140.zip`](https://github.com/yamccle/DoNote/releases/download/r140/DoNote-Windows-x64-r140.zip) | **首次安装基础完整包**（或早于 `r140` 跨版本升级；解压运行后点一次「检查在线更新」即升至 `r141`） | 1,070,552,134 字节（约 1.00 GiB） | `e1dea0697fb71cb4736f4e25b4f4bc9bce7e088e814a6a1b59e29768cf0be7ca` |
 
-### 2. 运行环境、首次安装与无损升级
+### 2. 运行环境、双轨安装与无损升级
 
 - **运行环境**：Windows 10 / 11 x64，需具备 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)（Windows 11 与主流 Windows 10 系统均已内置）。
-- **首次安装**：将 `DoNote-Windows-x64-r140.zip` 解压至任意拥有读写权限的目录（例如 `D:\DoNote`），双击 `DoNote.exe` 即可开箱使用（无需安装额外数据库或配置环境变量）。
+- **双轨安装（二选一，与内置在线更新完全互通）**：
+  - **方式 A · 用户级安装向导（推荐普通用户）**：下载对应版本的 `DoNote-Setup-x64-<rev>.exe` 双击运行，无需管理员权限（默认安装至 `%LocalAppData%\Programs\DoNote`），自动创建桌面与开始菜单快捷方式并在 Windows「设置 → 应用」注册标准卸载入口；覆盖安装与默认卸载均完整保留 `Data/` 资料库与 `models/` 模型。
+  - **方式 B · 便携绿色压缩包（推荐 U 盘 / 自定义目录）**：将 `DoNote-Windows-x64-<rev>.zip` 解压至任意拥有读写权限的目录（例如 `D:\DoNote`），双击 `DoNote.exe` 即可开箱使用（无需安装额外数据库或配置环境变量）。
+- **Windows SmartScreen 提示与 SHA-256 完整性校验**：
+  - 当前阶段 `.exe` 安装向导暂未接入商业代码签名证书，首次从网络下载运行时 Windows Defender SmartScreen 可能弹出「Windows 已保护你的电脑」，点击 **「更多信息」→「仍要运行」** 即可继续安装。
+  - 每次正式发布均附带公开的 `SHA256SUMS.txt` 与 `DoNote-<rev>-release.json`，可在 PowerShell 中运行以下命令核对下载文件指纹是否与 Release 页完全一致：
+    ```powershell
+    Get-FileHash .\DoNote-Setup-x64-r142.exe -Algorithm SHA256
+    ```
 - **静默提示与一键在线自动升级（保留全部资料与模型）**：
   1. **启动静默检测**：软件启动后会在后台静默查询 GitHub 最新正式版；若发现新版，仅在窗口顶部「设置」入口亮起温和琥珀色小圆点，绝不弹窗打断阅读思路。
   2. **自动优选增量补丁**：打开「偏好设置 → 资料与系统 → **检查在线更新**」，DoNote 会自动根据本机当前版本号优先下载百 KB 级增量补丁（跨版本时自动回退完整包），流式核验 SHA-256 与文件清单无误后，交由独立 `DoNoteUpdater.exe` 备份旧程序至上级 `DoNote-Backups`、原子替换并自动重启。

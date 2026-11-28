@@ -10,7 +10,7 @@ APP_ROOT = RUNTIME_ROOT.parent
 DEPENDENCIES = RUNTIME_ROOT / "translation-dependencies"
 sys.path[:0] = [str(SOURCE_DIR), str(DEPENDENCIES)]
 
-from pdf_gguf_translation import PdfGgufTranslation, uses_non_thinking_prompt
+from pdf_gguf_translation import PdfGgufTranslation, create_llama_instance, uses_non_thinking_prompt
 
 SYSTEM_PROMPT = """你是专业的英译中技术翻译，服务对象是模拟集成电路、电子工程和学术论文读者。
 只输出简体中文译文，不解释、不总结、不添加原文没有的信息，不使用 Markdown 代码块。
@@ -94,18 +94,7 @@ def load_model():
         raise RuntimeError("未找到本地翻译模型：" + os.path.basename(model_path))
     if uses_non_thinking_prompt(model_path):
         return
-    from llama_cpp import Llama
-    threads = max(2, min(12, int(os.environ.get("DONOTE_LLM_THREADS", "12"))))
-    llama_model = Llama(
-        model_path=model_path,
-        n_ctx=16384,
-        n_batch=256,
-        n_threads=threads,
-        n_threads_batch=threads,
-        n_gpu_layers=0,
-        use_mmap=True,
-        verbose=False,
-    )
+    llama_model = create_llama_instance(model_path, n_ctx=16384)
 
 
 def translate_text(text, context, source, target):

@@ -1,4 +1,4 @@
-<#
+﻿<#
 [INPUT]: 读取干净的 Git 提交、锁定的运行依赖包和旧版完整包。
 [OUTPUT]: 生成 Windows 更新包和发布记录。记录云备份、更新链与工作台等验证结果。
 [POS]: 正式发布入口。验证在独立目录运行。
@@ -47,6 +47,7 @@ try {
         throw '请使用更早的完整包作为升级基线。'
     }
     $fullName = "DoNote-Windows-x64-$Revision.zip"
+    $setupName = "DoNote-Setup-x64-$Revision.exe"
     $updateName = "DoNote-Update-$($base.version)-to-$Revision.zip"
     $reportName = "DoNote-$Revision-release.json"
     $archive = Join-Path $temp 'source.zip'
@@ -59,6 +60,7 @@ try {
     $stage = Join-Path $temp 'stage'
     $patch = Join-Path $temp $updateName
     $full = Join-Path $temp $fullName
+    $setup = Join-Path $temp $setupName
 
     & (Join-Path $desktop 'build.ps1') -RuntimeArchive $runtime -Output $stage -ReleaseVersion $Version -SourceCommit $sourceCommit
     & (Join-Path $desktop 'make-update-patch.ps1') -Baseline $baseline -Target $stage -Destination $patch -BaseVersion $base.version -ReleaseVersion $Version
@@ -69,6 +71,8 @@ try {
     & (Join-Path $tests 'test-release-update.ps1') -PreviousReleaseZip $previous -UpdateZip $patch
     & (Join-Path $tests 'test-update-chain.ps1')
     & (Join-Path $desktop 'package-release.ps1') -Source $stage -Destination $full
+    & (Join-Path $desktop 'make-installer.ps1') -PackageZip $full -Destination $setup
+    & (Join-Path $tests 'test-setup-installer.ps1')
 
     $manifestPath = Join-Path $stage 'release-manifest.json'
     $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
@@ -78,15 +82,22 @@ try {
         baseVersion = $base.version
         previousArchiveSha256 = (Get-FileHash -LiteralPath $previous).Hash.ToLowerInvariant()
         provenance = $manifest.provenance
-        checks = @('workspace', 'cloud-backup-transport', 'upgrade-and-rollback', 'online-update-chain', 'package-checksums')
-        artifacts = @(foreach ($item in $patch,$full) {
+        checks = @('workspace', 'cloud-backup-transport', 'upgrade-and-rollback', 'online-update-chain', 'setup-installer', 'package-checksums')
+        artifacts = @(foreach ($item in $patch,$full,$setup) {
             @{ name = [IO.Path]::GetFileName($item); sha256 = (Get-FileHash -LiteralPath $item).Hash.ToLowerInvariant() }
         })
     }
     [void][IO.Directory]::CreateDirectory($incoming)
     [IO.File]::Copy($full, (Join-Path $incoming $fullName))
+    [IO.File]::Copy($setup, (Join-Path $incoming $setupName))
     [IO.File]::Copy($patch, (Join-Path $incoming $updateName))
-    [IO.File]::WriteAllText((Join-Path $incoming $reportName),($report | ConvertTo-Json -Depth 6))
+    $reportPath = Join-Path $incoming $reportName
+    [IO.File]::WriteAllText($reportPath, ($report | ConvertTo-Json -Depth 6))
+    $checksumLines = @(foreach ($item in $setup, $full, $patch, $reportPath) {
+        $hash = (Get-FileHash -LiteralPath $item -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$hash  $([IO.Path]::GetFileName($item))"
+    })
+    [IO.File]::WriteAllText((Join-Path $incoming 'SHA256SUMS.txt'), ($checksumLines -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
     [IO.Directory]::Move($incoming, $published)
     Get-ChildItem -LiteralPath $published
 } finally {

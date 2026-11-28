@@ -4,6 +4,8 @@
 
 - `test-release-update.ps1` 调用桌面更新器，验证真实版本替换和中断回退。
 - `test-update-chain.ps1` 编译 `UpdateChainProbe.cs`。验证最小下载路径、缺包桥接和多步回退。
+- `test-setup-installer.ps1` 调用 `make-installer.ps1`，在隔离目录与测试注册表键下验证安装器自检、全新用户级安装、覆盖升级保留 `Data`/`models`、安全卸载保留资料与完全卸载清理。
+- `test-translation-acceleration.py` 验证 GPU 自适应探测、多段 JSON 批译解析与 OpenAI-Compatible 并发回环调用。
 - `UpdateChainProbe.cs` 使用合成安装目录检查失败后可从前一版本继续。
 - `test-workspace.mjs` 在独立浏览器中验证工作台与阅读器。字幕测试覆盖从进行中和已完成任务打开原视频。
 - `workspace-excerpts.mjs` 由 `test-workspace.mjs` 调用，验证网页摘录回跳与单进程并发抓取、PDF 摘录追加、页面反向引用角标、扫描页离线识字入索引、隔离空账户备份恢复、右侧三面板、PPT 逐页批注/导出讲义/全文检索、Bento 总览、画廊/看板双视图、`Ctrl+K` 指令面板与聚合设置中心。

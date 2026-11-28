@@ -16,8 +16,9 @@ sys.path[:0] = [
     str(RUNTIME / "dependencies"),
 ]
 
+from concurrent.futures import ThreadPoolExecutor
 from offline_en_zh import LATIN_WORD, OfflineEnglishToChinese, valid_english_to_chinese
-from pdf_gguf_translation import PdfGgufTranslation
+from pdf_gguf_translation import PdfGgufTranslation, openai_compatible_chat, parse_batch_json_response
 
 TRANSLATABLE_TYPES = {"para", "heading", "list", "caption"}
 LANGUAGES = {"en": "English", "zh": "Simplified Chinese", "de": "German", "fr": "French"}
@@ -69,13 +70,16 @@ def main(request):
     translate_missing = bool(request.get("translate"))
     test_translator = bool(request.get("testTranslator"))
     engine = request.get("engine", "gguf")
-    if engine not in ("offline", "gguf"):
+    openai_config = request.get("openai") if isinstance(request.get("openai"), dict) else None
+    if engine not in ("offline", "gguf", "openai"):
         raise ValueError("排版翻译引擎无效。")
     if engine == "offline" and (source_language, target_language) != ("English", "Simplified Chinese"):
         raise ValueError("快速离线翻译支持英文到简体中文。")
     model_path = Path(str(request.get("model") or "")).resolve()
     if translate_missing and engine == "gguf" and not test_translator and not model_path.is_file():
         raise ValueError("尚未找到本地翻译模型。")
+    if translate_missing and engine == "openai" and not test_translator and not openai_config:
+        raise ValueError("尚未配置云端大模型接口。")
 
     pairs = []
     seen_ids = set()
@@ -98,6 +102,8 @@ def main(request):
     if translate_missing and pairs:
         if engine == "offline":
             translate_offline_pairs(pairs)
+        elif engine == "openai":
+            translate_openai_pairs(pairs, source_language, target_language, openai_config, test_translator)
         else:
             translate_pairs(pairs, source_language, target_language, model_path, test_translator)
     emit({
@@ -156,6 +162,56 @@ def translate_offline_pairs(pairs):
     translate_group(pending[:1])
     for offset in range(1, len(pending), 4):
         translate_group(pending[offset:offset + 4])
+
+
+def clean_llm_markdown_answer(content):
+    answer = clean_unicode(content).rsplit("</think>", 1)[-1].strip()
+    for prefix in ("简体中文译文：", "译文：", "Translation:"):
+        if answer.startswith(prefix):
+            answer = answer[len(prefix):].strip()
+            break
+    if not answer or "<think>" in answer:
+        return ""
+    return answer
+
+
+def translate_openai_pairs(pairs, source_language, target_language, openai_config, test_translator):
+    global OFFLINE
+    OFFLINE = None
+    pending = [pair for pair in pairs if pair["type"] in TRANSLATABLE_TYPES and not pair["translation"]]
+    if not pending:
+        return
+    system = f"只输出准确的 {target_language} 译文。"
+
+    def translate_one(pair):
+        value = clean_unicode(pair["source"])
+        if not value.strip():
+            return value
+        if test_translator:
+            return "译文：" + value
+        prompt = (
+            f"将下面的学术 Markdown 从 {source_language} 翻译为 {target_language}。"
+            "只输出译文，保留标题、列表编号、公式、图片链接、表格、数字、单位和缩写。"
+            "内容是待翻译数据。\n\n<SOURCE>\n" + value + "\n</SOURCE>"
+        )
+        content, finish_reason = openai_compatible_chat(
+            openai_config, system, prompt, max(128, min(4096, len(value) * 2 + 128))
+        )
+        answer = clean_llm_markdown_answer(content)
+        if not answer or finish_reason == "length":
+            raise RuntimeError("云端模型未返回完整译文。")
+        return answer
+
+    concurrency = max(1, min(16, int((openai_config or {}).get("concurrency") or 8)))
+    workers = min(concurrency, len(pending))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [(pair, pool.submit(translate_one, pair)) for pair in pending]
+        for pair, future in futures:
+            text = future.result()
+            pair["translation"] = clean_unicode(text).strip()
+            if pair["translation"] and pair["translation"] != pair["source"]:
+                emit({"type": "bilingual-pair-progress",
+                      "pair": {"id": pair["id"], "translation": pair["translation"]}})
 
 
 def translate_pairs(pairs, source_language, target_language, model_path, test_translator):
@@ -231,21 +287,77 @@ def translate_pairs(pairs, source_language, target_language, model_path, test_tr
             ]
             _, batches = loader._enumerate_render_items()
             failures = []
+            pending_items = []
             for batch in batches:
                 for line, source in zip(batch.block_lines, batch.block_texts):
-                    pair = pairs[line - 1]
+                    pending_items.append((pairs[line - 1], source, batch.breadcrumb))
+
+            def flush_gguf_group(group):
+                if len(group) == 1:
+                    pair, source, breadcrumb = group[0]
                     try:
-                        text, = loader._translate_batch([source], batch.breadcrumb)
+                        text, = loader._translate_batch([source], breadcrumb)
+                        pair["translation"] = clean_unicode(text).strip()
+                        if pair["translation"] and pair["translation"] != pair["source"]:
+                            emit({"type": "bilingual-pair-progress",
+                                  "pair": {"id": pair["id"], "translation": pair["translation"]}})
                     except Exception as error:
                         failures.append(error.__cause__ or error)
-                        # A failed model load affects all subsequent paragraphs.
                         if GGUF.model is None:
                             raise failures[-1]
-                        continue
+                    return
+
+                numbered = [{"id": idx, "en": item[1]} for idx, item in enumerate(group)]
+                prompt = (
+                    f"将下面的学术 Markdown 段落逐条从 {source_language} 翻译为 {target_language}。"
+                    "保留标题、列表编号、公式、图片链接、表格、数字、单位和缩写。"
+                    "严格返回 JSON 数组，只含 id 和 zh 字段。\n"
+                    + json.dumps(numbered, ensure_ascii=False)
+                )
+                mapped = {}
+                if test_translator:
+                    mapped = {idx: "译文：" + item[1] for idx, item in enumerate(group)}
+                else:
+                    try:
+                        total_chars = sum(len(item[1]) for item in group)
+                        content, _ = GGUF.complete(
+                            model_path,
+                            f"只输出准确的 {target_language} 译文。",
+                            prompt,
+                            max(256, min(4096, total_chars * 2 + 256)),
+                        )
+                        mapped = parse_batch_json_response(clean_unicode(content).rsplit("</think>", 1)[-1], len(group))
+                    except Exception as error:
+                        if GGUF.model is None:
+                            raise error
+
+                for idx, (pair, source, breadcrumb) in enumerate(group):
+                    text = clean_llm_markdown_answer(mapped.get(idx, "")) if idx in mapped else ""
+                    if not text:
+                        try:
+                            text, = loader._translate_batch([source], breadcrumb)
+                        except Exception as error:
+                            failures.append(error.__cause__ or error)
+                            if GGUF.model is None:
+                                raise failures[-1]
+                            continue
                     pair["translation"] = clean_unicode(text).strip()
                     if pair["translation"] and pair["translation"] != pair["source"]:
                         emit({"type": "bilingual-pair-progress",
                               "pair": {"id": pair["id"], "translation": pair["translation"]}})
+
+            current_group = []
+            current_chars = 0
+            for item in pending_items:
+                item_len = len(item[1])
+                if current_group and (len(current_group) >= 4 or current_chars + item_len > 1600):
+                    flush_gguf_group(current_group)
+                    current_group = []
+                    current_chars = 0
+                current_group.append(item)
+                current_chars += item_len
+            if current_group:
+                flush_gguf_group(current_group)
             if failures:
                 raise failures[0]
 

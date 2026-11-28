@@ -29,6 +29,10 @@ internal sealed partial class WorkspaceWindow
         public string azureKey { get; set; }
         public string azureRegion { get; set; }
         public string localModel { get; set; }
+        public string openaiBaseUrl { get; set; }
+        public string openaiKey { get; set; }
+        public string openaiModel { get; set; }
+        public int openaiConcurrency { get; set; }
     }
 
     private string TranslationSettingsPath { get { return Path.Combine(dataRoot, "translation-settings.bin"); } }
@@ -70,9 +74,30 @@ internal sealed partial class WorkspaceWindow
         bool recovered;
         var settings = LoadTranslationSettings(out recovered);
         var provider = ReadTranslationValue(request, "provider");
-        if (provider != "localai" && provider != "mymemory" && provider != "baidu" && provider != "azure")
+        if (provider != "localai" && provider != "mymemory" && provider != "baidu" && provider != "azure" && provider != "openai")
             throw new InvalidOperationException("请选择可用的翻译源。");
         settings.provider = provider;
+        if (provider == "openai")
+        {
+            var baseUrl = ReadTranslationValue(request, "openaiBaseUrl").TrimEnd('/');
+            var key = ReadTranslationValue(request, "key");
+            var model = ReadTranslationValue(request, "openaiModel");
+            int concurrency;
+            if (!int.TryParse(ReadTranslationValue(request, "openaiConcurrency"), out concurrency)) concurrency = 8;
+            concurrency = Math.Max(1, Math.Min(16, concurrency));
+            Uri parsedUri;
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out parsedUri) ||
+                (parsedUri.Scheme != Uri.UriSchemeHttp && parsedUri.Scheme != Uri.UriSchemeHttps))
+                throw new InvalidOperationException("请输入有效的 http(s) 接口地址（Base URL）。");
+            if (string.IsNullOrEmpty(model) || model.Length > 120)
+                throw new InvalidOperationException("请输入有效的模型名称（如 deepseek-chat）。");
+            if (key.Length != 0) settings.openaiKey = key;
+            if (string.IsNullOrEmpty(settings.openaiKey))
+                throw new InvalidOperationException("请输入云端大模型 API 密钥。");
+            settings.openaiBaseUrl = baseUrl;
+            settings.openaiModel = model;
+            settings.openaiConcurrency = concurrency;
+        }
         if (provider == "baidu")
         {
             var appId = ReadTranslationValue(request, "appId");
@@ -116,6 +141,10 @@ internal sealed partial class WorkspaceWindow
         PostWorkspaceMessage(web, new { type = "translation-settings", settings.provider,
             recovered,
             baiduConfigured = ValidTranslationKey(settings.baiduSecret), azureConfigured = ValidTranslationKey(settings.azureKey),
+            openaiConfigured = !string.IsNullOrEmpty(settings.openaiKey),
+            openaiBaseUrl = string.IsNullOrEmpty(settings.openaiBaseUrl) ? "https://api.deepseek.com" : settings.openaiBaseUrl,
+            openaiModel = string.IsNullOrEmpty(settings.openaiModel) ? "deepseek-chat" : settings.openaiModel,
+            openaiConcurrency = settings.openaiConcurrency > 0 ? settings.openaiConcurrency : 8,
             region = settings.azureRegion ?? "", localModel = String.IsNullOrEmpty(settings.localModel) ? "large" : settings.localModel,
             localConfigured = FindLocalLlmModel(settings.localModel) != null,
             localModelPath = LocalLlmModelPath(settings.localModel),
@@ -210,6 +239,29 @@ internal sealed partial class WorkspaceWindow
         }
     }
 
+    private static string NormalizeOpenAiChatUrl(string baseUrl)
+    {
+        var url = (baseUrl ?? "").Trim().TrimEnd('/');
+        if (url.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)) return url;
+        if (url.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) || url.EndsWith("/compatible-mode/v1", StringComparison.OrdinalIgnoreCase))
+            return url + "/chat/completions";
+        return url + "/v1/chat/completions";
+    }
+
+    private Dictionary<string, object> BuildOpenAiWorkerConfig(TranslationSettings settings)
+    {
+        if (settings == null || string.IsNullOrWhiteSpace(settings.openaiBaseUrl) ||
+            string.IsNullOrWhiteSpace(settings.openaiModel) || string.IsNullOrWhiteSpace(settings.openaiKey))
+            throw new InvalidOperationException("云端大模型设置不完整，请在「设置 → 翻译服务」中补全接口地址、模型名和密钥。");
+        return new Dictionary<string, object>
+        {
+            { "baseUrl", settings.openaiBaseUrl },
+            { "apiKey", settings.openaiKey },
+            { "model", settings.openaiModel },
+            { "concurrency", settings.openaiConcurrency > 0 ? settings.openaiConcurrency : 8 }
+        };
+    }
+
     private async Task<string> TranslateWithProvider(TranslationSettings settings, string source, string target, string text, string context, CancellationToken cancellation)
     {
         HttpRequestMessage request;
@@ -217,7 +269,30 @@ internal sealed partial class WorkspaceWindow
         {
             return await TranslateWithLocalLlm(source, target, text, context, settings.localModel, cancellation);
         }
-        if (settings.provider == "baidu")
+        if (settings.provider == "openai")
+        {
+            var cfg = BuildOpenAiWorkerConfig(settings);
+            var endpoint = NormalizeOpenAiChatUrl((string)cfg["baseUrl"]);
+            var targetName = target == "zh" ? "简体中文" : "English";
+            var extra = (context ?? "").Replace(text, "").Trim();
+            var userPrompt = "把以下原文翻译成" + targetName + "，只输出译文。保留数字、单位、公式和缩写。"
+                + (string.IsNullOrEmpty(extra) ? "" : "\n术语参考（仅供理解）：" + (extra.Length > 2400 ? extra.Substring(0, 2400) : extra))
+                + "\n原文：\n" + text;
+            request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            request.Headers.Add("Authorization", "Bearer " + (string)cfg["apiKey"]);
+            request.Content = new StringContent(translationJson.Serialize(new
+            {
+                model = (string)cfg["model"],
+                messages = new[]
+                {
+                    new { role = "system", content = "你是专业学术论文英译中译者。只输出准确译文，不解释。" },
+                    new { role = "user", content = userPrompt }
+                },
+                temperature = 0.1,
+                stream = false
+            }), Encoding.UTF8, "application/json");
+        }
+        else if (settings.provider == "baidu")
         {
             if (Encoding.UTF8.GetByteCount(text) > 1000 || !ValidTranslationKey(settings.baiduSecret))
                 throw new InvalidOperationException("请检查百度翻译凭证或缩短原文。");
@@ -248,6 +323,14 @@ internal sealed partial class WorkspaceWindow
             if (!response.IsSuccessStatusCode)
                 throw new InvalidOperationException("翻译服务返回 HTTP " + (int)response.StatusCode + "，请检查凭证、区域或额度。");
             var jsonValue = translationJson.DeserializeObject(await response.Content.ReadAsStringAsync());
+            if (settings.provider == "openai")
+            {
+                var root = (Dictionary<string, object>)jsonValue;
+                var choices = root["choices"] as object[];
+                if (choices == null || choices.Length == 0) throw new InvalidOperationException("云端模型未返回有效译文。");
+                var message = (Dictionary<string, object>)((Dictionary<string, object>)choices[0])["message"];
+                return Convert.ToString(message["content"]).Trim();
+            }
             var rows = jsonValue as object[];
             if (settings.provider == "baidu")
             {
