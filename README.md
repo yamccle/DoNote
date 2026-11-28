@@ -112,10 +112,10 @@
 
 | 文件 | 用途 | 大小 | SHA-256 |
 | --- | --- | ---: | --- |
-| [Windows x64 安装向导](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Setup-x64-r143.exe) | **推荐首次安装或无损覆盖升级**（免管理员权限，自动建快捷方式与注册卸载项） | 1,070,770,881 字节 | `319bcf70743059f65f4cdff6ebf2fa5e3a330e724d9b27d54a9f0143ac8c4019` |
-| [Windows x64 便携完整包](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Windows-x64-r143.zip) | 绿色免安装解压即用（适合 U 盘或自定义路径） | 1,070,602,889 字节 | `1bb94c5c936afeb86f2e32670d9727da023bfe75a4d5ed5c65247d1b41d9c55a` |
-| [r142 → r143 增量包](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Update-26.1142.0088-to-r143.zip) | 本机已安装 `r142`（亦可软件内自动检查更新） | 543,859 字节 | `e51ae87c8e730d5dc08af529e48d7919a74d4dcd9f366c357d01a3869a32c0af` |
-| [r143 发布记录](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-r143-release.json) | 源码提交、依赖锁与全量门禁结果 | 1,212 字节 | `c8e18d1d3483820a8ed2338c3c7be8e3635276b1a3a5fb403fb09fdb74aae108` |
+| [Windows x64 安装向导](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Setup-x64-r143.exe) | **推荐首次安装或无损覆盖升级**（免管理员权限，自动建快捷方式与注册卸载项） | 1,070,752,765 字节 | `04363fa3f5096f382f5e80e2d123df420e0950aad83b84ee120fa74abfd9bcb2` |
+| [Windows x64 便携完整包](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Windows-x64-r143.zip) | 绿色免安装解压即用（适合 U 盘或自定义路径） | 1,070,584,773 字节 | `6c0b7ce6e131677accc7859e8d11133feee2f17bd7a85b8a2570f9986f50a79e` |
+| [r142 → r143 增量包](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Update-26.1142.0088-to-r143.zip) | 本机已安装 `r142`（亦可软件内自动检查更新） | 572,846 字节 | `457380411c9866f9445eba769a8e5d97d86c2dff1e396a13e3a646c9ab3a0cbc` |
+| [r143 发布记录](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-r143-release.json) | 源码提交、依赖锁与全量门禁结果 | 1,212 字节 | `a06f3a38387a75b0ebe89d0569582821f7b803bb0e89533d47df6eb03768b53d` |
 | [SHA256SUMS.txt](https://github.com/yamccle/DoNote/releases/download/r143/SHA256SUMS.txt) | 发行产物公开 SHA-256 校验文本 | 382 字节 | 核对上述 4 项下载指纹 |
 
 ### 双轨安装、校验提示与无损升级
