@@ -68,6 +68,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw '工作台回归验证失败。' }
     & (Join-Path $stage 'ai-bridge/node.exe') (Join-Path $tests 'test-cloud-backup.mjs')
     if ($LASTEXITCODE -ne 0) { throw '云备份传输回归验证失败。' }
+    & (Join-Path $stage 'video-runtime/python.exe') (Join-Path $tests 'test-translation-acceleration.py')
+    if ($LASTEXITCODE -ne 0) { throw '文献翻译加速回归验证失败。' }
     & (Join-Path $tests 'test-release-update.ps1') -PreviousReleaseZip $previous -UpdateZip $patch
     & (Join-Path $tests 'test-update-chain.ps1')
     & (Join-Path $desktop 'package-release.ps1') -Source $stage -Destination $full
@@ -82,7 +84,7 @@ try {
         baseVersion = $base.version
         previousArchiveSha256 = (Get-FileHash -LiteralPath $previous).Hash.ToLowerInvariant()
         provenance = $manifest.provenance
-        checks = @('workspace', 'cloud-backup-transport', 'upgrade-and-rollback', 'online-update-chain', 'setup-installer', 'package-checksums')
+        checks = @('workspace', 'cloud-backup-transport', 'translation-acceleration', 'upgrade-and-rollback', 'online-update-chain', 'setup-installer', 'package-checksums')
         artifacts = @(foreach ($item in $patch,$full,$setup) {
             @{ name = [IO.Path]::GetFileName($item); sha256 = (Get-FileHash -LiteralPath $item).Hash.ToLowerInvariant() }
         })
