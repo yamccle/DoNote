@@ -112,17 +112,17 @@
 
 | 文件 | 用途 | 大小 | SHA-256 |
 | --- | --- | ---: | --- |
-| [Windows x64 安装向导](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Setup-x64-r143.exe) | **推荐首次安装或无损覆盖升级**（免管理员权限，自动建快捷方式与注册卸载项） | 1,070,752,765 字节 | `04363fa3f5096f382f5e80e2d123df420e0950aad83b84ee120fa74abfd9bcb2` |
-| [Windows x64 便携完整包](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Windows-x64-r143.zip) | 绿色免安装解压即用（适合 U 盘或自定义路径） | 1,070,584,773 字节 | `6c0b7ce6e131677accc7859e8d11133feee2f17bd7a85b8a2570f9986f50a79e` |
-| [r142 → r143 增量包](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-Update-26.1142.0088-to-r143.zip) | 本机已安装 `r142`（亦可软件内自动检查更新） | 572,846 字节 | `457380411c9866f9445eba769a8e5d97d86c2dff1e396a13e3a646c9ab3a0cbc` |
-| [r143 发布记录](https://github.com/yamccle/DoNote/releases/download/r143/DoNote-r143-release.json) | 源码提交、依赖锁与全量门禁结果 | 1,212 字节 | `a06f3a38387a75b0ebe89d0569582821f7b803bb0e89533d47df6eb03768b53d` |
-| [SHA256SUMS.txt](https://github.com/yamccle/DoNote/releases/download/r143/SHA256SUMS.txt) | 发行产物公开 SHA-256 校验文本 | 382 字节 | 核对上述 4 项下载指纹 |
+| [Windows x64 安装向导](https://github.com/yamccle/DoNote/releases/download/r144/DoNote-Setup-x64-r144.exe) | **推荐首次安装或无损覆盖升级**（免管理员权限，自动建快捷方式与注册卸载项） | 1,070,812,945 字节 | `0030c3b0e482b02ca4badaf6396f94c0afd2e09bf6b662c24eab812d65977e42` |
+| [Windows x64 便携完整包](https://github.com/yamccle/DoNote/releases/download/r144/DoNote-Windows-x64-r144.zip) | 绿色免安装解压即用（适合 U 盘或自定义路径） | 1,070,644,953 字节 | `47de3b37097c12a258042902e2e019069a025684f6babd1019a260a7a6cdbb27` |
+| [r143 → r144 增量包](https://github.com/yamccle/DoNote/releases/download/r144/DoNote-Update-26.1143.0089-to-r144.zip) | 本机已安装 `r143`（亦可软件内自动检查更新） | 638,644 字节 | `a417944f75382d405d4b0bab421856dd80b94877276a7934afe758dfd90c1a40` |
+| [r144 发布记录](https://github.com/yamccle/DoNote/releases/download/r144/DoNote-r144-release.json) | 源码提交、依赖锁与全量门禁结果 | 1,232 字节 | `d7f65f7a0a8e82f7078064d00691ac84a28ff141b16dd96fa627f9966e9b448e` |
+| [SHA256SUMS.txt](https://github.com/yamccle/DoNote/releases/download/r144/SHA256SUMS.txt) | 发行产物公开 SHA-256 校验文本 | 382 字节 | 核对上述 4 项下载指纹 |
 
 ### 双轨安装、校验提示与无损升级
 
-1. **方式 A · 用户级安装向导（推荐）**：在 Windows 10 或 11 x64 上双击 `DoNote-Setup-x64-r143.exe`，默认安装到 `%LocalAppData%\Programs\DoNote`（无需管理员权限），支持覆盖升级保留 `Data/` 与 `models/`，默认安全卸载亦完整保留个人资料库与模型。
-   - **SmartScreen 提示与 SHA-256 核对**：现阶段安装包暂未接入商业代码签名，从网络下载后首次运行如遇 Windows SmartScreen 拦截，点击 **「更多信息」→「仍要运行」** 即可；安装前可在 PowerShell 运行 `Get-FileHash .\DoNote-Setup-x64-r143.exe -Algorithm SHA256` 对照上表与 `SHA256SUMS.txt` 确认文件未被篡改。
-2. **方式 B · 便携绿色压缩包**：解压 `DoNote-Windows-x64-r143.zip` 至任意读写目录，双击 `DoNote.exe` 即可运行（依赖系统内置 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)）。
+1. **方式 A · 用户级安装向导（推荐）**：在 Windows 10 或 11 x64 上双击 `DoNote-Setup-x64-r144.exe`，默认安装到 `%LocalAppData%\Programs\DoNote`（无需管理员权限），支持覆盖升级保留 `Data/` 与 `models/`，默认安全卸载亦完整保留个人资料库与模型。
+   - **SmartScreen 提示与 SHA-256 核对**：现阶段安装包暂未接入商业代码签名，从网络下载后首次运行如遇 Windows SmartScreen 拦截，点击 **「更多信息」→「仍要运行」** 即可；安装前可在 PowerShell 运行 `Get-FileHash .\DoNote-Setup-x64-r144.exe -Algorithm SHA256` 对照上表与 `SHA256SUMS.txt` 确认文件未被篡改。
+2. **方式 B · 便携绿色压缩包**：解压 `DoNote-Windows-x64-r144.zip` 至任意读写目录，双击 `DoNote.exe` 即可运行（依赖系统内置 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)）。
 3. **软件内一键在线升级**：打开「设置 → 资料与系统 → 检查在线更新」（或点「选择本地 ZIP…」选增量包），DoNote 会自动计算最短更新路径、校验全部文件哈希、暂存编辑状态并按序无损升级（完整保留 `Data/` 与 `models/`）。
 4. **失败后继续**：某一步安装失败时，更新器会回退该步。再次检查更新时会从最后成功的版本选包。
 
