@@ -74,7 +74,7 @@ def create_llama_instance(model_path, n_ctx=8192):
 
 
 def parse_batch_json_response(answer, count):
-    text = str(answer or "").strip()
+    text = str(answer or "").rsplit("</think>", 1)[-1].strip()
     parsed = None
     try:
         parsed = json.loads(text)

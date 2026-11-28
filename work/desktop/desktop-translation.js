@@ -81,7 +81,8 @@
   });
   window.desktopTranslation={provider:()=>currentSettings().provider,label:providerLabel,request,ready,
    localConfigured:()=>!!settings?.localConfigured,localModelPath:()=>settings?.localModelPath||'',
-   modelCacheKey:(preference=currentSettings().localModel)=>settings?.localModelKeys?.[preference]||'',
+   openaiConfigured:()=>!!settings?.openaiConfigured,openaiModel:()=>settings?.openaiModel||'deepseek-chat',
+   modelCacheKey:(preference=currentSettings().localModel)=>preference==='openai'?'openai:'+(settings?.openaiModel||'openai'):(settings?.localModelKeys?.[preference]||''),
    localModelPreference:()=>currentSettings().localModel||'large'};
   $('openTranslationSettings').onclick=()=>{
    const current=currentSettings();

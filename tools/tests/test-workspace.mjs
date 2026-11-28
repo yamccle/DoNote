@@ -11,6 +11,7 @@ import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { FIRST_PAGE_TEXT, LAST_PAGE_TEXT, writeLargePdf } from './large-pdf.mjs';
 import { testAppendPdfExcerpt, testPdfBacklinksAndScannedOcr, testWebExcerpt } from './workspace-excerpts.mjs';
+import { testPdfTranslationBridges } from './workspace-translation.mjs';
 
 const MIB = 1024 ** 2;
 const PAGE_COUNT = 321;
@@ -786,6 +787,7 @@ try {
   await Promise.all([writeLargePdf(fixture, PAGE_COUNT, pdfMib * MIB), writeLargePdf(resumeFixture, 3, 0)]);
   browser = await chromium.launch({ headless: true, ...(browserPath ? { executablePath: browserPath } : channel ? { channel } : {}) });
   const { page, errors } = await openWorkspace(browser);
+  await testPdfTranslationBridges(page);
   await testWorkspaceNavigation(page, resumeFixture);
   await testCloudBackupUi(page);
   await testLongPdf(page, fixture);

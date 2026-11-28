@@ -368,6 +368,14 @@ def main(request):
                         current_chars = 0
                         for item in llm_items:
                             item_len = len(item[1])
+                            formula_count = sum(item[3].values())
+                            if formula_count >= 3:
+                                if current:
+                                    batches.append(current)
+                                    current = []
+                                    current_chars = 0
+                                batches.append([item])
+                                continue
                             if current and (len(current) >= 6 or current_chars + item_len > 1800):
                                 batches.append(current)
                                 current = []

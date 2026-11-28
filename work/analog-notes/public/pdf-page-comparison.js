@@ -25,7 +25,8 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
     + '<button type="button" class="secondary" data-next aria-label="对照下一页">›</button></div>'
     + '<select aria-label="对照缩放"></select>'
     + '<select aria-label="对照翻译模型"><option value="offline">快速离线</option>'
-    + '<option value="gguf">本地大模型</option></select>'
+    + '<option value="gguf">本地大模型</option>'
+    + '<option value="openai">云端大模型</option></select>'
     + '<span role="status"></span><button type="button" class="secondary" data-retry hidden>重试</button></header>'
     + '<div class="pdf-compare-scroll" tabindex="0" aria-label="原文与译文页面">'
     + '<div class="pdf-compare-pages"><div class="pdf-compare-captions"><span>原始 PDF</span>'
@@ -70,8 +71,11 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
 
   function createTranslation(run, choice) {
     const settings = window.desktopTranslation;
-    const preference = choice === 'offline' ? 'offline' : settings?.localModelPreference?.() || 'large';
-    const modelKey = choice === 'offline' ? 'offline-ct2-v2' : settings?.modelCacheKey?.(preference) || preference;
+    const preference = choice === 'offline' ? 'offline' :
+      choice === 'openai' ? 'openai' : (settings?.localModelPreference?.() || 'large');
+    const modelKey = choice === 'offline' ? 'offline-ct2-v2' :
+      choice === 'openai' ? (settings?.modelCacheKey?.('openai') || 'openai') :
+      (settings?.modelCacheKey?.(preference) || preference);
     return {
       preference, records: new Map(),
       key(number) { return JSON.stringify([run.fingerprint, modelKey, 'pdf2zh-full-v2-en-zh', number]); }
@@ -544,10 +548,14 @@ function installPdfPageComparison(session, {button, layout, originalBar, tools, 
       }
       const viewport = (await session.pdf.getPage(session.page)).getViewport({scale: 1});
       session.controller.signal.throwIfAborted();
+      await window.desktopTranslation?.ready?.().catch(() => {});
+      session.controller.signal.throwIfAborted();
       let choice;
       try { choice = localStorage.getItem(enginePreferenceKey); } catch {}
-      engine.value = ['offline', 'gguf'].includes(choice) ? choice :
+      const configuredProvider = window.desktopTranslation?.provider?.();
+      const defaultChoice = configuredProvider === 'openai' && window.desktopTranslation?.openaiConfigured?.() ? 'openai' :
         (window.desktopTranslation?.localConfigured?.() ? 'gguf' : 'offline');
+      engine.value = ['offline', 'gguf', 'openai'].includes(choice) ? choice : defaultChoice;
       const fragment = document.createDocumentFragment();
       const rows = Array.from({length: total}, (_, index) => {
         const row = document.createElement('section');

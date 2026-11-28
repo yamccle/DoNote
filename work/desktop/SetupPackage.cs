@@ -347,6 +347,7 @@ internal static class SetupPackage
             }
 
             if (TryDeleteFile(manifestPath)) removedFiles++;
+            TryDeleteDirectory(Path.Combine(installDir, "video-runtime", "vulkan-dependencies"));
 
             if (options.RemoveData)
             {

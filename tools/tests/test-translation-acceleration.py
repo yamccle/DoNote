@@ -57,9 +57,9 @@ def main():
     assert pgt.normalize_chat_completions_url("https://dashscope.aliyuncs.com/compatible-mode/v1") == "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     assert pgt.normalize_chat_completions_url("http://127.0.0.1:11434/v1/chat/completions") == "http://127.0.0.1:11434/v1/chat/completions"
 
-    # 2. Batch JSON response parser checks (clean JSON + markdown fenced JSON + out-of-range filtering)
+    # 2. Batch JSON response parser checks (clean JSON + markdown fenced JSON + <think> reasoning + out-of-range filtering)
     mapped = pgt.parse_batch_json_response(
-        '```json\n[{"id": 0, "zh": "第一段 {v0}"}, {"id": 1, "zh": "第二段"}, {"id": 99, "zh": "越界"}]\n```',
+        '<think>Let us draft [{"id": 0, "zh": "草稿"}]</think>\n```json\n[{"id": 0, "zh": "第一段 {v0}"}, {"id": 1, "zh": "第二段"}, {"id": 99, "zh": "越界"}]\n```',
         2,
     )
     assert mapped == {0: "第一段 {v0}", 1: "第二段"}, f"Unexpected parsed batch: {mapped}"

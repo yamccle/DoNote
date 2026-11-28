@@ -314,12 +314,17 @@ internal sealed partial class WorkspaceWindow
         openaiConfig = null;
         if (preference == "offline") return "offline";
         var settings = LoadTranslationSettings();
-        if (preference == "openai" || (settings != null && settings.provider == "openai"))
+        if (preference == "openai" || (preference == "auto" && settings != null && settings.provider == "openai"))
         {
             openaiConfig = BuildOpenAiWorkerConfig(settings);
             return "openai";
         }
         model = FindLocalLlmModel(preference);
+        if (model == null && settings != null && settings.provider == "openai" && !string.IsNullOrEmpty(settings.openaiKey))
+        {
+            openaiConfig = BuildOpenAiWorkerConfig(settings);
+            return "openai";
+        }
         if (model == null) throw new InvalidOperationException(LocalLlmMissingMessage(preference));
         return "gguf";
     }

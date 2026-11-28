@@ -439,14 +439,16 @@ function installPdfReflow(session,originalBar,tools,layout){
    };
    missing.sort((left,right)=>distance(left)-distance(right));
    let chars=0;
-   const limit=entries.some(entry=>entry.target.dataset.ready==='true')?3:1;
+   const hasReady=entries.some(entry=>entry.target.dataset.ready==='true');
+   const limit=provider==='openai'?10:(hasReady?5:1);
+   const charLimit=provider==='openai'?5000:2200;
    missing=missing.filter((entry,index)=>{
     chars+=entry.block.text.length;
-    return index<limit&&(index===0||chars<=1800);
+    return index<limit&&(index===0||chars<=charLimit);
    });
   }
   let failed='';
-  if((provider==='localai'||provider==='offline')&&window.BilingualBook?.available){
+  if((provider==='localai'||provider==='offline'||provider==='openai')&&window.BilingualBook?.available){
    try{
     const task=nativeTranslationQueue.then(()=>{
      signal.throwIfAborted();
@@ -633,10 +635,11 @@ function installPdfReflow(session,originalBar,tools,layout){
   run?.abort();
   const controller=new AbortController();
   const offline=bilingual&&bilingualEngine.value==='offline'&&window.BilingualBook?.available&&source==='en'&&target==='zh';
-  const preference=offline?'offline':window.desktopTranslation?.localModelPreference?.()||'large';
+  const configuredProvider=offline?'offline':window.desktopTranslation?.provider()||'mymemory';
+  const preference=offline?'offline':(configuredProvider==='openai'?'openai':window.desktopTranslation?.localModelPreference?.()||'large');
   run={bilingual,source,target,firstPage:page,next:page,
-   provider:offline?'offline':window.desktopTranslation?.provider()||'mymemory',
-   preference,modelKey:offline?'offline-ct2-v2':window.desktopTranslation?.modelCacheKey?.()||preference,
+   provider:configuredProvider,
+   preference,modelKey:offline?'offline-ct2-v2':window.desktopTranslation?.modelCacheKey?.(preference)||preference,
    signal:controller.signal,abort:()=>controller.abort(),pages:new Map(),failures:new Map(),layouts:new Map()};
   layout.hidden=true;tools.hidden=true;originalBar.hidden=true;
   documentPane.replaceChildren();view.hidden=false;scroller.scrollTop=0;

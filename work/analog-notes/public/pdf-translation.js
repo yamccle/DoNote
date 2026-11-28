@@ -20,6 +20,7 @@ function wellFormedText(value){
  }
  return clean;
 }
+const pdf2zhPending=new Map();
 const pdf2zhSources=new Map();
 function pdf2zhTaskPatch(id){
  const source=pdf2zhSources.get(id);
@@ -85,7 +86,7 @@ if(window.chrome?.webview){
     window.DoNoteTasks.upsert('pdf2zh:' + data.id, {
      kind: 'translate',
      ...pdf2zhTaskPatch(data.id),
-     detail: data.message || data.stage || '正在排版与翻译文档…',
+     detail: data.status || data.message || data.stage || '正在排版与翻译文档…',
      percent: Number.isFinite(data.percent) ? data.percent : null,
      state: 'running'
     });
@@ -227,6 +228,7 @@ window.PdfMathTranslate = {
      pdf2zhPending.delete(progressKey);
      pdf2zhPending.delete(paragraphKey);
      pdf2zhPending.delete(outputKey);
+     pdf2zhSources.delete(requestId);
     }
    },
   };
@@ -261,7 +263,7 @@ function onlineTranslationChunks(paragraph,limit=500){
 }
 async function translatePdfOnline(text,source,target,signal,progress,context='',provider=window.desktopTranslation?.provider()||'mymemory'){
  const bridge=window.desktopTranslation;
- if(provider==='localai'){progress(1,1);return bridge.request({action:'translate',provider,text,source,target,context},signal)}
+ if(provider==='localai'||provider==='openai'){progress(1,1);return bridge.request({action:'translate',provider,text,source,target,context},signal)}
  if(provider==='azure'){progress(1,1);return bridge.request({action:'translate',provider,text,source,target},signal)}
  const paragraphs=text.split('\n\n').map(part=>onlineTranslationChunks(part,provider==='baidu'?900:500)),total=paragraphs.reduce((sum,chunks)=>sum+chunks.length,0);
  const pair=[source,target].map(lang=>lang==='zh'?'zh-CN':lang).join('|');
@@ -354,7 +356,7 @@ function installPdfTranslationPanel(session, panel, showPanel) {
   if (!automatic) input.value = text;
   const {source,target} = storedTranslateLanguage();
   const bridge = window.desktopTranslation;
-  const key = JSON.stringify([source, target, text, bridge?.modelCacheKey?.()]);
+  const key = JSON.stringify([source, target, text, online, bridge?.provider?.(), bridge?.modelCacheKey?.()]);
   if (automatic && session.translationKey === key) return;
 
   session.translationController?.abort();
@@ -396,7 +398,7 @@ function installPdfTranslationPanel(session, panel, showPanel) {
     service = bridge?.label?.(provider) || 'MyMemory';
     translated = await translatePdfOnline(text, source, target, signal, (current, total) => {
      if (active()) status.textContent = '正在在线翻译…' + (total > 1 ? ' ' + current + ' / ' + total : '');
-    }, '', provider);
+    }, provider === 'openai' ? pageContext() : '', provider);
    } else if (useLlm || useOffline) {
     if (useLlm) {
      service = bridge.label('localai');
